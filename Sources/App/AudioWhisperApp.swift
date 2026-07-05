@@ -21,13 +21,13 @@ internal struct AudioWhisperApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("Dashboard...") {
-                    DashboardWindowManager.shared.showDashboardWindow()
+                Button(L10n.Menu.settings) {
+                    DashboardWindowManager.shared.showDashboardWindow(selectedNav: .preferences)
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
             CommandGroup(replacing: .windowArrangement) {
-                Button(LocalizedStrings.Menu.closeWindow) {
+                Button(L10n.Menu.closeWindow) {
                     NSApplication.shared.keyWindow?.orderOut(nil)
                 }
                 // No keyboard shortcut hints

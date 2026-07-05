@@ -20,7 +20,16 @@ internal final class TranscriptionRecord {
     var sourceAppBundleId: String?
     var sourceAppName: String?
     var sourceAppIconData: Data?
-    
+
+    // Transcription processing time (how long the ASR + correction took)
+    var transcriptionTime: TimeInterval?
+    var modelReadyTime: TimeInterval?
+    var asrTime: TimeInterval?
+    var correctionTime: TimeInterval?
+    var clipboardTime: TimeInterval?
+    var pasteTime: TimeInterval?
+    var endToEndTime: TimeInterval?
+
     init(
         text: String,
         provider: TranscriptionProvider,
@@ -30,7 +39,14 @@ internal final class TranscriptionRecord {
         characterCount: Int = 0,
         sourceAppBundleId: String? = nil,
         sourceAppName: String? = nil,
-        sourceAppIconData: Data? = nil
+        sourceAppIconData: Data? = nil,
+        transcriptionTime: TimeInterval? = nil,
+        modelReadyTime: TimeInterval? = nil,
+        asrTime: TimeInterval? = nil,
+        correctionTime: TimeInterval? = nil,
+        clipboardTime: TimeInterval? = nil,
+        pasteTime: TimeInterval? = nil,
+        endToEndTime: TimeInterval? = nil
     ) {
         self.id = UUID()
         self.text = text
@@ -43,6 +59,13 @@ internal final class TranscriptionRecord {
         self.sourceAppBundleId = sourceAppBundleId
         self.sourceAppName = sourceAppName
         self.sourceAppIconData = sourceAppIconData
+        self.transcriptionTime = transcriptionTime
+        self.modelReadyTime = modelReadyTime
+        self.asrTime = asrTime
+        self.correctionTime = correctionTime
+        self.clipboardTime = clipboardTime
+        self.pasteTime = pasteTime
+        self.endToEndTime = endToEndTime
     }
 }
 
@@ -89,6 +112,24 @@ internal extension TranscriptionRecord {
         }
         let truncatedText = String(text.prefix(maxLength))
         return truncatedText + "..."
+    }
+
+    var formattedTranscriptionTime: String? {
+        guard let t = transcriptionTime else { return nil }
+        if t < 1 {
+            return String(format: "%.0fms", t * 1000)
+        } else if t < 60 {
+            return String(format: "%.1fs", t)
+        } else {
+            let minutes = Int(t / 60)
+            let seconds = Int(t.truncatingRemainder(dividingBy: 60))
+            return "\(minutes)m \(seconds)s"
+        }
+    }
+
+    var hasDetailedTiming: Bool {
+        [modelReadyTime, asrTime, correctionTime, clipboardTime, pasteTime, endToEndTime]
+            .contains { ($0 ?? 0) > 0 }
     }
 
     var wordsPerMinute: Double? {

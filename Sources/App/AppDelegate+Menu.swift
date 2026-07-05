@@ -5,15 +5,16 @@ import UniformTypeIdentifiers
 internal extension AppDelegate {
     func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: LocalizedStrings.Menu.record, action: #selector(toggleRecordWindow), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Transcribe Audio File...", action: #selector(transcribeAudioFile), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.Menu.record, action: #selector(toggleRecordWindow), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.Menu.transcribeAudioFile, action: #selector(transcribeAudioFile), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.Menu.settings, action: #selector(showSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Dashboard...", action: #selector(showDashboard), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "Help", action: #selector(showHelp), keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: LocalizedStrings.Menu.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: L10n.Menu.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
         return menu
+    }
+
+    func refreshStatusMenu() {
+        statusItem?.menu = makeStatusMenu()
     }
 
     @MainActor @objc func showDashboard() {
@@ -24,14 +25,6 @@ internal extension AppDelegate {
     @MainActor @objc func showSettings() {
         Logger.app.info("Settings menu item selected")
         DashboardWindowManager.shared.showDashboardWindow(selectedNav: .preferences)
-    }
-
-    @objc func showHelp() {
-        let shouldOpenSettings = WelcomeWindow.showWelcomeDialog()
-
-        if shouldOpenSettings {
-            DashboardWindowManager.shared.showDashboardWindow()
-        }
     }
 
     @objc func transcribeAudioFile() {
@@ -49,8 +42,8 @@ internal extension AppDelegate {
             .init(filenameExtension: "flac") ?? .audio,
             .init(filenameExtension: "caf") ?? .audio
         ]
-        panel.message = "Select an audio file to transcribe"
-        panel.prompt = "Transcribe"
+        panel.message = L10n.Menu.audioFilePanelMessage
+        panel.prompt = L10n.Menu.transcribePrompt
 
         panel.begin { [weak self] response in
             guard response == .OK, let url = panel.url else { return }

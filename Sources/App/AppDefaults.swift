@@ -7,10 +7,14 @@ import Foundation
 ///   accidentally clobber user preferences or treat a first-run as "already configured".
 /// - AppStorage initial values across the app should match these constants.
 internal enum AppDefaults {
+    private static let productionBundleIdentifier = "com.audiowhisper.app"
+    private static let developmentBundleIdentifier = "com.audiowhisper-dev.app"
+
     internal enum Keys {
         static let transcriptionProvider = "transcriptionProvider"
         static let selectedWhisperModel = "selectedWhisperModel"
         static let selectedParakeetModel = "selectedParakeetModel"
+        static let openAITranscriptionModel = "openAITranscriptionModel"
 
         static let semanticCorrectionMode = "semanticCorrectionMode"
         static let semanticCorrectionModelRepo = "semanticCorrectionModelRepo"
@@ -42,6 +46,7 @@ internal enum AppDefaults {
     internal static let defaultTranscriptionProvider: TranscriptionProvider = .local
     internal static let defaultWhisperModel: WhisperModel = .base
     internal static let defaultParakeetModel: ParakeetModel = .v3Multilingual
+    internal static let defaultOpenAITranscriptionModel = "gpt-4o-transcribe"
     internal static let defaultSemanticCorrectionMode: SemanticCorrectionMode = .off
     internal static let defaultSemanticCorrectionModelRepo: String = "mlx-community/Qwen3-1.7B-4bit"
 
@@ -50,14 +55,15 @@ internal enum AppDefaults {
             Keys.transcriptionProvider: defaultTranscriptionProvider.rawValue,
             Keys.selectedWhisperModel: defaultWhisperModel.rawValue,
             Keys.selectedParakeetModel: defaultParakeetModel.rawValue,
+            Keys.openAITranscriptionModel: defaultOpenAITranscriptionModel,
 
             Keys.semanticCorrectionMode: defaultSemanticCorrectionMode.rawValue,
             Keys.semanticCorrectionModelRepo: defaultSemanticCorrectionModelRepo,
 
             Keys.startAtLogin: true,
             Keys.playCompletionSound: true,
-            Keys.transcriptionHistoryEnabled: false,
-            Keys.transcriptionRetentionPeriod: RetentionPeriod.oneMonth.rawValue,
+            Keys.transcriptionHistoryEnabled: true,
+            Keys.transcriptionRetentionPeriod: RetentionPeriod.forever.rawValue,
             Keys.maxModelStorageGB: 5.0,
             Keys.enableSmartPaste: false,
             Keys.immediateRecording: false,
@@ -74,5 +80,32 @@ internal enum AppDefaults {
             Keys.hasSetupParakeet: false
         ])
     }
-}
 
+    /// Dev builds use a different bundle identifier and therefore a different preferences domain.
+    /// If history was enabled in the production app, keep the dev app aligned on first launch so
+    /// local debugging doesn't silently disable history persistence.
+    internal static func migrateHistoryPreferencesIfNeeded(
+        bundle: Bundle = .main,
+        currentBundleIdentifier: String? = nil,
+        userDefaults: UserDefaults = .standard
+    ) {
+        let activeBundleIdentifier = currentBundleIdentifier ?? bundle.bundleIdentifier
+        guard activeBundleIdentifier == developmentBundleIdentifier else { return }
+
+        let hasLocalHistoryPreference = userDefaults.object(forKey: Keys.transcriptionHistoryEnabled) != nil
+        let hasLocalRetentionPreference = userDefaults.object(forKey: Keys.transcriptionRetentionPeriod) != nil
+        guard !hasLocalHistoryPreference, !hasLocalRetentionPreference else { return }
+
+        guard let productionDefaults = userDefaults.persistentDomain(forName: productionBundleIdentifier) else {
+            return
+        }
+
+        if let enabled = productionDefaults[Keys.transcriptionHistoryEnabled] as? Bool {
+            userDefaults.set(enabled, forKey: Keys.transcriptionHistoryEnabled)
+        }
+
+        if let retention = productionDefaults[Keys.transcriptionRetentionPeriod] as? String {
+            userDefaults.set(retention, forKey: Keys.transcriptionRetentionPeriod)
+        }
+    }
+}

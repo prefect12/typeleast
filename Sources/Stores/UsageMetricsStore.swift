@@ -4,7 +4,7 @@ import Observation
 private enum UsageMetricsConstants {
     static let defaultTypingWordsPerMinute: Double = 45.0
     static let averageCharactersPerWord: Double = 5.0
-    static let maxDailyActivityDays: Int = 90 // Keep 90 days of daily activity
+    static let maxDailyActivityDays: Int = 3650 // Keep long-running local history.
 }
 
 internal struct UsageSnapshot: Equatable {
@@ -73,7 +73,10 @@ internal final class UsageMetricsStore {
         static let totalCharacters = "usage.totalCharacters"
         static let lastUpdated = "usage.lastUpdated"
         static let dailyActivity = "usage.dailyActivity"
+        static let didImportDevelopmentUsage = "usage.didImportDevelopmentUsage"
     }
+
+    private static let developmentBundleIdentifier = "com.audiowhisper-dev.app"
     
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -84,6 +87,7 @@ internal final class UsageMetricsStore {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        Self.importDevelopmentUsageIfNeeded(defaults: defaults)
         let dailyData = defaults.dictionary(forKey: Keys.dailyActivity) as? [String: Int] ?? [:]
         self.snapshot = UsageSnapshot(
             totalSessions: defaults.integer(forKey: Keys.totalSessions),
@@ -228,6 +232,63 @@ internal final class UsageMetricsStore {
         defaults.set(snapshot.totalCharacters, forKey: Keys.totalCharacters)
         defaults.set(snapshot.lastUpdated, forKey: Keys.lastUpdated)
         defaults.set(snapshot.dailyActivity, forKey: Keys.dailyActivity)
+    }
+
+    private static func importDevelopmentUsageIfNeeded(defaults: UserDefaults) {
+        guard defaults === UserDefaults.standard else { return }
+        guard defaults.object(forKey: Keys.didImportDevelopmentUsage) == nil else { return }
+        guard let developmentDomain = defaults.persistentDomain(forName: developmentBundleIdentifier) else { return }
+
+        let developmentSessions = intValue(developmentDomain[Keys.totalSessions])
+        let developmentWords = intValue(developmentDomain[Keys.totalWords])
+        let developmentCharacters = intValue(developmentDomain[Keys.totalCharacters])
+        let developmentDuration = doubleValue(developmentDomain[Keys.totalDuration])
+        guard developmentSessions > 0 || developmentWords > 0 || developmentCharacters > 0 || developmentDuration > 0 else {
+            return
+        }
+
+        defaults.set(defaults.integer(forKey: Keys.totalSessions) + developmentSessions, forKey: Keys.totalSessions)
+        defaults.set(defaults.integer(forKey: Keys.totalWords) + developmentWords, forKey: Keys.totalWords)
+        defaults.set(defaults.integer(forKey: Keys.totalCharacters) + developmentCharacters, forKey: Keys.totalCharacters)
+        defaults.set(defaults.double(forKey: Keys.totalDuration) + developmentDuration, forKey: Keys.totalDuration)
+
+        let currentDaily = defaults.dictionary(forKey: Keys.dailyActivity) as? [String: Int] ?? [:]
+        let developmentDaily = intDictionary(developmentDomain[Keys.dailyActivity])
+        defaults.set(mergeDailyActivity(currentDaily, developmentDaily), forKey: Keys.dailyActivity)
+
+        let currentLastUpdated = defaults.object(forKey: Keys.lastUpdated) as? Date
+        let developmentLastUpdated = developmentDomain[Keys.lastUpdated] as? Date
+        defaults.set([currentLastUpdated, developmentLastUpdated].compactMap { $0 }.max(), forKey: Keys.lastUpdated)
+        defaults.set(true, forKey: Keys.didImportDevelopmentUsage)
+    }
+
+    private static func mergeDailyActivity(_ lhs: [String: Int], _ rhs: [String: Int]) -> [String: Int] {
+        var merged = lhs
+        for (day, count) in rhs {
+            merged[day, default: 0] += count
+        }
+        return merged
+    }
+
+    private static func intDictionary(_ value: Any?) -> [String: Int] {
+        guard let dictionary = value as? [String: Any] else { return [:] }
+        return dictionary.reduce(into: [:]) { result, entry in
+            result[entry.key] = intValue(entry.value)
+        }
+    }
+
+    private static func intValue(_ value: Any?) -> Int {
+        if let int = value as? Int { return int }
+        if let number = value as? NSNumber { return number.intValue }
+        if let string = value as? String { return Int(string) ?? 0 }
+        return 0
+    }
+
+    private static func doubleValue(_ value: Any?) -> Double {
+        if let double = value as? Double { return double }
+        if let number = value as? NSNumber { return number.doubleValue }
+        if let string = value as? String { return Double(string) ?? 0 }
+        return 0
     }
 
     static func estimatedWordCount(for text: String) -> Int {

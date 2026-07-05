@@ -34,19 +34,19 @@ internal struct CategoryEditorSheet: View {
 
         let cat = category ?? CategoryDefinition(
             id: "new-category",
-            displayName: "New Category",
+            displayName: L10n.Categories.newCategoryDefaultName,
             icon: "sparkles",
             colorHex: "#888888",
-            promptDescription: "Describe this category's purpose",
+            promptDescription: L10n.Categories.categoryPurposePlaceholder,
             promptTemplate: CategoryDefinition.fallback.promptTemplate,
             isSystem: false
         )
 
-        _displayName = State(initialValue: cat.displayName)
+        _displayName = State(initialValue: cat.localizedDisplayName)
         _identifier = State(initialValue: cat.id)
         _icon = State(initialValue: cat.icon)
         _accentColor = State(initialValue: cat.color)
-        _promptDescription = State(initialValue: cat.promptDescription)
+        _promptDescription = State(initialValue: cat.localizedPromptDescription)
         _promptTemplate = State(initialValue: cat.promptTemplate)
     }
 
@@ -61,11 +61,11 @@ internal struct CategoryEditorSheet: View {
                         .background(accentColor, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(displayName.isEmpty ? "Category Name" : displayName)
+                        Text(displayName.isEmpty ? L10n.Categories.categoryNamePlaceholder : displayName)
                             .font(.headline)
                             .lineLimit(1)
 
-                        Text(identifier.isEmpty ? "identifier" : identifier)
+                        Text(identifier.isEmpty ? L10n.Categories.identifierPlaceholder : identifier)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -75,7 +75,7 @@ internal struct CategoryEditorSheet: View {
                     Spacer(minLength: 0)
 
                     if isSystem {
-                        Text("System")
+                        Text(L10n.Categories.systemBadge)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
@@ -83,31 +83,31 @@ internal struct CategoryEditorSheet: View {
                 .padding(.vertical, 4)
             }
 
-            Section("Identity") {
-                TextField("Display Name", text: $displayName)
+            Section(L10n.Categories.identity) {
+                TextField(L10n.Categories.displayName, text: $displayName)
 
-                TextField("Identifier", text: $identifier)
+                TextField(L10n.Categories.identifier, text: $identifier)
                     .disabled(isSystem)
 
                 if isSystem {
-                    Text("System category identifiers can’t be changed.")
+                    Text(L10n.Categories.systemIdentifierHelp)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
 
-            Section("Appearance") {
-                TextField("Icon (SF Symbol)", text: $icon)
+            Section(L10n.Categories.appearance) {
+                TextField(L10n.Categories.icon, text: $icon)
 
-                ColorPicker("Color", selection: $accentColor, supportsOpacity: false)
+                ColorPicker(L10n.Categories.color, selection: $accentColor, supportsOpacity: false)
             }
 
-            Section("Correction") {
-                TextField("Description", text: $promptDescription, axis: .vertical)
+            Section(L10n.Categories.correction) {
+                TextField(L10n.Categories.description, text: $promptDescription, axis: .vertical)
                     .lineLimit(2...3)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Prompt Template")
+                    Text(L10n.Categories.promptTemplate)
                         .font(.subheadline.weight(.semibold))
 
                     TextEditor(text: $promptTemplate)
@@ -118,7 +118,7 @@ internal struct CategoryEditorSheet: View {
                                 .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
                         )
 
-                    Text("Instructions sent to the correction model for this category.")
+                    Text(L10n.Categories.promptTemplateHelp)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -134,7 +134,7 @@ internal struct CategoryEditorSheet: View {
 
             if !isNewCategory && !isSystem, let onDelete {
                 Section {
-                    Button("Delete Category", role: .destructive) {
+                    Button(L10n.Categories.deleteCategory, role: .destructive) {
                         onDelete()
                         dismiss()
                     }
@@ -142,17 +142,17 @@ internal struct CategoryEditorSheet: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle(isNewCategory ? "New Category" : "Edit Category")
+        .navigationTitle(isNewCategory ? L10n.Categories.newCategoryTitle : L10n.Categories.editCategoryTitle)
         .frame(width: 560, height: 680)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel", role: .cancel) {
+                Button(L10n.Common.cancel, role: .cancel) {
                     dismiss()
                 }
             }
 
             ToolbarItem(placement: .confirmationAction) {
-                Button(isNewCategory ? "Add" : "Save") {
+                Button(isNewCategory ? L10n.Common.add : L10n.Common.save) {
                     save()
                 }
                 .disabled(displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -167,14 +167,14 @@ internal struct CategoryEditorSheet: View {
         let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmedName.isEmpty {
-            validationError = "Display name is required."
+            validationError = L10n.Categories.displayNameRequired
             return
         }
 
         // Check for duplicate ID (only if ID changed or new category).
         let originalId = originalCategory?.id
         if trimmedId != originalId && categoryStore.containsCategory(withId: trimmedId) {
-            validationError = "A category with this identifier already exists."
+            validationError = L10n.Categories.duplicateIdentifier
             return
         }
 
