@@ -68,13 +68,11 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertEqual(L10n.Home.streakDays(5), "5 days")
         XCTAssertEqual(L10n.Menu.record, "Record")
         XCTAssertEqual(L10n.Menu.transcribeAudioFile, "Transcribe Audio File...")
-        XCTAssertEqual(L10n.Menu.dashboard, "Dashboard...")
-        XCTAssertEqual(L10n.Menu.settings, "Settings...")
-        XCTAssertEqual(L10n.Menu.help, "Help")
+        XCTAssertEqual(L10n.Menu.settings, "Settings")
         XCTAssertEqual(L10n.Menu.quit, "Quit")
         XCTAssertEqual(L10n.Categories.categoryTypes, "Category Types")
         XCTAssertEqual(L10n.Categories.name(for: "coding", fallback: ""), "Coding")
-        XCTAssertEqual(L10n.Categories.promptDescription(for: "terminal", fallback: ""), "Preserves CLI terms, flags, paths. Fixes: 'suit oh' → 'sudo', 'see dee' → 'cd'")
+        XCTAssertEqual(L10n.Categories.promptDescription(for: "terminal", fallback: ""), "Preserves CLI, GitHub, repo, deploy, monitoring terms, flags, and paths")
         XCTAssertEqual(L10n.Recording.preparingAudio, "Preparing audio...")
         XCTAssertEqual(L10n.Preferences.language, "Language")
         XCTAssertEqual(L10n.Common.cancel, "Cancel")
@@ -94,15 +92,13 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertEqual(L10n.Home.streakDays(5), "5 天")
         XCTAssertEqual(L10n.Menu.record, "录音")
         XCTAssertEqual(L10n.Menu.transcribeAudioFile, "转录音频文件...")
-        XCTAssertEqual(L10n.Menu.dashboard, "仪表盘...")
-        XCTAssertEqual(L10n.Menu.settings, "偏好设置...")
-        XCTAssertEqual(L10n.Menu.help, "帮助")
+        XCTAssertEqual(L10n.Menu.settings, "设置")
         XCTAssertEqual(L10n.Menu.quit, "退出")
         XCTAssertEqual(L10n.Categories.categoryTypes, "分类类型")
         XCTAssertEqual(L10n.Categories.appAssignments, "应用分配")
         XCTAssertEqual(L10n.Categories.systemBadge, "系统")
         XCTAssertEqual(L10n.Categories.name(for: "coding", fallback: ""), "编程")
-        XCTAssertTrue(L10n.Categories.promptDescription(for: "terminal", fallback: "").contains("保留 CLI 术语"))
+        XCTAssertTrue(L10n.Categories.promptDescription(for: "terminal", fallback: "").contains("保留 CLI、GitHub"))
         XCTAssertEqual(L10n.Recording.preparingAudio, "准备音频...")
         XCTAssertEqual(L10n.Preferences.language, "语言")
         XCTAssertEqual(L10n.Common.cancel, "取消")
@@ -114,11 +110,11 @@ class LanguageManagerTests: XCTestCase {
 
         LanguageManager.shared.current = .english
         XCTAssertEqual(coding.localizedDisplayName, "Coding")
-        XCTAssertTrue(coding.localizedPromptDescription.contains("Preserves syntax"))
+        XCTAssertTrue(coding.localizedPromptDescription.contains("Preserves code"))
 
         LanguageManager.shared.current = .chinese
         XCTAssertEqual(coding.localizedDisplayName, "编程")
-        XCTAssertTrue(coding.localizedPromptDescription.contains("保留语法"))
+        XCTAssertTrue(coding.localizedPromptDescription.contains("保留代码"))
     }
 
     func testL10nProviderDisplayName() {

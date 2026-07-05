@@ -7,10 +7,7 @@ internal extension AppDelegate {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: L10n.Menu.record, action: #selector(toggleRecordWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: L10n.Menu.transcribeAudioFile, action: #selector(transcribeAudioFile), keyEquivalent: ""))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: L10n.Menu.dashboard, action: #selector(showDashboard), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: L10n.Menu.settings, action: #selector(showSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: L10n.Menu.help, action: #selector(showHelp), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: L10n.Menu.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: ""))
         return menu
@@ -28,14 +25,6 @@ internal extension AppDelegate {
     @MainActor @objc func showSettings() {
         Logger.app.info("Settings menu item selected")
         DashboardWindowManager.shared.showDashboardWindow(selectedNav: .preferences)
-    }
-
-    @objc func showHelp() {
-        let shouldOpenSettings = WelcomeWindow.showWelcomeDialog()
-
-        if shouldOpenSettings {
-            DashboardWindowManager.shared.showDashboardWindow()
-        }
     }
 
     @objc func transcribeAudioFile() {

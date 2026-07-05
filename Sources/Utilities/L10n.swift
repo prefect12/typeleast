@@ -24,9 +24,7 @@ internal enum L10n {
     enum Menu {
         static var record: String { isCN ? "录音" : "Record" }
         static var transcribeAudioFile: String { isCN ? "转录音频文件..." : "Transcribe Audio File..." }
-        static var dashboard: String { isCN ? "仪表盘..." : "Dashboard..." }
-        static var settings: String { isCN ? "偏好设置..." : "Settings..." }
-        static var help: String { isCN ? "帮助" : "Help" }
+        static var settings: String { isCN ? "设置" : "Settings" }
         static var quit: String { isCN ? "退出" : "Quit" }
         static var closeWindow: String { isCN ? "关闭窗口" : "Close Window" }
         static var audioFilePanelMessage: String {
