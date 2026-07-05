@@ -51,15 +51,23 @@ internal enum PasteError: LocalizedError {
 internal class PasteManager {
     
     private let accessibilityManager: AccessibilityPermissionManager
+    private let userDefaults: UserDefaults
+    private let pasteboard: NSPasteboard
     
-    init(accessibilityManager: AccessibilityPermissionManager = AccessibilityPermissionManager()) {
+    init(
+        accessibilityManager: AccessibilityPermissionManager = AccessibilityPermissionManager(),
+        userDefaults: UserDefaults = .standard,
+        pasteboard: NSPasteboard = .general
+    ) {
         self.accessibilityManager = accessibilityManager
+        self.userDefaults = userDefaults
+        self.pasteboard = pasteboard
     }
     
     /// Attempts to paste text to the currently active application
     /// Uses CGEvent to simulate ⌘V 
     func pasteToActiveApp() {
-        let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
+        let enableSmartPaste = userDefaults.bool(forKey: "enableSmartPaste")
         
         if enableSmartPaste {
             // Use CGEvent to simulate ⌘V
@@ -74,11 +82,10 @@ internal class PasteManager {
     /// This is the function mentioned in the test requirements
     func smartPaste(into targetApp: NSRunningApplication?, text: String) {
         // First copy text to clipboard as fallback - this ensures users always have access to the text
-        let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
         
-        let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
+        let enableSmartPaste = userDefaults.bool(forKey: "enableSmartPaste")
         
         guard enableSmartPaste else {
             // SmartPaste is disabled in settings - fail with appropriate error

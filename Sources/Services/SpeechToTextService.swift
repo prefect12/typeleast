@@ -34,6 +34,7 @@ internal class SpeechToTextService {
     private let localWhisperService = LocalWhisperService()
     private let parakeetService = ParakeetService()
     private let keychainService: KeychainServiceProtocol
+    private let userDefaults: UserDefaults
     private let correctionService = SemanticCorrectionService()
 
     private static let technicalASRPrompt = """
@@ -48,8 +49,12 @@ internal class SpeechToTextService {
     \(technicalASRPrompt)
     """
     
-    init(keychainService: KeychainServiceProtocol = KeychainService.shared) {
+    init(
+        keychainService: KeychainServiceProtocol = KeychainService.shared,
+        userDefaults: UserDefaults = .standard
+    ) {
         self.keychainService = keychainService
+        self.userDefaults = userDefaults
     }
     
     // Raw transcription without semantic correction
@@ -77,7 +82,7 @@ internal class SpeechToTextService {
     }
 
     func transcribe(audioURL: URL) async throws -> String {
-        let useOpenAI = UserDefaults.standard.bool(forKey: "useOpenAI")
+        let useOpenAI = userDefaults.bool(forKey: "useOpenAI")
         if useOpenAI != false { // Default to OpenAI if not set
             let text = try await transcribeWithOpenAI(audioURL: audioURL)
             return await correctionService.correct(text: text, providerUsed: .openai)
@@ -117,7 +122,7 @@ internal class SpeechToTextService {
     }
     
     private var geminiBaseURL: String {
-        let custom = UserDefaults.standard.string(forKey: "geminiBaseURL") ?? ""
+        let custom = userDefaults.string(forKey: "geminiBaseURL") ?? ""
         if custom.isEmpty {
             return "https://generativelanguage.googleapis.com"
         }
@@ -129,7 +134,7 @@ internal class SpeechToTextService {
     /// If the custom URL contains "audio/transcriptions", it's treated as a full endpoint.
     /// Otherwise, "/audio/transcriptions" is appended to the base URL.
     private var openAITranscriptionEndpoint: String {
-        let custom = UserDefaults.standard.string(forKey: "openAIBaseURL") ?? ""
+        let custom = userDefaults.string(forKey: "openAIBaseURL") ?? ""
         if custom.isEmpty {
             return "https://api.openai.com/v1/audio/transcriptions"
         }
@@ -145,7 +150,7 @@ internal class SpeechToTextService {
 
     /// Detects if the endpoint is Azure OpenAI based on the URL pattern
     private var isAzureOpenAI: Bool {
-        let custom = UserDefaults.standard.string(forKey: "openAIBaseURL") ?? ""
+        let custom = userDefaults.string(forKey: "openAIBaseURL") ?? ""
         return custom.contains(".openai.azure.com")
     }
 
@@ -347,7 +352,7 @@ internal class SpeechToTextService {
         guard Arch.isAppleSilicon else {
             throw SpeechToTextError.transcriptionFailed("Parakeet requires an Apple Silicon Mac.")
         }
-        let modeRaw = UserDefaults.standard.string(forKey: "semanticCorrectionMode") ?? SemanticCorrectionMode.off.rawValue
+        let modeRaw = userDefaults.string(forKey: "semanticCorrectionMode") ?? SemanticCorrectionMode.off.rawValue
         let semanticCorrectionMode = SemanticCorrectionMode(rawValue: modeRaw) ?? .off
         let shouldWarmup = semanticCorrectionMode != .off
         // Ensure managed Python environment with uv
@@ -355,7 +360,7 @@ internal class SpeechToTextService {
         let pythonPath = pyURL.path
         do {
             if shouldWarmup {
-                let modelRepo = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionModelRepo) ?? AppDefaults.defaultSemanticCorrectionModelRepo
+                let modelRepo = userDefaults.string(forKey: AppDefaults.Keys.semanticCorrectionModelRepo) ?? AppDefaults.defaultSemanticCorrectionModelRepo
                 async let warmupTask: Void = MLDaemonManager.shared.warmup(type: "mlx", repo: modelRepo)
                 async let transcription = parakeetService.transcribe(audioFileURL: audioURL, pythonPath: pythonPath)
                 let (text, _) = try await (transcription, warmupTask)

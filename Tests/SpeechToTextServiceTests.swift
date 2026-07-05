@@ -6,11 +6,16 @@ class SpeechToTextServiceTests: XCTestCase {
     var service: SpeechToTextService!
     var mockKeychain: MockKeychainService!
     var testAudioURL: URL!
+    private var defaultsSuiteName: String!
+    private var defaults: UserDefaults!
     
     override func setUp() {
         super.setUp()
+        defaultsSuiteName = "com.audiowhisper.tests.speech.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
         mockKeychain = MockKeychainService()
-        service = SpeechToTextService(keychainService: mockKeychain)
+        service = SpeechToTextService(keychainService: mockKeychain, userDefaults: defaults)
         
         // Create a temporary test audio file
         testAudioURL = createTestAudioFile()
@@ -23,6 +28,9 @@ class SpeechToTextServiceTests: XCTestCase {
         service = nil
         mockKeychain = nil
         testAudioURL = nil
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defaults = nil
+        defaultsSuiteName = nil
         super.tearDown()
     }
     
@@ -44,10 +52,10 @@ class SpeechToTextServiceTests: XCTestCase {
     func testProviderSelectionDefaultsToOpenAI() async {
         // Create a fresh mock keychain with no keys
         let cleanMockKeychain = MockKeychainService()
-        let cleanService = SpeechToTextService(keychainService: cleanMockKeychain)
+        let cleanService = SpeechToTextService(keychainService: cleanMockKeychain, userDefaults: defaults)
         
         // Clear any existing preference
-        UserDefaults.standard.removeObject(forKey: "useOpenAI")
+        defaults.removeObject(forKey: "useOpenAI")
         
         // Since we can't easily mock the network calls, we'll test that the right path is taken
         // by checking that it fails with the expected error (missing API key)
@@ -62,7 +70,7 @@ class SpeechToTextServiceTests: XCTestCase {
     }
     
     func testProviderSelectionUsesOpenAIWhenSet() async {
-        UserDefaults.standard.set(true, forKey: "useOpenAI")
+        defaults.set(true, forKey: "useOpenAI")
         
         do {
             _ = try await service.transcribe(audioURL: testAudioURL)
@@ -77,9 +85,9 @@ class SpeechToTextServiceTests: XCTestCase {
     func testProviderSelectionUsesGeminiWhenSet() async {
         // Create a fresh mock keychain with no keys
         let cleanMockKeychain = MockKeychainService()
-        let cleanService = SpeechToTextService(keychainService: cleanMockKeychain)
+        let cleanService = SpeechToTextService(keychainService: cleanMockKeychain, userDefaults: defaults)
         
-        UserDefaults.standard.set(false, forKey: "useOpenAI")
+        defaults.set(false, forKey: "useOpenAI")
         
         do {
             _ = try await cleanService.transcribe(audioURL: testAudioURL)
@@ -217,7 +225,7 @@ class SpeechToTextServiceTests: XCTestCase {
     func testAPIKeyFromKeychain() {
         // Test the keychain reading functionality with mock
         let mockKeychain = MockKeychainService()
-        let _ = SpeechToTextService(keychainService: mockKeychain)
+        let _ = SpeechToTextService(keychainService: mockKeychain, userDefaults: defaults)
         
         // Test that it returns nil when no key is found
         let apiKey = mockKeychain.getQuietly(service: "AudioWhisper", account: "OpenAI")
@@ -232,7 +240,7 @@ class SpeechToTextServiceTests: XCTestCase {
     // MARK: - Concurrent Access Tests
     
     func testConcurrentTranscriptionCalls() async {
-        UserDefaults.standard.set(true, forKey: "useOpenAI")
+        defaults.set(true, forKey: "useOpenAI")
         
         let tasks = (0..<5).map { _ in
             Task {
@@ -256,7 +264,7 @@ class SpeechToTextServiceTests: XCTestCase {
     // MARK: - Performance Tests
     
     func testProviderSelectionPerformance() {
-        UserDefaults.standard.set(true, forKey: "useOpenAI")
+        defaults.set(true, forKey: "useOpenAI")
         
         measure {
             Task {
@@ -312,7 +320,7 @@ extension SpeechToTextServiceTests {
     
     func testTranscribeWithParakeetProviderMissingPython() async {
         let invalidPythonPath = "/invalid/python/path"
-        UserDefaults.standard.set(invalidPythonPath, forKey: "parakeetPythonPath")
+        defaults.set(invalidPythonPath, forKey: "parakeetPythonPath")
         
         do {
             _ = try await service.transcribe(audioURL: testAudioURL, provider: .parakeet)
@@ -332,7 +340,7 @@ extension SpeechToTextServiceTests {
         }
         
         // Clean up
-        UserDefaults.standard.removeObject(forKey: "parakeetPythonPath")
+        defaults.removeObject(forKey: "parakeetPythonPath")
     }
     
     func testParakeetProviderWithSystemPython() async {
@@ -340,7 +348,7 @@ extension SpeechToTextServiceTests {
         
         // Only test if system Python exists
         if FileManager.default.fileExists(atPath: systemPythonPath) {
-            UserDefaults.standard.set(systemPythonPath, forKey: "parakeetPythonPath")
+            defaults.set(systemPythonPath, forKey: "parakeetPythonPath")
             
             do {
                 _ = try await service.transcribe(audioURL: testAudioURL, provider: .parakeet)
@@ -354,7 +362,7 @@ extension SpeechToTextServiceTests {
             }
             
             // Clean up
-            UserDefaults.standard.removeObject(forKey: "parakeetPythonPath")
+            defaults.removeObject(forKey: "parakeetPythonPath")
         }
     }
     
@@ -369,22 +377,22 @@ extension SpeechToTextServiceTests {
 
     func testOpenAIEndpointDefaultsToStandard() {
         // Clear any custom URL
-        UserDefaults.standard.removeObject(forKey: "openAIBaseURL")
+        defaults.removeObject(forKey: "openAIBaseURL")
 
         // The default should be the standard OpenAI endpoint
         // We can't directly test the private property, but we can verify the behavior
         // by checking that a request would go to the right place (via error message or mock)
-        let customURL = UserDefaults.standard.string(forKey: "openAIBaseURL")
+        let customURL = defaults.string(forKey: "openAIBaseURL")
         XCTAssertNil(customURL)
     }
 
     func testOpenAIEndpointWithBaseURL() {
         // Test that a base URL gets /audio/transcriptions appended
         let baseURL = "https://api.example.com/v1"
-        UserDefaults.standard.set(baseURL, forKey: "openAIBaseURL")
+        defaults.set(baseURL, forKey: "openAIBaseURL")
 
         // Verify it was set
-        let storedURL = UserDefaults.standard.string(forKey: "openAIBaseURL")
+        let storedURL = defaults.string(forKey: "openAIBaseURL")
         XCTAssertEqual(storedURL, baseURL)
 
         // The endpoint logic should append /audio/transcriptions
@@ -392,16 +400,16 @@ extension SpeechToTextServiceTests {
         XCTAssertFalse(baseURL.contains("audio/transcriptions"))
 
         // Cleanup
-        UserDefaults.standard.removeObject(forKey: "openAIBaseURL")
+        defaults.removeObject(forKey: "openAIBaseURL")
     }
 
     func testOpenAIEndpointWithFullAzureURL() {
         // Test that a full Azure URL is used as-is
         let azureURL = "https://my-resource.openai.azure.com/openai/deployments/whisper/audio/transcriptions?api-version=2024-02-01"
-        UserDefaults.standard.set(azureURL, forKey: "openAIBaseURL")
+        defaults.set(azureURL, forKey: "openAIBaseURL")
 
         // Verify it was set
-        let storedURL = UserDefaults.standard.string(forKey: "openAIBaseURL")
+        let storedURL = defaults.string(forKey: "openAIBaseURL")
         XCTAssertEqual(storedURL, azureURL)
 
         // The endpoint logic should use this URL as-is
@@ -412,16 +420,16 @@ extension SpeechToTextServiceTests {
         XCTAssertTrue(azureURL.contains(".openai.azure.com"))
 
         // Cleanup
-        UserDefaults.standard.removeObject(forKey: "openAIBaseURL")
+        defaults.removeObject(forKey: "openAIBaseURL")
     }
 
     func testOpenAIEndpointWithProxyURL() {
         // Test proxy service like aiswarm.me
         let proxyURL = "https://aiswarm.me/v1"
-        UserDefaults.standard.set(proxyURL, forKey: "openAIBaseURL")
+        defaults.set(proxyURL, forKey: "openAIBaseURL")
 
         // Verify it was set
-        let storedURL = UserDefaults.standard.string(forKey: "openAIBaseURL")
+        let storedURL = defaults.string(forKey: "openAIBaseURL")
         XCTAssertEqual(storedURL, proxyURL)
 
         // Should NOT be detected as Azure
@@ -431,7 +439,7 @@ extension SpeechToTextServiceTests {
         XCTAssertFalse(proxyURL.contains("audio/transcriptions"))
 
         // Cleanup
-        UserDefaults.standard.removeObject(forKey: "openAIBaseURL")
+        defaults.removeObject(forKey: "openAIBaseURL")
     }
 
     func testAzureEndpointDetection() {
@@ -460,14 +468,14 @@ extension SpeechToTextServiceTests {
     func testOpenAIEndpointPreservesQueryString() {
         // Test that query strings are preserved for full endpoints
         let urlWithQuery = "https://my-resource.openai.azure.com/openai/deployments/whisper/audio/transcriptions?api-version=2024-02-01"
-        UserDefaults.standard.set(urlWithQuery, forKey: "openAIBaseURL")
+        defaults.set(urlWithQuery, forKey: "openAIBaseURL")
 
-        let storedURL = UserDefaults.standard.string(forKey: "openAIBaseURL")
+        let storedURL = defaults.string(forKey: "openAIBaseURL")
         XCTAssertEqual(storedURL, urlWithQuery)
         XCTAssertTrue(storedURL?.contains("api-version=") == true)
 
         // Cleanup
-        UserDefaults.standard.removeObject(forKey: "openAIBaseURL")
+        defaults.removeObject(forKey: "openAIBaseURL")
     }
 
 }

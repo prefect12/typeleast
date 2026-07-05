@@ -3,29 +3,35 @@ import XCTest
 
 final class AppDefaultsTests: XCTestCase {
     private var defaultsSuiteName: String!
+    private var productionDomainName: String!
     private var defaults: UserDefaults!
 
     override func setUp() {
         super.setUp()
         defaultsSuiteName = "com.audiowhisper.tests.appdefaults.\(UUID().uuidString)"
+        productionDomainName = "\(defaultsSuiteName!).production"
         defaults = UserDefaults(suiteName: defaultsSuiteName)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defaults.removePersistentDomain(forName: productionDomainName)
     }
 
     override func tearDown() {
         defaults.removePersistentDomain(forName: defaultsSuiteName)
+        defaults.removePersistentDomain(forName: productionDomainName)
         defaults = nil
+        productionDomainName = nil
         defaultsSuiteName = nil
         super.tearDown()
     }
 
     func testMigrateHistoryPreferencesCopiesProductionSettingsForDevBuild() {
-        defaults.set(true, forKey: AppDefaults.Keys.transcriptionHistoryEnabled, inDomain: "com.audiowhisper.app")
-        defaults.set(RetentionPeriod.threeMonths.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod, inDomain: "com.audiowhisper.app")
+        defaults.set(true, forKey: AppDefaults.Keys.transcriptionHistoryEnabled, inDomain: productionDomainName)
+        defaults.set(RetentionPeriod.threeMonths.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod, inDomain: productionDomainName)
 
         AppDefaults.migrateHistoryPreferencesIfNeeded(
             currentBundleIdentifier: "com.audiowhisper-dev.app",
-            userDefaults: defaults
+            userDefaults: defaults,
+            sourceBundleIdentifier: productionDomainName
         )
 
         XCTAssertEqual(defaults.object(forKey: AppDefaults.Keys.transcriptionHistoryEnabled) as? Bool, true)
@@ -35,12 +41,13 @@ final class AppDefaultsTests: XCTestCase {
     func testMigrateHistoryPreferencesDoesNotOverrideExistingDevSettings() {
         defaults.set(false, forKey: AppDefaults.Keys.transcriptionHistoryEnabled)
         defaults.set(RetentionPeriod.forever.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod)
-        defaults.set(true, forKey: AppDefaults.Keys.transcriptionHistoryEnabled, inDomain: "com.audiowhisper.app")
-        defaults.set(RetentionPeriod.oneWeek.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod, inDomain: "com.audiowhisper.app")
+        defaults.set(true, forKey: AppDefaults.Keys.transcriptionHistoryEnabled, inDomain: productionDomainName)
+        defaults.set(RetentionPeriod.oneWeek.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod, inDomain: productionDomainName)
 
         AppDefaults.migrateHistoryPreferencesIfNeeded(
             currentBundleIdentifier: "com.audiowhisper-dev.app",
-            userDefaults: defaults
+            userDefaults: defaults,
+            sourceBundleIdentifier: productionDomainName
         )
 
         XCTAssertEqual(defaults.object(forKey: AppDefaults.Keys.transcriptionHistoryEnabled) as? Bool, false)
