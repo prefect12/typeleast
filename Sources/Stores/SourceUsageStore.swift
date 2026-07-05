@@ -60,9 +60,48 @@ internal struct SourceUsageStats: Codable, Identifiable, Equatable {
         return String(chars)
     }
     
-    func nsImage() -> NSImage? {
-        guard let iconData = iconData else { return nil }
-        return NSImage(data: iconData)
+    func nsImage(workspace: NSWorkspace = .shared) -> NSImage? {
+        if let iconData, let image = NSImage(data: iconData) {
+            return image
+        }
+        guard bundleIdentifier != SourceAppInfo.unknown.bundleIdentifier,
+              let appURL = workspace.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            return nil
+        }
+        return workspace.icon(forFile: appURL.path)
+    }
+}
+
+private struct PersistedSourceUsageStats: Codable {
+    let bundleIdentifier: String
+    let displayName: String
+    let totalWords: Int
+    let totalCharacters: Int
+    let sessionCount: Int
+    let lastUsed: Date
+    let fallbackSymbolName: String?
+
+    init(_ stats: SourceUsageStats) {
+        self.bundleIdentifier = stats.bundleIdentifier
+        self.displayName = stats.displayName
+        self.totalWords = stats.totalWords
+        self.totalCharacters = stats.totalCharacters
+        self.sessionCount = stats.sessionCount
+        self.lastUsed = stats.lastUsed
+        self.fallbackSymbolName = stats.fallbackSymbolName
+    }
+
+    var stats: SourceUsageStats {
+        SourceUsageStats(
+            bundleIdentifier: bundleIdentifier,
+            displayName: displayName,
+            totalWords: totalWords,
+            totalCharacters: totalCharacters,
+            sessionCount: sessionCount,
+            lastUsed: lastUsed,
+            iconData: nil,
+            fallbackSymbolName: fallbackSymbolName
+        )
     }
 }
 
@@ -75,7 +114,9 @@ internal final class SourceUsageStore {
     private let storageKey = "sourceUsage.stats"
     private let importDevelopmentKey = "sourceUsage.didImportDevelopmentUsage"
     private let developmentBundleIdentifier = "com.audiowhisper-dev.app"
-    private let maxSources = 50
+    private static let maxSources = 50
+    private static let maxPersistedPayloadBytes = 512 * 1024
+    private static let legacyIconDataField = Data(#""iconData""#.utf8)
     
     private(set) var orderedStats: [SourceUsageStats] = []
     private var statsByBundle: [String: SourceUsageStats] = [:]
@@ -84,11 +125,14 @@ internal final class SourceUsageStore {
         self.defaults = defaults
         importDevelopmentSourcesIfNeeded()
         if let data = defaults.data(forKey: storageKey) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            if let decoded = try? decoder.decode([String: SourceUsageStats].self, from: data) {
+            if let decoded = Self.decodeStats(from: data) {
                 statsByBundle = decoded
-                orderedStats = decoded.values.sorted(by: defaultSort)
+                let originalCount = statsByBundle.count
+                trimIfNeeded()
+                refreshOrderedStats()
+                if shouldRewritePersistedPayload(data: data, originalCount: originalCount) {
+                    persist()
+                }
                 return
             }
         }
@@ -136,18 +180,15 @@ internal final class SourceUsageStore {
     }
     
     private func trimIfNeeded() {
-        guard statsByBundle.count > maxSources else { return }
-        let surplus = statsByBundle.count - maxSources
-        let candidates = orderedStats.reversed()
-        for stat in candidates.prefix(surplus) {
+        guard statsByBundle.count > Self.maxSources else { return }
+        let candidates = statsByBundle.values.sorted(by: Self.defaultSort).dropFirst(Self.maxSources)
+        for stat in candidates {
             statsByBundle[stat.bundleIdentifier] = nil
         }
     }
 
     private func persist() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(statsByBundle) {
+        if let data = Self.encodeStats(statsByBundle) {
             defaults.set(data, forKey: storageKey)
         }
     }
@@ -160,15 +201,13 @@ internal final class SourceUsageStore {
             return
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        guard let developmentStats = try? decoder.decode([String: SourceUsageStats].self, from: developmentData) else {
+        guard let developmentStats = Self.decodeStats(from: developmentData) else {
             return
         }
 
         var mergedStats: [String: SourceUsageStats] = [:]
         if let currentData = defaults.data(forKey: storageKey),
-           let currentStats = try? decoder.decode([String: SourceUsageStats].self, from: currentData) {
+           let currentStats = Self.decodeStats(from: currentData) {
             mergedStats = currentStats
         }
 
@@ -189,25 +228,56 @@ internal final class SourceUsageStore {
             }
         }
 
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(mergedStats) {
+        mergedStats = Self.trimmed(mergedStats)
+        if let data = Self.encodeStats(mergedStats) {
             defaults.set(data, forKey: storageKey)
             defaults.set(true, forKey: importDevelopmentKey)
         }
     }
     
     private func refreshOrderedStats() {
-        orderedStats = statsByBundle.values.sorted(by: defaultSort)
+        orderedStats = statsByBundle.values.sorted(by: Self.defaultSort)
     }
-    
-    private var defaultSort: (SourceUsageStats, SourceUsageStats) -> Bool {
-        { lhs, rhs in
-            if lhs.totalWords == rhs.totalWords {
-                return lhs.lastUsed > rhs.lastUsed
-            }
-            return lhs.totalWords > rhs.totalWords
+
+    private func shouldRewritePersistedPayload(data: Data, originalCount: Int) -> Bool {
+        data.count > Self.maxPersistedPayloadBytes ||
+            data.range(of: Self.legacyIconDataField) != nil ||
+            statsByBundle.count != originalCount
+    }
+
+    private static func decodeStats(from data: Data) -> [String: SourceUsageStats]? {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let persisted = try? decoder.decode([String: PersistedSourceUsageStats].self, from: data) {
+            return persisted.mapValues(\.stats)
         }
+        if let legacy = try? decoder.decode([String: SourceUsageStats].self, from: data) {
+            return legacy.mapValues { stat in
+                var lightweight = stat
+                lightweight.iconData = nil
+                return lightweight
+            }
+        }
+        return nil
+    }
+
+    private static func encodeStats(_ stats: [String: SourceUsageStats]) -> Data? {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try? encoder.encode(stats.mapValues(PersistedSourceUsageStats.init))
+    }
+
+    private static func trimmed(_ stats: [String: SourceUsageStats]) -> [String: SourceUsageStats] {
+        guard stats.count > maxSources else { return stats }
+        let keep = Set(stats.values.sorted(by: defaultSort).prefix(maxSources).map(\.bundleIdentifier))
+        return stats.filter { keep.contains($0.key) }
+    }
+
+    private static func defaultSort(lhs: SourceUsageStats, rhs: SourceUsageStats) -> Bool {
+        if lhs.totalWords == rhs.totalWords {
+            return lhs.lastUsed > rhs.lastUsed
+        }
+        return lhs.totalWords > rhs.totalWords
     }
 
     /// Clears all persisted source usage stats.

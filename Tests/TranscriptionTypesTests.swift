@@ -58,6 +58,21 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertEqual(decodedLocal, .local)
         XCTAssertEqual(decodedParakeet, .parakeet)
     }
+
+    func testTranscriptionLanguageCases() {
+        XCTAssertEqual(TranscriptionLanguage.auto.apiLanguageCode, nil)
+        XCTAssertEqual(TranscriptionLanguage.chinese.apiLanguageCode, "zh")
+        XCTAssertEqual(TranscriptionLanguage.english.apiLanguageCode, "en")
+        XCTAssertTrue(TranscriptionLanguage.allCases.contains(.auto))
+        XCTAssertTrue(TranscriptionLanguage.allCases.contains(.chinese))
+        XCTAssertTrue(TranscriptionLanguage.allCases.contains(.english))
+    }
+
+    func testTranscriptionLanguageInstructionsPreventTranslation() {
+        XCTAssertTrue(TranscriptionLanguage.auto.speechInstruction.contains("do not translate"))
+        XCTAssertTrue(TranscriptionLanguage.chinese.speechInstruction.contains("Transcribe in Chinese"))
+        XCTAssertTrue(TranscriptionLanguage.english.speechInstruction.contains("Transcribe in English"))
+    }
     
     // MARK: - WhisperModel Tests
     

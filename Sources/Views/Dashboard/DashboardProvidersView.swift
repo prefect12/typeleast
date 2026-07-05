@@ -8,6 +8,7 @@ internal struct DashboardProvidersView: View {
     @AppStorage(AppDefaults.Keys.hasSetupParakeet) var hasSetupParakeet = false
     @AppStorage(AppDefaults.Keys.hasSetupLocalLLM) var hasSetupLocalLLM = false
     @AppStorage(AppDefaults.Keys.openAITranscriptionModel) var openAITranscriptionModel = AppDefaults.defaultOpenAITranscriptionModel
+    @AppStorage(AppDefaults.Keys.transcriptionLanguage) var transcriptionLanguage = AppDefaults.defaultTranscriptionLanguage
     @AppStorage("openAIBaseURL") var openAIBaseURL = ""
     @AppStorage("geminiBaseURL") var geminiBaseURL = ""
     @AppStorage(AppDefaults.Keys.maxModelStorageGB) var maxModelStorageGB = 5.0
@@ -54,6 +55,17 @@ internal struct DashboardProvidersView: View {
                 Text("Engine")
             } footer: {
                 Text(engineConfig(for: transcriptionProvider).tagline)
+            }
+
+            Section {
+                Picker(L10n.Provider.audioLanguage, selection: $transcriptionLanguage) {
+                    ForEach(TranscriptionLanguage.allCases) { language in
+                        Text(language.displayName).tag(language)
+                    }
+                }
+                .pickerStyle(.menu)
+            } footer: {
+                Text(L10n.Provider.audioLanguageFooter)
             }
 
             if transcriptionProvider == .openai || transcriptionProvider == .gemini {

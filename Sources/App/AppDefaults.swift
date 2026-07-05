@@ -15,6 +15,7 @@ internal enum AppDefaults {
         static let selectedWhisperModel = "selectedWhisperModel"
         static let selectedParakeetModel = "selectedParakeetModel"
         static let openAITranscriptionModel = "openAITranscriptionModel"
+        static let transcriptionLanguage = "transcriptionLanguage"
 
         static let semanticCorrectionMode = "semanticCorrectionMode"
         static let semanticCorrectionModelRepo = "semanticCorrectionModelRepo"
@@ -47,6 +48,7 @@ internal enum AppDefaults {
     internal static let defaultWhisperModel: WhisperModel = .base
     internal static let defaultParakeetModel: ParakeetModel = .v3Multilingual
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-transcribe"
+    internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
     internal static let defaultSemanticCorrectionMode: SemanticCorrectionMode = .off
     internal static let defaultSemanticCorrectionModelRepo: String = "mlx-community/Qwen3-1.7B-4bit"
 
@@ -56,6 +58,7 @@ internal enum AppDefaults {
             Keys.selectedWhisperModel: defaultWhisperModel.rawValue,
             Keys.selectedParakeetModel: defaultParakeetModel.rawValue,
             Keys.openAITranscriptionModel: defaultOpenAITranscriptionModel,
+            Keys.transcriptionLanguage: defaultTranscriptionLanguage.rawValue,
 
             Keys.semanticCorrectionMode: defaultSemanticCorrectionMode.rawValue,
             Keys.semanticCorrectionModelRepo: defaultSemanticCorrectionModelRepo,

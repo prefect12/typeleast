@@ -82,8 +82,16 @@ internal enum DashboardTheme {
         NSColor(red: red / 255.0, green: green / 255.0, blue: blue / 255.0, alpha: 1)
     }
 
-    private static func adaptive(light: NSColor, dark _: NSColor) -> Color {
-        Color(nsColor: light)
+    private static func adaptive(light: NSColor, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let match = appearance.bestMatch(from: [
+                .accessibilityHighContrastDarkAqua,
+                .darkAqua,
+                .accessibilityHighContrastAqua,
+                .aqua
+            ])
+            return match == .darkAqua || match == .accessibilityHighContrastDarkAqua ? dark : light
+        })
     }
 }
 
@@ -166,7 +174,6 @@ internal struct DashboardView: View {
             .layoutPriority(1)
         }
         .background(DashboardTheme.pageBg)
-        .preferredColorScheme(.light)
         .id(languageManager.current)
         .task {
             await metricsStore.bootstrapIfNeeded()
@@ -189,7 +196,9 @@ internal struct DashboardView: View {
         case .providers:
             DashboardProvidersView()
         case .preferences:
-            DashboardPreferencesView()
+            DashboardPreferencesView {
+                selectionModel.selectedNav = .recording
+            }
         case .permissions:
             DashboardPermissionsView()
         }

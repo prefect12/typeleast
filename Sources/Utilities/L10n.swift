@@ -157,6 +157,13 @@ internal enum L10n {
             default: return provider.capitalized
             }
         }
+
+        static var audioLanguage: String { isCN ? "音频语言" : "Audio Language" }
+        static var audioLanguageFooter: String {
+            isCN
+                ? "自动识别会保留原始语种；短录音识别错误时可手动指定语言。"
+                : "Auto-detect preserves the spoken language. Choose a language when short clips are detected incorrectly."
+        }
     }
 
     // MARK: - Categories
@@ -278,6 +285,7 @@ internal enum L10n {
         static var startAtLoginDesc: String { isCN ? "登录时自动启动 AudioWhisper" : "Launch AudioWhisper when you sign in." }
         static var expressMode: String { isCN ? "快捷模式" : "Express Mode" }
         static var expressModeDesc: String { isCN ? "快捷键直接开始/停止录音" : "Hotkey immediately starts and stops recording." }
+        static var configureShortcut: String { isCN ? "设置快捷键..." : "Configure Shortcut..." }
         static var autoBoost: String { isCN ? "自动增强麦克风" : "Auto-Boost Microphone" }
         static var autoBoostDesc: String { isCN ? "录音时暂时最大化麦克风输入" : "Temporarily maximize mic input while recording." }
         static var smartPaste: String { isCN ? "智能粘贴" : "Smart Paste" }

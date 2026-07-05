@@ -161,6 +161,7 @@ internal final class DataManager: DataManagerProtocol {
             
             // Perform cleanup after save to maintain retention policy
             await cleanupExpiredRecordsQuietly()
+            TimingAnalysisStore.shared.invalidate()
             
         } catch {
             Logger.dataManager.error("Failed to save transcription record: \(error.localizedDescription)")
@@ -265,6 +266,7 @@ internal final class DataManager: DataManagerProtocol {
             // Rebuild usage metrics from remaining records
             let remainingRecords = allRecords.filter { $0.id != record.id }
             UsageMetricsStore.shared.rebuild(using: remainingRecords)
+            TimingAnalysisStore.shared.invalidate()
             
         } catch {
             Logger.dataManager.error("Failed to delete transcription record: \(error.localizedDescription)")
@@ -293,6 +295,7 @@ internal final class DataManager: DataManagerProtocol {
             // Reset usage metrics and source stats since all records are gone
             UsageMetricsStore.shared.reset()
             SourceUsageStore.shared.reset()
+            TimingAnalysisStore.shared.invalidate()
             
         } catch {
             Logger.dataManager.error("Failed to delete all transcription records: \(error.localizedDescription)")
@@ -324,6 +327,7 @@ internal final class DataManager: DataManagerProtocol {
                 record.endToEndTime = endToEndTime
             }
             try context.save()
+            TimingAnalysisStore.shared.invalidate()
         } catch {
             Logger.dataManager.error("Failed to update timing for record \(recordID): \(error.localizedDescription)")
             throw DataManagerError.saveFailed(error)
@@ -360,6 +364,7 @@ internal final class DataManager: DataManagerProtocol {
             
             if !expiredRecords.isEmpty {
                 Logger.dataManager.info("Cleaned up \(expiredRecords.count) expired transcription records")
+                TimingAnalysisStore.shared.invalidate()
             }
             
         } catch {
@@ -413,6 +418,7 @@ internal final class MockDataManager: DataManagerProtocol {
         guard isHistoryEnabled else { return }
         
         records.append(record)
+        TimingAnalysisStore.shared.invalidate()
         
         Logger.dataManager.info("Mock saved transcription record with ID: \(record.id)")
     }
@@ -450,6 +456,7 @@ internal final class MockDataManager: DataManagerProtocol {
         
         // Rebuild usage metrics from remaining records
         UsageMetricsStore.shared.rebuild(using: records)
+        TimingAnalysisStore.shared.invalidate()
     }
     
     func deleteAllRecords() async throws {
@@ -460,6 +467,7 @@ internal final class MockDataManager: DataManagerProtocol {
         // Reset usage metrics and source stats since all records are gone
         UsageMetricsStore.shared.reset()
         SourceUsageStore.shared.reset()
+        TimingAnalysisStore.shared.invalidate()
     }
 
     func updateTiming(for recordID: UUID, pasteTime: TimeInterval?, endToEndTime: TimeInterval?) async throws {
@@ -470,6 +478,7 @@ internal final class MockDataManager: DataManagerProtocol {
         if let endToEndTime {
             record.endToEndTime = endToEndTime
         }
+        TimingAnalysisStore.shared.invalidate()
     }
     
     func cleanupExpiredRecords() async throws {
@@ -482,6 +491,7 @@ internal final class MockDataManager: DataManagerProtocol {
         
         if removedCount > 0 {
             Logger.dataManager.info("Mock cleaned up \(removedCount) expired transcription records")
+            TimingAnalysisStore.shared.invalidate()
         }
     }
     

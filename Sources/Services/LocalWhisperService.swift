@@ -141,7 +141,12 @@ internal final class LocalWhisperService: Sendable {
         memoryPressureSource?.cancel()
     }
     
-    func transcribe(audioFileURL: URL, model: WhisperModel, progressCallback: (@Sendable (String) -> Void)? = nil) async throws -> String {
+    func transcribe(
+        audioFileURL: URL,
+        model: WhisperModel,
+        language: TranscriptionLanguage = .auto,
+        progressCallback: (@Sendable (String) -> Void)? = nil
+    ) async throws -> String {
         let modelName = model.whisperKitModelName
 
         // Get or create WhisperKit instance from actor-isolated cache
@@ -156,8 +161,7 @@ internal final class LocalWhisperService: Sendable {
         // task: .translate would perform X→English translation
         var decodingOptions = DecodingOptions()
         decodingOptions.task = .transcribe
-        // Let WhisperKit auto-detect the language
-        decodingOptions.language = nil
+        decodingOptions.language = language.apiLanguageCode
 
         // Transcribe the audio file
         progressCallback?("Processing audio...")

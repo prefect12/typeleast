@@ -71,6 +71,7 @@ private extension UISnapshotTests {
             "hasSetupParakeet",
             "hasSetupLocalLLM",
             "openAIBaseURL",
+            "transcriptionLanguage",
             "geminiBaseURL",
             "maxModelStorageGB",
             "globalHotkey",
