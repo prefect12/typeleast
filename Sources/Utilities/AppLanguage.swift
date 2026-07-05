@@ -21,6 +21,7 @@ internal final class LanguageManager: ObservableObject {
     static let shared = LanguageManager()
 
     private static let key = "appLanguage"
+    internal static let defaultLanguage: AppLanguage = .chinese
 
     @Published var current: AppLanguage {
         didSet {
@@ -29,7 +30,11 @@ internal final class LanguageManager: ObservableObject {
     }
 
     private init() {
-        let raw = UserDefaults.standard.string(forKey: Self.key) ?? ""
-        self.current = AppLanguage(rawValue: raw) ?? .english
+        self.current = Self.initialLanguage()
+    }
+
+    internal static func initialLanguage(defaults: UserDefaults = .standard) -> AppLanguage {
+        let raw = defaults.string(forKey: Self.key) ?? ""
+        return AppLanguage(rawValue: raw) ?? defaultLanguage
     }
 }
