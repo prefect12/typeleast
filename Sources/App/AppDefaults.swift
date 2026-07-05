@@ -87,7 +87,8 @@ internal enum AppDefaults {
     internal static func migrateHistoryPreferencesIfNeeded(
         bundle: Bundle = .main,
         currentBundleIdentifier: String? = nil,
-        userDefaults: UserDefaults = .standard
+        userDefaults: UserDefaults = .standard,
+        sourceBundleIdentifier: String = productionBundleIdentifier
     ) {
         let activeBundleIdentifier = currentBundleIdentifier ?? bundle.bundleIdentifier
         guard activeBundleIdentifier == developmentBundleIdentifier else { return }
@@ -96,7 +97,7 @@ internal enum AppDefaults {
         let hasLocalRetentionPreference = userDefaults.object(forKey: Keys.transcriptionRetentionPeriod) != nil
         guard !hasLocalHistoryPreference, !hasLocalRetentionPreference else { return }
 
-        guard let productionDefaults = userDefaults.persistentDomain(forName: productionBundleIdentifier) else {
+        guard let productionDefaults = userDefaults.persistentDomain(forName: sourceBundleIdentifier) else {
             return
         }
 
