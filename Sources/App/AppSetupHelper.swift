@@ -126,27 +126,14 @@ internal class AppSetupHelper {
     }
     
     
-    static func checkFirstRun() -> Bool {
-        let hasExistingProvider = UserDefaults.standard.string(forKey: "transcriptionProvider") != nil
-        let hasCompletedWelcome = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
-        let lastWelcomeVersion = UserDefaults.standard.string(forKey: "lastWelcomeVersion") ?? "0"
-        
-        let currentWelcomeVersion = AppDefaults.currentWelcomeVersion
-        
-        // Show welcome for new users OR existing users who haven't seen the SmartPaste welcome
-        let shouldShowWelcome = (!hasExistingProvider && !hasCompletedWelcome) || (lastWelcomeVersion != currentWelcomeVersion)
-        
-        if shouldShowWelcome {
-            if !hasExistingProvider {
-                // First run - default to LocalWhisper
-                UserDefaults.standard.set(TranscriptionProvider.local.rawValue, forKey: "transcriptionProvider")
-            }
-            return true
-        } else if !hasExistingProvider {
-            // Provider was somehow reset - default to LocalWhisper
-            UserDefaults.standard.set(TranscriptionProvider.local.rawValue, forKey: "transcriptionProvider")
+    static func checkFirstRun(userDefaults: UserDefaults = .standard) -> Bool {
+        if userDefaults.string(forKey: AppDefaults.Keys.transcriptionProvider) == nil {
+            userDefaults.set(AppDefaults.defaultTranscriptionProvider.rawValue, forKey: AppDefaults.Keys.transcriptionProvider)
         }
-        
+
+        userDefaults.set(true, forKey: AppDefaults.Keys.hasCompletedWelcome)
+        userDefaults.set(AppDefaults.currentWelcomeVersion, forKey: AppDefaults.Keys.lastWelcomeVersion)
+
         return false
     }
     

@@ -33,7 +33,7 @@ internal class WindowController {
     
     func toggleRecordWindow(_ window: NSWindow? = nil, completion: (() -> Void)? = nil) {
         // Don't show recorder window during first-run welcome experience
-        let hasCompletedWelcome = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
+        let hasCompletedWelcome = UserDefaults.standard.object(forKey: AppDefaults.Keys.hasCompletedWelcome) as? Bool ?? true
         if !hasCompletedWelcome {
             completion?()
             return

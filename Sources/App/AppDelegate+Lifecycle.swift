@@ -12,6 +12,7 @@ internal extension AppDelegate {
 
         // Ensure a single, consistent set of defaults before any UI/services read from UserDefaults/AppStorage.
         AppDefaults.register()
+        _ = AppSetupHelper.checkFirstRun()
 
         do {
             try DataManager.shared.initialize()
@@ -49,12 +50,6 @@ internal extension AppDelegate {
         )
 
         setupNotificationObservers()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            if AppSetupHelper.checkFirstRun() {
-                self.showWelcomeAndSettings()
-            }
-        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

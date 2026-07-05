@@ -223,14 +223,10 @@ final class WindowControllerTests: XCTestCase {
         XCTAssertNoThrow(windowController.toggleRecordWindow())
     }
     
-    func testDefaultWelcomeState() {
-        // When hasCompletedWelcome is not set, should default to false
+    func testDefaultWelcomeStateAllowsRecording() {
         UserDefaults.standard.removeObject(forKey: "hasCompletedWelcome")
-        
-        let hasCompleted = UserDefaults.standard.bool(forKey: "hasCompletedWelcome")
-        XCTAssertFalse(hasCompleted)
-        
-        // Should block window toggle
+
+        XCTAssertNil(UserDefaults.standard.object(forKey: "hasCompletedWelcome"))
         XCTAssertNoThrow(windowController.toggleRecordWindow())
     }
 }
