@@ -2,14 +2,62 @@ import SwiftUI
 import HotKey
 import AppKit
 
+internal enum HotKeyRecordingResult: Equatable {
+    case keyCombo(String)
+    case modifierOnly(PressAndHoldKey)
+}
+
+internal enum GlobalShortcutDisplay {
+    private static let modifierOnlyPrefix = "modifierOnly:"
+
+    static func storedValue(for key: PressAndHoldKey) -> String {
+        "\(modifierOnlyPrefix)\(key.rawValue)"
+    }
+
+    static func modifierOnlyKey(from value: String) -> PressAndHoldKey? {
+        if value.hasPrefix(modifierOnlyPrefix) {
+            let rawValue = String(value.dropFirst(modifierOnlyPrefix.count))
+            return PressAndHoldKey(rawValue: rawValue)
+        }
+
+        switch value {
+        case "Right Command (⌘)", "右 Command (⌘)":
+            return .rightCommand
+        case "Left Command (⌘)", "左 Command (⌘)":
+            return .leftCommand
+        case "Right Option (⌥)", "右 Option (⌥)":
+            return .rightOption
+        case "Left Option (⌥)", "左 Option (⌥)":
+            return .leftOption
+        case "Right Control (⌃)", "右 Control (⌃)":
+            return .rightControl
+        case "Left Control (⌃)", "左 Control (⌃)":
+            return .leftControl
+        case "Globe / Fn (🌐)":
+            return .globe
+        default:
+            break
+        }
+
+        return PressAndHoldKey.allCases.first { key in
+            value == key.displayName || value == key.rawValue
+        }
+    }
+
+    static func text(for value: String) -> String {
+        modifierOnlyKey(from: value)?.displayName ?? value
+    }
+}
+
 internal struct HotKeyRecorderView: View {
     @Binding var isRecording: Bool
     @Binding var recordedModifiers: NSEvent.ModifierFlags
     @Binding var recordedKey: Key?
-    let onComplete: (String) -> Void
+    let onComplete: (HotKeyRecordingResult) -> Void
     
-    @State private var displayText = "Press keys..."
+    @State private var displayText = L10n.RecordingSettings.pressKeys
     @State private var eventMonitor: Any?
+    @State private var pendingModifierOnlyKey: PressAndHoldKey?
     
     private var accentColor: Color { DashboardTheme.accent }
     
@@ -21,22 +69,28 @@ internal struct HotKeyRecorderView: View {
                 .padding(.vertical, 4)
                 .background(accentColor.opacity(0.14))
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                .onAppear {
-                    startRecording()
-                }
-                .onDisappear {
-                    stopRecording()
-                }
             
-            Button("Cancel") {
+            Button(L10n.Common.cancel) {
                 stopRecording()
                 isRecording = false
             }
             .buttonStyle(.bordered)
         }
+        .onAppear {
+            startRecording()
+        }
+        .onDisappear {
+            stopRecording()
+        }
     }
     
     private func startRecording() {
+        guard eventMonitor == nil else { return }
+        displayText = HotKeyRecorderLogic.displayText(
+            modifiers: recordedModifiers,
+            key: recordedKey,
+            modifierOnlyKey: pendingModifierOnlyKey
+        )
         eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             handleKeyEvent(event)
             return nil // Consume the event
@@ -52,50 +106,115 @@ internal struct HotKeyRecorderView: View {
     
     private func handleKeyEvent(_ event: NSEvent) {
         if event.type == .flagsChanged {
-            recordedModifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+            let modifierOnlyKey = HotKeyRecorderLogic.modifierOnlyKey(fromKeyCode: event.keyCode)
+            let currentModifiers = HotKeyRecorderLogic.modifiers(from: event.modifierFlags)
+
+            if let modifierOnlyKey {
+                if currentModifiers.contains(modifierOnlyKey.modifierFlag) {
+                    pendingModifierOnlyKey = modifierOnlyKey
+                    recordedModifiers = modifierOnlyKey.modifierFlag
+                    recordedKey = nil
+                    updateDisplayText()
+                } else if pendingModifierOnlyKey == modifierOnlyKey, recordedKey == nil {
+                    completeRecording(.modifierOnly(modifierOnlyKey))
+                }
+
+                return
+            }
+
+            if !currentModifiers.isEmpty {
+                pendingModifierOnlyKey = nil
+                recordedModifiers = currentModifiers
+                recordedKey = nil
+            }
             updateDisplayText()
         } else if event.type == .keyDown {
-            if let key = keyFromKeyCode(event.keyCode) {
+            pendingModifierOnlyKey = nil
+            recordedModifiers = HotKeyRecorderLogic.modifiers(from: event.modifierFlags)
+
+            if let key = HotKeyRecorderLogic.keyFromKeyCode(event.keyCode) {
                 recordedKey = key
                 
                 // Complete the recording if we have both modifiers and a key
-                if (recordedKey != nil && !recordedModifiers.isEmpty) ||
-                   (recordedKey != nil && isFunctionKey(key) && recordedModifiers.isEmpty) {
-                    if isValidHotkey(modifiers: recordedModifiers, key: key) {
-                        let hotkeyString = formatHotkey(modifiers: recordedModifiers, key: key)
-                        stopRecording()
-                        onComplete(hotkeyString)
-                        isRecording = false
+                if HotKeyRecorderLogic.isComplete(modifiers: recordedModifiers, key: key) {
+                    if HotKeyRecorderLogic.isValidHotkey(modifiers: recordedModifiers, key: key) {
+                        let hotkeyString = HotKeyRecorderLogic.formatHotkey(modifiers: recordedModifiers, key: key)
+                        completeRecording(.keyCombo(hotkeyString))
                     } else {
                         // Invalid hotkey, show error briefly
-                        displayText = "Invalid combination"
+                        displayText = L10n.RecordingSettings.invalidHotkey
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                             recordedModifiers = []
                             recordedKey = nil
-                            displayText = "Press keys..."
+                            pendingModifierOnlyKey = nil
+                            displayText = L10n.RecordingSettings.pressKeys
                         }
                     }
+                } else {
+                    updateDisplayText()
                 }
             }
         }
     }
     
     private func updateDisplayText() {
+        displayText = HotKeyRecorderLogic.displayText(
+            modifiers: recordedModifiers,
+            key: recordedKey,
+            modifierOnlyKey: pendingModifierOnlyKey
+        )
+    }
+
+    private func completeRecording(_ result: HotKeyRecordingResult) {
+        stopRecording()
+        onComplete(result)
+        isRecording = false
+    }
+}
+
+internal enum HotKeyRecorderLogic {
+    private static let modifierMask: NSEvent.ModifierFlags = [.command, .shift, .option, .control]
+
+    static func modifiers(from flags: NSEvent.ModifierFlags) -> NSEvent.ModifierFlags {
+        flags.intersection(modifierMask)
+    }
+
+    static func displayText(
+        modifiers: NSEvent.ModifierFlags,
+        key: Key?,
+        modifierOnlyKey: PressAndHoldKey? = nil
+    ) -> String {
+        if let modifierOnlyKey, key == nil {
+            return "\(modifierOnlyKey.displayName)  \(L10n.RecordingSettings.releaseToSave)"
+        }
+
         var parts: [String] = []
         
-        if recordedModifiers.contains(.command) { parts.append("⌘") }
-        if recordedModifiers.contains(.shift) { parts.append("⇧") }
-        if recordedModifiers.contains(.option) { parts.append("⌥") }
-        if recordedModifiers.contains(.control) { parts.append("⌃") }
+        if modifiers.contains(.command) { parts.append("⌘") }
+        if modifiers.contains(.shift) { parts.append("⇧") }
+        if modifiers.contains(.option) { parts.append("⌥") }
+        if modifiers.contains(.control) { parts.append("⌃") }
         
-        if let key = recordedKey {
+        if let key {
             parts.append(keyToString(key))
         }
-        
-        displayText = parts.isEmpty ? "Press keys..." : parts.joined()
+
+        if parts.isEmpty {
+            return L10n.RecordingSettings.pressKeys
+        }
+
+        if key == nil {
+            return "\(parts.joined())  \(L10n.RecordingSettings.pressAnotherKey)"
+        }
+
+        return parts.joined()
+    }
+
+    static func modifierOnlyKey(fromKeyCode keyCode: UInt16) -> PressAndHoldKey? {
+        PressAndHoldKey.allCases.first { $0.keyCode == keyCode }
     }
     
-    private func formatHotkey(modifiers: NSEvent.ModifierFlags, key: Key) -> String {
+    static func formatHotkey(modifiers: NSEvent.ModifierFlags, key: Key) -> String {
         var parts: [String] = []
         
         if modifiers.contains(.command) { parts.append("⌘") }
@@ -107,8 +226,13 @@ internal struct HotKeyRecorderView: View {
         
         return parts.joined()
     }
+
+    static func isComplete(modifiers: NSEvent.ModifierFlags, key: Key?) -> Bool {
+        guard let key else { return false }
+        return !modifiers.isEmpty || isFunctionKey(key)
+    }
     
-    private func isValidHotkey(modifiers: NSEvent.ModifierFlags, key: Key) -> Bool {
+    static func isValidHotkey(modifiers: NSEvent.ModifierFlags, key: Key) -> Bool {
         // Allow function keys with no modifiers
         if modifiers.isEmpty {
             return isFunctionKey(key)
@@ -128,7 +252,7 @@ internal struct HotKeyRecorderView: View {
         return true
     }
 
-    private func isFunctionKey(_ key: Key) -> Bool {
+    static func isFunctionKey(_ key: Key) -> Bool {
         switch key {
         case .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
              .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20:
@@ -138,7 +262,7 @@ internal struct HotKeyRecorderView: View {
         }
     }
     
-    private func keyFromKeyCode(_ keyCode: UInt16) -> Key? {
+    static func keyFromKeyCode(_ keyCode: UInt16) -> Key? {
         switch keyCode {
         case 0: return .a
         case 1: return .s
@@ -220,7 +344,7 @@ internal struct HotKeyRecorderView: View {
         }
     }
     
-    private func keyToString(_ key: Key) -> String {
+    static func keyToString(_ key: Key) -> String {
         switch key {
         case .f1: return "F1"
         case .f2: return "F2"

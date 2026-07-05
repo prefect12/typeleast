@@ -48,6 +48,10 @@ internal class HotKeyManager {
     }
     
     private func parseHotkeyString(_ hotkeyString: String) -> (Key?, NSEvent.ModifierFlags) {
+        if GlobalShortcutDisplay.modifierOnlyKey(from: hotkeyString) != nil {
+            return (nil, [])
+        }
+
         var modifiers: NSEvent.ModifierFlags = []
         var keyString = hotkeyString
         

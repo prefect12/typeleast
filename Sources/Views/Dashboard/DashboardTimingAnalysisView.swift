@@ -138,6 +138,23 @@ private struct TimingRun: Identifiable {
     }()
 }
 
+private struct TimingAnalysisSnapshot {
+    let runs: [TimingRun]
+    let visibleRuns: [TimingRun]
+    let chartSegments: [TimingSegment]
+    let hoveredRun: TimingRun?
+    let chartWidth: CGFloat
+    let chartYUpperBound: Double
+    let xAxisVisibleKeys: [String]
+    let chartLabelsByKey: [String: String]
+    let runsByChartKey: [String: TimingRun]
+    let stageTotals: [(stage: TimingStage, seconds: TimeInterval)]
+    let stageTotalSeconds: TimeInterval
+    let bottleneckStageTotals: [(stage: TimingStage, seconds: TimeInterval)]
+    let averageProcessing: TimeInterval
+    let slowestRun: TimingRun?
+}
+
 internal struct DashboardTimingAnalysisView: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var timingStore = TimingAnalysisStore.shared
@@ -146,62 +163,8 @@ internal struct DashboardTimingAnalysisView: View {
     @State private var hoveredRunID: UUID?
     @State private var timingHoverLocation: CGPoint?
 
-    private var runs: [TimingRun] {
-        let source = recordLimit == 0 ? timingStore.records : Array(timingStore.records.prefix(recordLimit))
-        return source.enumerated()
-            .map { TimingRun(record: $0.element, index: $0.offset) }
-            .filter { !$0.segments(includeRecording: true).isEmpty }
-    }
-
-    private var visibleRuns: [TimingRun] {
-        runs.filter { !$0.segments(includeRecording: includeRecording).isEmpty }
-    }
-
-    private var chartSegments: [TimingSegment] {
-        visibleRuns.flatMap { $0.segments(includeRecording: includeRecording) }
-    }
-
-    private var hoveredRun: TimingRun? {
-        guard let hoveredRunID else { return nil }
-        return visibleRuns.first { $0.id == hoveredRunID }
-    }
-
-    private var chartWidth: CGFloat {
-        max(900, CGFloat(visibleRuns.count) * 36)
-    }
-
-    private var chartYUpperBound: Double {
-        let maxTotal = visibleRuns
-            .map { $0.visibleTotal(includeRecording: includeRecording) }
-            .max() ?? 0
-        return max(1, maxTotal * 1.16)
-    }
-
-    private var xAxisVisibleKeys: [String] {
-        guard !visibleRuns.isEmpty else { return [] }
-        let maxLabels = 18
-        let interval = max(1, Int(ceil(Double(visibleRuns.count) / Double(maxLabels))))
-
-        return visibleRuns.enumerated().compactMap { offset, run in
-            if offset == 0 || offset == visibleRuns.count - 1 || offset % interval == 0 {
-                return run.chartKey
-            }
-            return nil
-        }
-    }
-
-    private var stageTotals: [(stage: TimingStage, seconds: TimeInterval)] {
-        TimingStage.allCases.compactMap { stage in
-            let total = chartSegments
-                .filter { $0.stage == stage }
-                .reduce(0) { $0 + $1.seconds }
-            return total > 0 ? (stage, total) : nil
-        }
-        .sorted { $0.seconds > $1.seconds }
-    }
-
-    private var bottleneckStageTotals: [(stage: TimingStage, seconds: TimeInterval)] {
-        Self.bottleneckStageTotals(from: stageTotals)
+    private var activeRecordLimit: Int? {
+        recordLimit == 0 ? nil : recordLimit
     }
 
     static func bottleneckStageTotals(
@@ -210,32 +173,25 @@ internal struct DashboardTimingAnalysisView: View {
         totals.filter { $0.stage.canSummarizeAsBottleneck }
     }
 
-    private var averageProcessing: TimeInterval {
-        guard !runs.isEmpty else { return 0 }
-        return runs.reduce(0) { $0 + $1.processingTotal() } / Double(runs.count)
-    }
-
-    private var slowestRun: TimingRun? {
-        visibleRuns.max { $0.visibleTotal(includeRecording: includeRecording) < $1.visibleTotal(includeRecording: includeRecording) }
-    }
-
     var body: some View {
+        let snapshot = makeSnapshot()
+
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 controls
-                summaryGrid
-                breakdownChart
-                stageDistribution
-                detailRows
+                summaryGrid(snapshot)
+                breakdownChart(snapshot)
+                stageDistribution(snapshot)
+                detailRows(snapshot)
             }
             .padding(24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(DashboardTheme.pageBg)
         .id(languageManager.current)
-        .task(id: timingStore.reloadToken) {
-            await timingStore.loadIfNeeded()
+        .task(id: "\(timingStore.reloadToken)-\(recordLimit)") {
+            await timingStore.loadIfNeeded(recordLimit: activeRecordLimit)
         }
     }
 
@@ -271,30 +227,30 @@ internal struct DashboardTimingAnalysisView: View {
         }
     }
 
-    private var summaryGrid: some View {
+    private func summaryGrid(_ snapshot: TimingAnalysisSnapshot) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-            TimingStatTile(title: L10n.Timing.analyzedRuns, value: "\(visibleRuns.count)", tint: DashboardTheme.accent)
-            TimingStatTile(title: L10n.Timing.averageProcessing, value: formatDuration(averageProcessing), tint: DashboardTheme.success)
-            TimingStatTile(title: L10n.Timing.slowestRun, value: slowestRun.map { formatDuration($0.visibleTotal(includeRecording: includeRecording)) } ?? "0s", tint: Color(nsColor: .systemRed))
-            if let bottleneck = bottleneckStageTotals.first {
+            TimingStatTile(title: L10n.Timing.analyzedRuns, value: "\(snapshot.visibleRuns.count)", tint: DashboardTheme.accent)
+            TimingStatTile(title: L10n.Timing.averageProcessing, value: formatDuration(snapshot.averageProcessing), tint: DashboardTheme.success)
+            TimingStatTile(title: L10n.Timing.slowestRun, value: snapshot.slowestRun.map { formatDuration($0.visibleTotal(includeRecording: includeRecording)) } ?? "0s", tint: Color(nsColor: .systemRed))
+            if let bottleneck = snapshot.bottleneckStageTotals.first {
                 TimingStatTile(title: L10n.Timing.slowestStage, value: bottleneck.stage.title, tint: bottleneck.stage.color)
             }
         }
     }
 
-    private var breakdownChart: some View {
+    private func breakdownChart(_ snapshot: TimingAnalysisSnapshot) -> some View {
         TimingPanel {
             VStack(alignment: .leading, spacing: 14) {
                 Text(L10n.Timing.runBreakdown)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(DashboardTheme.ink)
 
-                if chartSegments.isEmpty {
+                if snapshot.chartSegments.isEmpty {
                     emptyState
                 } else {
                     ScrollView(.horizontal, showsIndicators: true) {
                         Chart {
-                            ForEach(chartSegments) { segment in
+                            ForEach(snapshot.chartSegments) { segment in
                                 BarMark(
                                     x: .value(L10n.Timing.recordDetails, segment.chartKey),
                                     y: .value(L10n.Timing.total, segment.seconds)
@@ -303,24 +259,24 @@ internal struct DashboardTimingAnalysisView: View {
                                 .cornerRadius(3)
                             }
 
-                            if let hoveredRun {
+                            if let hoveredRun = snapshot.hoveredRun {
                                 RuleMark(x: .value(L10n.Timing.recordDetails, hoveredRun.chartKey))
                                     .foregroundStyle(DashboardTheme.inkMuted.opacity(0.55))
                                     .lineStyle(.init(lineWidth: 1, dash: [4, 4]))
                             }
                         }
                         .chartForegroundStyleScale(stageColorScale)
-                        .chartYScale(domain: 0...chartYUpperBound)
+                        .chartYScale(domain: 0...snapshot.chartYUpperBound)
                         .chartLegend(.hidden)
                         .chartXAxis {
-                            AxisMarks(values: xAxisVisibleKeys) { value in
+                            AxisMarks(values: snapshot.xAxisVisibleKeys) { value in
                                 AxisGridLine()
                                     .foregroundStyle(DashboardTheme.rule.opacity(0.42))
                                 AxisTick()
                                     .foregroundStyle(DashboardTheme.inkMuted.opacity(0.75))
                                 AxisValueLabel {
                                     if let key = value.as(String.self) {
-                                        Text(chartLabel(for: key))
+                                        Text(snapshot.chartLabelsByKey[key] ?? key)
                                             .font(.caption2.weight(.semibold))
                                             .foregroundStyle(DashboardTheme.inkLight)
                                     }
@@ -351,13 +307,13 @@ internal struct DashboardTimingAnalysisView: View {
                                     .fill(.clear)
                                     .contentShape(Rectangle())
                                     .onContinuousHover { phase in
-                                        updateRunHover(phase: phase, proxy: proxy, geometry: geometry)
+                                        updateRunHover(phase: phase, proxy: proxy, geometry: geometry, snapshot: snapshot)
                                     }
                             }
                         }
                         .overlay {
                             GeometryReader { geometry in
-                                if let hoveredRun, let timingHoverLocation {
+                                if let hoveredRun = snapshot.hoveredRun, let timingHoverLocation {
                                     let x = min(
                                         max(timingHoverLocation.x + 124, 124),
                                         max(124, geometry.size.width - 124)
@@ -377,7 +333,7 @@ internal struct DashboardTimingAnalysisView: View {
                             }
                             .allowsHitTesting(false)
                         }
-                        .frame(width: chartWidth, height: 340)
+                        .frame(width: snapshot.chartWidth, height: 340)
                     }
                     .frame(height: 370)
                 }
@@ -385,22 +341,22 @@ internal struct DashboardTimingAnalysisView: View {
         }
     }
 
-    private var stageDistribution: some View {
+    private func stageDistribution(_ snapshot: TimingAnalysisSnapshot) -> some View {
         TimingPanel {
             VStack(alignment: .leading, spacing: 12) {
                 Text(L10n.Timing.stageDistribution)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(DashboardTheme.ink)
 
-                if stageTotals.isEmpty {
+                if snapshot.stageTotals.isEmpty {
                     emptyState
                 } else {
                     VStack(spacing: 10) {
-                        ForEach(Array(stageTotals.enumerated()), id: \.element.stage.id) { _, item in
+                        ForEach(Array(snapshot.stageTotals.enumerated()), id: \.element.stage.id) { _, item in
                             TimingStageRow(
                                 stage: item.stage,
                                 seconds: item.seconds,
-                                total: stageTotals.reduce(0) { $0 + $1.seconds },
+                                total: snapshot.stageTotalSeconds,
                                 formatter: formatDuration
                             )
                         }
@@ -410,24 +366,24 @@ internal struct DashboardTimingAnalysisView: View {
         }
     }
 
-    private var detailRows: some View {
+    private func detailRows(_ snapshot: TimingAnalysisSnapshot) -> some View {
         TimingPanel {
             VStack(alignment: .leading, spacing: 12) {
                 Text(L10n.Timing.recordDetails)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(DashboardTheme.ink)
 
-                if visibleRuns.isEmpty {
+                if snapshot.visibleRuns.isEmpty {
                     emptyState
                 } else {
                     VStack(spacing: 0) {
-                        ForEach(visibleRuns) { run in
+                        ForEach(Array(snapshot.visibleRuns.enumerated()), id: \.element.id) { offset, run in
                             TimingDetailRow(
                                 run: run,
                                 includeRecording: includeRecording,
                                 durationFormatter: formatDuration
                             )
-                            if run.id != visibleRuns.last?.id {
+                            if offset < snapshot.visibleRuns.count - 1 {
                                 Divider()
                             }
                         }
@@ -461,6 +417,71 @@ internal struct DashboardTimingAnalysisView: View {
         ]
     }
 
+    private func makeSnapshot() -> TimingAnalysisSnapshot {
+        let source = recordLimit == 0 ? timingStore.records : Array(timingStore.records.prefix(recordLimit))
+        let runs = source.enumerated()
+            .map { TimingRun(record: $0.element, index: $0.offset) }
+            .filter { !$0.segments(includeRecording: true).isEmpty }
+        let visibleRuns = runs.filter { !$0.segments(includeRecording: includeRecording).isEmpty }
+        let chartSegments = visibleRuns.flatMap { $0.segments(includeRecording: includeRecording) }
+
+        let stageTotals: [(stage: TimingStage, seconds: TimeInterval)] = TimingStage.allCases.compactMap { stage -> (stage: TimingStage, seconds: TimeInterval)? in
+            let total = chartSegments.reduce(0) { running, segment in
+                segment.stage == stage ? running + segment.seconds : running
+            }
+            return total > 0 ? (stage, total) : nil
+        }
+        .sorted(by: { lhs, rhs in lhs.seconds > rhs.seconds })
+
+        let averageProcessing: TimeInterval
+        if runs.isEmpty {
+            averageProcessing = 0
+        } else {
+            averageProcessing = runs.reduce(0) { $0 + $1.processingTotal() } / Double(runs.count)
+        }
+
+        let slowestRun = visibleRuns.max {
+            $0.visibleTotal(includeRecording: includeRecording) < $1.visibleTotal(includeRecording: includeRecording)
+        }
+        let maxTotal = visibleRuns
+            .map { $0.visibleTotal(includeRecording: includeRecording) }
+            .max() ?? 0
+        let xAxisVisibleKeys = Self.xAxisVisibleKeys(for: visibleRuns)
+        let chartLabelsByKey = Dictionary(uniqueKeysWithValues: visibleRuns.map { ($0.chartKey, $0.chartLabel) })
+        let runsByChartKey = Dictionary(uniqueKeysWithValues: visibleRuns.map { ($0.chartKey, $0) })
+        let hoveredRun = hoveredRunID.flatMap { id in visibleRuns.first { $0.id == id } }
+
+        return TimingAnalysisSnapshot(
+            runs: runs,
+            visibleRuns: visibleRuns,
+            chartSegments: chartSegments,
+            hoveredRun: hoveredRun,
+            chartWidth: max(900, CGFloat(visibleRuns.count) * 36),
+            chartYUpperBound: max(1, maxTotal * 1.16),
+            xAxisVisibleKeys: xAxisVisibleKeys,
+            chartLabelsByKey: chartLabelsByKey,
+            runsByChartKey: runsByChartKey,
+            stageTotals: stageTotals,
+            stageTotalSeconds: stageTotals.reduce(0) { $0 + $1.seconds },
+            bottleneckStageTotals: Self.bottleneckStageTotals(from: stageTotals),
+            averageProcessing: averageProcessing,
+            slowestRun: slowestRun
+        )
+    }
+
+    private static func xAxisVisibleKeys(for visibleRuns: [TimingRun]) -> [String] {
+        guard !visibleRuns.isEmpty else { return [] }
+        let maxLabels = 18
+        let interval = max(1, Int(ceil(Double(visibleRuns.count) / Double(maxLabels))))
+
+        return visibleRuns.enumerated().compactMap { offset, run in
+            if offset == 0 || offset == visibleRuns.count - 1 || offset % interval == 0 {
+                return run.chartKey
+            }
+            return nil
+        }
+    }
+
     private func formatDuration(_ seconds: TimeInterval) -> String {
         guard seconds.isFinite, seconds > 0 else { return "0s" }
         if seconds < 1 {
@@ -484,11 +505,12 @@ internal struct DashboardTimingAnalysisView: View {
         return "\(formatted) ms"
     }
 
-    private func chartLabel(for key: String) -> String {
-        visibleRuns.first { $0.chartKey == key }?.chartLabel ?? key
-    }
-
-    private func updateRunHover(phase: HoverPhase, proxy: ChartProxy, geometry: GeometryProxy) {
+    private func updateRunHover(
+        phase: HoverPhase,
+        proxy: ChartProxy,
+        geometry: GeometryProxy,
+        snapshot: TimingAnalysisSnapshot
+    ) {
         switch phase {
         case .active(let location):
             guard let plotFrameAnchor = proxy.plotFrame else {
@@ -506,18 +528,27 @@ internal struct DashboardTimingAnalysisView: View {
 
             let x = location.x - plotFrame.origin.x
             guard let key: String = proxy.value(atX: x),
-                  let run = visibleRuns.first(where: { $0.chartKey == key }) else {
+                  let run = snapshot.runsByChartKey[key] else {
                 hoveredRunID = nil
                 timingHoverLocation = nil
                 return
             }
 
-            hoveredRunID = run.id
-            timingHoverLocation = location
+            if hoveredRunID != run.id {
+                hoveredRunID = run.id
+            }
+            if shouldUpdateHoverLocation(to: location) {
+                timingHoverLocation = location
+            }
         case .ended:
             hoveredRunID = nil
             timingHoverLocation = nil
         }
+    }
+
+    private func shouldUpdateHoverLocation(to location: CGPoint) -> Bool {
+        guard let current = timingHoverLocation else { return true }
+        return abs(current.x - location.x) > 4 || abs(current.y - location.y) > 4
     }
 
     private static let integerFormatter: NumberFormatter = {
@@ -677,8 +708,8 @@ private struct TimingDetailRow: View {
         run.segments(includeRecording: includeRecording)
     }
 
-    private var transcriptText: String {
-        run.record.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var transcriptPreview: String {
+        run.record.preview.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     var body: some View {
@@ -700,12 +731,12 @@ private struct TimingDetailRow: View {
                     .foregroundStyle(DashboardTheme.ink)
             }
 
-            if !transcriptText.isEmpty {
-                Text(transcriptText)
+            if !transcriptPreview.isEmpty {
+                Text(transcriptPreview)
                     .font(.callout.weight(.medium))
                     .lineSpacing(2)
                     .foregroundStyle(DashboardTheme.ink)
-                    .textSelection(.enabled)
+                    .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 10)
                     .padding(.horizontal, 12)
