@@ -35,12 +35,28 @@ class LanguageManagerTests: XCTestCase {
 
     // MARK: - LanguageManager persistence
 
-    func testLanguageManagerDefaultsToEnglish() {
-        UserDefaults.standard.removeObject(forKey: "appLanguage")
-        let manager = LanguageManager.shared
-        // After removing, the shared instance may still retain its value,
-        // so just verify it's a valid language
-        XCTAssertNotNil(manager.current)
+    func testLanguageManagerDefaultsToChinese() {
+        let defaults = makeIsolatedDefaults()
+        defaults.removeObject(forKey: "appLanguage")
+
+        XCTAssertEqual(LanguageManager.initialLanguage(defaults: defaults), .chinese)
+    }
+
+    func testLanguageManagerUsesDefaultForInvalidStoredLanguage() {
+        let defaults = makeIsolatedDefaults()
+        defaults.set("fr", forKey: "appLanguage")
+
+        XCTAssertEqual(LanguageManager.initialLanguage(defaults: defaults), .chinese)
+    }
+
+    func testLanguageManagerUsesStoredLanguage() {
+        let defaults = makeIsolatedDefaults()
+
+        defaults.set("en", forKey: "appLanguage")
+        XCTAssertEqual(LanguageManager.initialLanguage(defaults: defaults), .english)
+
+        defaults.set("zh", forKey: "appLanguage")
+        XCTAssertEqual(LanguageManager.initialLanguage(defaults: defaults), .chinese)
     }
 
     func testLanguageManagerPersistsChoice() {
@@ -161,5 +177,12 @@ class LanguageManagerTests: XCTestCase {
         let labelCN = L10n.RecordRow.accessibilityLabel(date: "3月14日", provider: "openai")
         XCTAssertTrue(labelCN.contains("3月14日"))
         XCTAssertTrue(labelCN.contains("转录于"))
+    }
+
+    private func makeIsolatedDefaults() -> UserDefaults {
+        let suiteName = "LanguageManagerTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 }
