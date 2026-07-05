@@ -24,6 +24,7 @@ internal enum L10n {
     enum Menu {
         static var record: String { isCN ? "录音" : "Record" }
         static var transcribeAudioFile: String { isCN ? "转录音频文件..." : "Transcribe Audio File..." }
+        static var dashboard: String { isCN ? "仪表盘..." : "Dashboard..." }
         static var settings: String { isCN ? "设置" : "Settings" }
         static var quit: String { isCN ? "退出" : "Quit" }
         static var closeWindow: String { isCN ? "关闭窗口" : "Close Window" }
@@ -70,10 +71,8 @@ internal enum L10n {
         static var transcriptionTimeFooter: String { isCN ? "最近 20 次转录的处理时间（含语义纠正）" : "Processing time for recent 20 transcriptions (incl. semantic correction)." }
         static var topSources: String { isCN ? "常用来源" : "Top Sources" }
         static var noSources: String { isCN ? "暂无来源数据" : "No sources yet." }
-        static var providerMix: String { isCN ? "引擎占比" : "Provider Mix" }
         static var sourceMix: String { isCN ? "来源分布" : "Source Mix" }
         static var modelBreakdown: String { isCN ? "模型" : "Models" }
-        static var dayBreakdown: String { isCN ? "当日构成" : "Day Breakdown" }
         static var noDataForDay: String { isCN ? "这一天暂无保存的转录记录" : "No saved transcripts for this day." }
         static var aggregateOnlyDay: String { isCN ? "这一天只有旧版汇总数据，没有逐条转录明细" : "Only legacy aggregate data is available for this day; individual transcripts were not saved." }
         static var legacySummary: String { isCN ? "旧版汇总" : "Legacy Summary" }

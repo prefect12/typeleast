@@ -7,6 +7,7 @@ internal struct DashboardProvidersView: View {
     @AppStorage(AppDefaults.Keys.selectedParakeetModel) var selectedParakeetModel = AppDefaults.defaultParakeetModel
     @AppStorage(AppDefaults.Keys.hasSetupParakeet) var hasSetupParakeet = false
     @AppStorage(AppDefaults.Keys.hasSetupLocalLLM) var hasSetupLocalLLM = false
+    @AppStorage(AppDefaults.Keys.openAITranscriptionModel) var openAITranscriptionModel = AppDefaults.defaultOpenAITranscriptionModel
     @AppStorage("openAIBaseURL") var openAIBaseURL = ""
     @AppStorage("geminiBaseURL") var geminiBaseURL = ""
     @AppStorage(AppDefaults.Keys.maxModelStorageGB) var maxModelStorageGB = 5.0
@@ -361,6 +362,8 @@ internal struct DashboardProvidersView: View {
                 ) {
                     saveAPIKey(openAIKey, service: "AudioWhisper", account: "OpenAI")
                 }
+
+                openAIModelField
             }
 
             if transcriptionProvider == .gemini {
@@ -461,6 +464,18 @@ internal struct DashboardProvidersView: View {
                     .frame(maxWidth: 320)
             }
         }
+    }
+
+    private var openAIModelField: some View {
+        LabeledContent("Transcription Model") {
+            TextField(AppDefaults.defaultOpenAITranscriptionModel, text: $openAITranscriptionModel)
+                .textFieldStyle(.roundedBorder)
+                .font(DashboardTheme.Fonts.mono(12, weight: .regular))
+                .frame(maxWidth: 260)
+        }
+        .padding(.horizontal, DashboardTheme.Spacing.lg)
+        .padding(.bottom, DashboardTheme.Spacing.md)
+        .help("Default: \(AppDefaults.defaultOpenAITranscriptionModel). Use a deployment/model name supported by your endpoint.")
     }
     
 }
