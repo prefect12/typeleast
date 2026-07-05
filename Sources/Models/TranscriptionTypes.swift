@@ -31,6 +31,70 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
     }
 }
 
+internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Identifiable {
+    case auto
+    case chinese = "zh"
+    case english = "en"
+    case japanese = "ja"
+    case korean = "ko"
+    case spanish = "es"
+    case french = "fr"
+    case german = "de"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .auto:
+            return L10n.isChinese ? "自动识别" : "Auto-detect"
+        case .chinese:
+            return L10n.isChinese ? "中文" : "Chinese"
+        case .english:
+            return L10n.isChinese ? "英语" : "English"
+        case .japanese:
+            return L10n.isChinese ? "日语" : "Japanese"
+        case .korean:
+            return L10n.isChinese ? "韩语" : "Korean"
+        case .spanish:
+            return L10n.isChinese ? "西班牙语" : "Spanish"
+        case .french:
+            return L10n.isChinese ? "法语" : "French"
+        case .german:
+            return L10n.isChinese ? "德语" : "German"
+        }
+    }
+
+    var apiLanguageCode: String? {
+        switch self {
+        case .auto:
+            return nil
+        default:
+            return rawValue
+        }
+    }
+
+    var speechInstruction: String {
+        switch self {
+        case .auto:
+            return "Detect the spoken language automatically. Preserve the original spoken language and mixed-language wording; do not translate."
+        case .chinese:
+            return "The spoken language is Chinese. Transcribe in Chinese, preserve mixed English technical terms, and do not translate."
+        case .english:
+            return "The spoken language is English. Transcribe in English and do not translate."
+        case .japanese:
+            return "The spoken language is Japanese. Transcribe in Japanese and do not translate."
+        case .korean:
+            return "The spoken language is Korean. Transcribe in Korean and do not translate."
+        case .spanish:
+            return "The spoken language is Spanish. Transcribe in Spanish and do not translate."
+        case .french:
+            return "The spoken language is French. Transcribe in French and do not translate."
+        case .german:
+            return "The spoken language is German. Transcribe in German and do not translate."
+        }
+    }
+}
+
 internal enum WhisperModel: String, CaseIterable, Codable, Sendable {
     case tiny = "tiny"
     case base = "base"

@@ -66,6 +66,38 @@ class SpeechToTextServiceTests: XCTestCase {
 
         XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
     }
+
+    func testTranscriptionLanguageDefaultsToAuto() {
+        defaults.removeObject(forKey: AppDefaults.Keys.transcriptionLanguage)
+
+        XCTAssertEqual(service.resolvedTranscriptionLanguage, .auto)
+    }
+
+    func testTranscriptionLanguageUsesConfiguredValue() {
+        defaults.set(TranscriptionLanguage.chinese.rawValue, forKey: AppDefaults.Keys.transcriptionLanguage)
+
+        XCTAssertEqual(service.resolvedTranscriptionLanguage, .chinese)
+    }
+
+    func testTranscriptionLanguageFallsBackForInvalidValue() {
+        defaults.set("not-a-language", forKey: AppDefaults.Keys.transcriptionLanguage)
+
+        XCTAssertEqual(service.resolvedTranscriptionLanguage, .auto)
+    }
+
+    func testASRPromptPreservesAutoDetectedLanguage() {
+        let prompt = SpeechToTextService.technicalASRPrompt(language: .auto)
+
+        XCTAssertTrue(prompt.contains("Detect the spoken language automatically"))
+        XCTAssertTrue(prompt.contains("do not translate"))
+    }
+
+    func testASRPromptCanForceChinese() {
+        let prompt = SpeechToTextService.technicalASRPrompt(language: .chinese)
+
+        XCTAssertTrue(prompt.contains("spoken language is Chinese"))
+        XCTAssertTrue(prompt.contains("preserve mixed English technical terms"))
+    }
     
     func testProviderSelectionDefaultsToOpenAI() async {
         // Create a fresh mock keychain with no keys

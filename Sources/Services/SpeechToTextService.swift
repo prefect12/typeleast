@@ -37,17 +37,22 @@ internal class SpeechToTextService {
     private let userDefaults: UserDefaults
     private let correctionService = SemanticCorrectionService()
 
-    private static let technicalASRPrompt = """
-    The speaker may mix Chinese with English technical terms. Preserve and correctly spell GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, creator, matching, pipeline, queue, worker, webhook, monitoring, monitor, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT.
-    Common speech variants: 进 Hub, 金 Hub, or Git Hub usually means GitHub; 瑞坡 usually means repo; 批啊 or P R usually means PR; 康佩恩 usually means campaign; 格拉法纳 means Grafana; 普罗米修斯 means Prometheus; 观测云 means Guance.
-    Return only the transcription without commentary.
-    """
+    internal static func technicalASRPrompt(language: TranscriptionLanguage = .auto) -> String {
+        """
+        \(language.speechInstruction)
+        Preserve and correctly spell GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, creator, matching, pipeline, queue, worker, webhook, monitoring, monitor, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT.
+        Common speech variants: 进 Hub, 金 Hub, or Git Hub usually means GitHub; 瑞坡 usually means repo; 批啊 or P R usually means PR; 康佩恩 usually means campaign; 格拉法纳 means Grafana; 普罗米修斯 means Prometheus; 观测云 means Guance.
+        Return only the transcription without commentary.
+        """
+    }
 
-    private static let geminiTranscriptionPrompt = """
-    Transcribe this audio to text. Return only the transcription without any additional text.
+    internal static func geminiTranscriptionPrompt(language: TranscriptionLanguage = .auto) -> String {
+        """
+        Transcribe this audio to text. Return only the transcription without any additional text.
 
-    \(technicalASRPrompt)
-    """
+        \(technicalASRPrompt(language: language))
+        """
+    }
     
     init(
         localWhisperService: LocalWhisperService = .shared,
@@ -162,6 +167,11 @@ internal class SpeechToTextService {
         return configured
     }
 
+    var resolvedTranscriptionLanguage: TranscriptionLanguage {
+        let raw = userDefaults.string(forKey: AppDefaults.Keys.transcriptionLanguage) ?? AppDefaults.defaultTranscriptionLanguage.rawValue
+        return TranscriptionLanguage(rawValue: raw) ?? AppDefaults.defaultTranscriptionLanguage
+    }
+
     /// Detects if the endpoint is Azure OpenAI based on the URL pattern
     private var isAzureOpenAI: Bool {
         let custom = userDefaults.string(forKey: "openAIBaseURL") ?? ""
@@ -183,8 +193,9 @@ internal class SpeechToTextService {
         }
 
         let transcriptionURL = openAITranscriptionEndpoint
+        let language = resolvedTranscriptionLanguage
         guard let modelData = resolvedOpenAITranscriptionModel.data(using: .utf8),
-              let promptData = Self.technicalASRPrompt.data(using: .utf8) else {
+              let promptData = Self.technicalASRPrompt(language: language).data(using: .utf8) else {
             throw SpeechToTextError.transcriptionFailed("Failed to encode OpenAI transcription request")
         }
 
@@ -195,6 +206,10 @@ internal class SpeechToTextService {
                     // Azure deployments already specify the model, but OpenAI-compatible APIs still expect the field.
                     multipartFormData.append(modelData, withName: "model")
                     multipartFormData.append(promptData, withName: "prompt")
+                    if let languageCode = language.apiLanguageCode,
+                       let languageData = languageCode.data(using: .utf8) {
+                        multipartFormData.append(languageData, withName: "language")
+                    }
                 },
                 to: transcriptionURL,
                 headers: headers
@@ -223,13 +238,13 @@ internal class SpeechToTextService {
         
         // Use Files API for larger files (>10MB) to avoid memory issues
         if fileSize > 10 * 1024 * 1024 {
-            return try await transcribeWithGeminiFilesAPI(audioURL: audioURL, apiKey: apiKey)
+            return try await transcribeWithGeminiFilesAPI(audioURL: audioURL, apiKey: apiKey, language: resolvedTranscriptionLanguage)
         } else {
-            return try await transcribeWithGeminiInline(audioURL: audioURL, apiKey: apiKey)
+            return try await transcribeWithGeminiInline(audioURL: audioURL, apiKey: apiKey, language: resolvedTranscriptionLanguage)
         }
     }
     
-    private func transcribeWithGeminiFilesAPI(audioURL: URL, apiKey: String) async throws -> String {
+    private func transcribeWithGeminiFilesAPI(audioURL: URL, apiKey: String, language: TranscriptionLanguage) async throws -> String {
         // First, upload the file using Files API
         let fileUploadURL = "\(geminiBaseURL)/upload/v1beta/files"
         
@@ -276,7 +291,7 @@ internal class SpeechToTextService {
                         "file_uri": uploadedFile.file.uri
                     ]
                 ], [
-                    "text": Self.geminiTranscriptionPrompt
+                    "text": Self.geminiTranscriptionPrompt(language: language)
                 ]]
             ]]
         ]
@@ -299,7 +314,7 @@ internal class SpeechToTextService {
         }
     }
     
-    private func transcribeWithGeminiInline(audioURL: URL, apiKey: String) async throws -> String {
+    private func transcribeWithGeminiInline(audioURL: URL, apiKey: String, language: TranscriptionLanguage) async throws -> String {
         // For smaller files, use inline data to avoid the extra upload step
         // Double-check file size for safety
         let fileAttributes = try FileManager.default.attributesOfItem(atPath: audioURL.path)
@@ -332,7 +347,7 @@ internal class SpeechToTextService {
                         "data": base64Audio
                     ]
                 ], [
-                    "text": Self.geminiTranscriptionPrompt
+                    "text": Self.geminiTranscriptionPrompt(language: language)
                 ]]
             ]]
         ]
@@ -357,7 +372,7 @@ internal class SpeechToTextService {
     
     private func transcribeWithLocal(audioURL: URL, model: WhisperModel) async throws -> String {
         do {
-            let text = try await localWhisperService.transcribe(audioFileURL: audioURL, model: model) { progress in
+            let text = try await localWhisperService.transcribe(audioFileURL: audioURL, model: model, language: resolvedTranscriptionLanguage) { progress in
                 NotificationCenter.default.post(name: .transcriptionProgress, object: progress)
             }
             return Self.cleanTranscriptionText(text)

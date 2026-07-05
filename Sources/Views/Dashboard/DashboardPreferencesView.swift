@@ -5,6 +5,7 @@ import os.log
 internal struct DashboardPreferencesView: View {
     @AppStorage("startAtLogin") private var startAtLogin = true
     @AppStorage("immediateRecording") private var immediateRecording = false
+    @AppStorage("globalHotkey") private var globalHotkey = "⌘⇧Space"
     @AppStorage("autoBoostMicrophoneVolume") private var autoBoostMicrophoneVolume = false
     @AppStorage("enableSmartPaste") private var enableSmartPaste = false
     @AppStorage("playCompletionSound") private var playCompletionSound = true
@@ -14,6 +15,8 @@ internal struct DashboardPreferencesView: View {
 
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var loginItemError: String?
+
+    var onConfigureShortcuts: (() -> Void)?
 
     private let storageOptions: [Double] = [1, 2, 5, 10, 20]
 
@@ -56,12 +59,28 @@ internal struct DashboardPreferencesView: View {
                     updateLoginItem(enabled: newValue)
                 }
 
-                Toggle(isOn: $immediateRecording) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.Preferences.expressMode)
-                        Text(L10n.Preferences.expressModeDesc)
-                            .font(.caption)
+                HStack(alignment: .center, spacing: 16) {
+                    Toggle(isOn: $immediateRecording) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(L10n.Preferences.expressMode)
+                            Text(L10n.Preferences.expressModeDesc)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer(minLength: 12)
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(globalHotkey)
+                            .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.secondary)
+
+                        Button(L10n.Preferences.configureShortcut) {
+                            onConfigureShortcuts?()
+                        }
+                        .buttonStyle(.link)
+                        .disabled(onConfigureShortcuts == nil)
                     }
                 }
 

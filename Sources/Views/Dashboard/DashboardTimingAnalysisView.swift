@@ -140,14 +140,14 @@ private struct TimingRun: Identifiable {
 
 internal struct DashboardTimingAnalysisView: View {
     @ObservedObject private var languageManager = LanguageManager.shared
-    @State private var records: [TranscriptionRecord] = []
+    @State private var timingStore = TimingAnalysisStore.shared
     @State private var includeRecording = false
     @State private var recordLimit = 50
     @State private var hoveredRunID: UUID?
     @State private var timingHoverLocation: CGPoint?
 
     private var runs: [TimingRun] {
-        let source = recordLimit == 0 ? records : Array(records.prefix(recordLimit))
+        let source = recordLimit == 0 ? timingStore.records : Array(timingStore.records.prefix(recordLimit))
         return source.enumerated()
             .map { TimingRun(record: $0.element, index: $0.offset) }
             .filter { !$0.segments(includeRecording: true).isEmpty }
@@ -234,8 +234,8 @@ internal struct DashboardTimingAnalysisView: View {
         }
         .background(DashboardTheme.pageBg)
         .id(languageManager.current)
-        .task {
-            await loadRecords()
+        .task(id: timingStore.reloadToken) {
+            await timingStore.loadIfNeeded()
         }
     }
 
@@ -459,11 +459,6 @@ internal struct DashboardTimingAnalysisView: View {
             L10n.Timing.clipboard: DashboardTheme.accent,
             L10n.Timing.paste: Color(nsColor: .systemRed)
         ]
-    }
-
-    @MainActor
-    private func loadRecords() async {
-        records = await DataManager.shared.fetchAllRecordsQuietly()
     }
 
     private func formatDuration(_ seconds: TimeInterval) -> String {

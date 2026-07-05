@@ -127,7 +127,25 @@ final class SourceUsageStoreTests: XCTestCase {
         XCTAssertEqual(restored.count, 2)
         XCTAssertEqual(restored.first?.bundleIdentifier, "com.persist.b", "Higher word count should be ordered first on load")
         XCTAssertEqual(restored.first?.fallbackSymbolName, "tray")
-        XCTAssertEqual(restored.last?.iconData, Data([0x0A]))
+        XCTAssertNil(restored.last?.iconData, "Legacy persisted icons should be stripped during load")
+
+        let rewrittenData = defaults.data(forKey: "sourceUsage.stats")
+        XCTAssertNotNil(rewrittenData)
+        XCTAssertNil(String(data: rewrittenData ?? Data(), encoding: .utf8)?.range(of: "iconData"))
+    }
+
+    func testPersistedDefaultsDoNotStoreIconData() {
+        let info = makeInfo(bundleId: "com.test.icon", name: "Icon App", iconByte: 0x0B)
+
+        store.recordUsage(for: info, words: 25, characters: 100)
+
+        let persisted = defaults.data(forKey: "sourceUsage.stats") ?? Data()
+        let payload = String(data: persisted, encoding: .utf8) ?? ""
+        XCTAssertFalse(payload.contains("iconData"), "Persisted source usage should stay lightweight")
+
+        store = SourceUsageStore(defaults: defaults)
+        XCTAssertEqual(store.allSources().first?.bundleIdentifier, "com.test.icon")
+        XCTAssertNil(store.allSources().first?.iconData)
     }
 
     private func makeInfo(bundleId: String, name: String, iconByte: UInt8? = nil, fallbackSymbol: String? = nil) -> SourceAppInfo {

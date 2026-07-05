@@ -92,6 +92,7 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertEqual(L10n.Categories.promptDescription(for: "terminal", fallback: ""), "Preserves CLI, GitHub, repo, deploy, monitoring terms, flags, and paths")
         XCTAssertEqual(L10n.Recording.preparingAudio, "Preparing audio...")
         XCTAssertEqual(L10n.Preferences.language, "Language")
+        XCTAssertEqual(L10n.Preferences.configureShortcut, "Configure Shortcut...")
         XCTAssertEqual(L10n.Common.cancel, "Cancel")
         XCTAssertEqual(L10n.Common.save, "Save")
     }
@@ -119,6 +120,7 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertTrue(L10n.Categories.promptDescription(for: "terminal", fallback: "").contains("保留 CLI、GitHub"))
         XCTAssertEqual(L10n.Recording.preparingAudio, "准备音频...")
         XCTAssertEqual(L10n.Preferences.language, "语言")
+        XCTAssertEqual(L10n.Preferences.configureShortcut, "设置快捷键...")
         XCTAssertEqual(L10n.Common.cancel, "取消")
         XCTAssertEqual(L10n.Common.save, "保存")
     }
@@ -140,11 +142,13 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertEqual(L10n.Provider.displayName(for: "openai"), "OpenAI")
         XCTAssertEqual(L10n.Provider.displayName(for: "local"), "Local Whisper")
         XCTAssertEqual(L10n.Provider.displayName(for: "funasr"), "FunASR")
+        XCTAssertEqual(L10n.Provider.audioLanguage, "Audio Language")
 
         LanguageManager.shared.current = .chinese
         XCTAssertEqual(L10n.Provider.displayName(for: "local"), "本地 Whisper")
         // OpenAI and FunASR don't change
         XCTAssertEqual(L10n.Provider.displayName(for: "openai"), "OpenAI")
+        XCTAssertEqual(L10n.Provider.audioLanguage, "音频语言")
     }
 
     func testL10nFormatDuration() {
