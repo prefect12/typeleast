@@ -2,8 +2,9 @@ import Foundation
 
 internal enum WhisperKitStorage {
     // WhisperKit downloads CoreML bundles into a model folder. During download, the folder may exist with
-    // partial contents (e.g. config JSON), so "is downloaded" must check for the required CoreML bundles
-    // and tokenizer artifacts rather than any single file extension.
+    // partial contents (e.g. config JSON), so "is downloaded" must check the required CoreML bundles
+    // rather than any single file extension. Tokenizers are managed separately by WhisperKit and may live
+    // in a tokenizer repo cache instead of this CoreML model folder.
     private static let requiredCoreMLBundles = [
         "AudioEncoder.mlmodelc",
         "MelSpectrogram.mlmodelc",
@@ -26,7 +27,10 @@ internal enum WhisperKitStorage {
 
     static func isModelDownloaded(_ model: WhisperModel, fileManager: FileManager = .default) -> Bool {
         guard let modelDirectory = modelDirectory(for: model, fileManager: fileManager) else { return false }
+        return isModelDownloaded(at: modelDirectory, fileManager: fileManager)
+    }
 
+    static func isModelDownloaded(at modelDirectory: URL, fileManager: FileManager = .default) -> Bool {
         var isDirectory: ObjCBool = false
         let exists = fileManager.fileExists(atPath: modelDirectory.path, isDirectory: &isDirectory)
         guard exists, isDirectory.boolValue else { return false }
@@ -54,33 +58,7 @@ internal enum WhisperKitStorage {
             }
         }
 
-        // Tokenizer artifact (location varies by model, so search under `models/`).
-        let modelsDir = modelDirectory.appendingPathComponent("models", isDirectory: true)
-        var isModelsDir: ObjCBool = false
-        guard fileManager.fileExists(atPath: modelsDir.path, isDirectory: &isModelsDir),
-              isModelsDir.boolValue else {
-            return false
-        }
-
-        return containsTokenizerJSON(in: modelsDir, fileManager: fileManager)
-    }
-
-    private static func containsTokenizerJSON(in directory: URL, fileManager: FileManager) -> Bool {
-        guard let enumerator = fileManager.enumerator(
-            at: directory,
-            includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
-        ) else {
-            return false
-        }
-
-        for case let fileURL as URL in enumerator {
-            if fileURL.lastPathComponent == "tokenizer.json" {
-                return true
-            }
-        }
-
-        return false
+        return true
     }
 
     static func localModelPath(for model: WhisperModel, fileManager: FileManager = .default) -> String? {

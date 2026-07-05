@@ -73,8 +73,8 @@ internal enum AppDefaults {
             Keys.pressAndHoldKeyIdentifier: PressAndHoldConfiguration.defaults.key.rawValue,
             Keys.pressAndHoldMode: PressAndHoldConfiguration.defaults.mode.rawValue,
 
-            Keys.hasCompletedWelcome: false,
-            Keys.lastWelcomeVersion: "0",
+            Keys.hasCompletedWelcome: true,
+            Keys.lastWelcomeVersion: currentWelcomeVersion,
 
             Keys.hasSetupLocalLLM: false,
             Keys.hasSetupParakeet: false
