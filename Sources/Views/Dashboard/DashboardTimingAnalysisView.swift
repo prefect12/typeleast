@@ -1,7 +1,7 @@
 import SwiftUI
 import Charts
 
-private enum TimingStage: String, CaseIterable, Identifiable {
+internal enum TimingStage: String, CaseIterable, Identifiable {
     case recording
     case modelReady
     case asr
@@ -37,6 +37,10 @@ private enum TimingStage: String, CaseIterable, Identifiable {
         case .clipboard: return DashboardTheme.accent
         case .paste: return Color(nsColor: .systemRed)
         }
+    }
+
+    var canSummarizeAsBottleneck: Bool {
+        self != .legacyProcessing
     }
 }
 
@@ -196,6 +200,16 @@ internal struct DashboardTimingAnalysisView: View {
         .sorted { $0.seconds > $1.seconds }
     }
 
+    private var bottleneckStageTotals: [(stage: TimingStage, seconds: TimeInterval)] {
+        Self.bottleneckStageTotals(from: stageTotals)
+    }
+
+    static func bottleneckStageTotals(
+        from totals: [(stage: TimingStage, seconds: TimeInterval)]
+    ) -> [(stage: TimingStage, seconds: TimeInterval)] {
+        totals.filter { $0.stage.canSummarizeAsBottleneck }
+    }
+
     private var averageProcessing: TimeInterval {
         guard !runs.isEmpty else { return 0 }
         return runs.reduce(0) { $0 + $1.processingTotal() } / Double(runs.count)
@@ -262,7 +276,9 @@ internal struct DashboardTimingAnalysisView: View {
             TimingStatTile(title: L10n.Timing.analyzedRuns, value: "\(visibleRuns.count)", tint: DashboardTheme.accent)
             TimingStatTile(title: L10n.Timing.averageProcessing, value: formatDuration(averageProcessing), tint: DashboardTheme.success)
             TimingStatTile(title: L10n.Timing.slowestRun, value: slowestRun.map { formatDuration($0.visibleTotal(includeRecording: includeRecording)) } ?? "0s", tint: Color(nsColor: .systemRed))
-            TimingStatTile(title: L10n.Timing.slowestStage, value: stageTotals.first.map { $0.stage.title } ?? "-", tint: stageTotals.first?.stage.color ?? DashboardTheme.inkMuted)
+            if let bottleneck = bottleneckStageTotals.first {
+                TimingStatTile(title: L10n.Timing.slowestStage, value: bottleneck.stage.title, tint: bottleneck.stage.color)
+            }
         }
     }
 
