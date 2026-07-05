@@ -145,6 +145,41 @@ internal enum L10n {
         static var retrying: String { isCN ? "重新转录中..." : "Retrying transcription..." }
     }
 
+    // MARK: - Recording Settings
+    enum RecordingSettings {
+        static var microphone: String { isCN ? "麦克风" : "Microphone" }
+        static var noMicrophones: String {
+            isCN ? "未检测到麦克风。请接入麦克风，或检查系统权限。" :
+                "No microphones detected. Plug in a microphone or check system permissions."
+        }
+        static var inputDevice: String { isCN ? "输入设备" : "Input Device" }
+        static var systemDefault: String { isCN ? "系统默认" : "System Default" }
+        static var globalHotkey: String { isCN ? "全局快捷键" : "Global Hotkey" }
+        static var globalHotkeyFooter: String { isCN ? "在任何位置开始或停止录音。" : "Starts and stops recording system-wide." }
+        static var changeHotkey: String { isCN ? "更改…" : "Change…" }
+        static var pressKeys: String { isCN ? "按下快捷键..." : "Press keys..." }
+        static var pressAnotherKey: String { isCN ? "再按一个键" : "press another key" }
+        static var releaseToSave: String { isCN ? "松开保存" : "release to save" }
+        static var invalidHotkey: String { isCN ? "组合不可用" : "Invalid combination" }
+        static var pressAndHold: String { isCN ? "按住录音" : "Press & Hold" }
+        static var enablePressAndHold: String { isCN ? "启用按住录音" : "Enable Press & Hold" }
+        static var pressAndHoldDesc: String { isCN ? "按住一个修饰键来控制录音。" : "Hold a modifier key to control recording." }
+        static var pressAndHoldFooter: String {
+            isCN ? "在其他应用中使用需要辅助功能权限。" : "Requires Accessibility permission to work in other apps."
+        }
+        static var behavior: String { isCN ? "行为" : "Behavior" }
+        static var key: String { isCN ? "按键" : "Key" }
+        static var holdMode: String { isCN ? "按住时录音" : "Press and Hold" }
+        static var toggleMode: String { isCN ? "按一次切换" : "Press to Toggle" }
+        static var rightCommand: String { isCN ? "右 Command (⌘)" : "Right Command (⌘)" }
+        static var leftCommand: String { isCN ? "左 Command (⌘)" : "Left Command (⌘)" }
+        static var rightOption: String { isCN ? "右 Option (⌥)" : "Right Option (⌥)" }
+        static var leftOption: String { isCN ? "左 Option (⌥)" : "Left Option (⌥)" }
+        static var rightControl: String { isCN ? "右 Control (⌃)" : "Right Control (⌃)" }
+        static var leftControl: String { isCN ? "左 Control (⌃)" : "Left Control (⌃)" }
+        static var globe: String { isCN ? "Globe / Fn (🌐)" : "Globe / Fn (🌐)" }
+    }
+
     // MARK: - Providers
     enum Provider {
         static func displayName(for provider: String) -> String {

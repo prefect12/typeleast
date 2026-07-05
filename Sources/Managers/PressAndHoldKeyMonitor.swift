@@ -10,9 +10,9 @@ internal enum PressAndHoldMode: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .hold:
-            return "Press and Hold"
+            return L10n.RecordingSettings.holdMode
         case .toggle:
-            return "Press to Toggle"
+            return L10n.RecordingSettings.toggleMode
         }
     }
 }
@@ -31,19 +31,19 @@ internal enum PressAndHoldKey: String, CaseIterable, Identifiable {
     var displayName: String {
         switch self {
         case .rightCommand:
-            return "Right Command (⌘)"
+            return L10n.RecordingSettings.rightCommand
         case .leftCommand:
-            return "Left Command (⌘)"
+            return L10n.RecordingSettings.leftCommand
         case .rightOption:
-            return "Right Option (⌥)"
+            return L10n.RecordingSettings.rightOption
         case .leftOption:
-            return "Left Option (⌥)"
+            return L10n.RecordingSettings.leftOption
         case .rightControl:
-            return "Right Control (⌃)"
+            return L10n.RecordingSettings.rightControl
         case .leftControl:
-            return "Left Control (⌃)"
+            return L10n.RecordingSettings.leftControl
         case .globe:
-            return "Globe / Fn (🌐)"
+            return L10n.RecordingSettings.globe
         }
     }
 

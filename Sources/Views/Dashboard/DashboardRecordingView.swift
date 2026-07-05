@@ -19,11 +19,11 @@ internal struct DashboardRecordingView: View {
         Form {
             Section {
                 if availableMicrophones.isEmpty {
-                    Text("No microphones detected. Plug in a microphone or check system permissions.")
+                    Text(L10n.RecordingSettings.noMicrophones)
                         .foregroundStyle(.secondary)
                 } else {
-                    Picker("Input Device", selection: $selectedMicrophone) {
-                        Text("System Default").tag("")
+                    Picker(L10n.RecordingSettings.inputDevice, selection: $selectedMicrophone) {
+                        Text(L10n.RecordingSettings.systemDefault).tag("")
                         ForEach(availableMicrophones, id: \.uniqueID) { device in
                             Text(device.localizedName).tag(device.uniqueID)
                         }
@@ -31,7 +31,7 @@ internal struct DashboardRecordingView: View {
                     .pickerStyle(.menu)
                 }
             } header: {
-                Text("Microphone")
+                Text(L10n.RecordingSettings.microphone)
             }
 
             Section {
@@ -40,20 +40,19 @@ internal struct DashboardRecordingView: View {
                         isRecording: $isRecordingHotkey,
                         recordedModifiers: $recordedModifiers,
                         recordedKey: $recordedKey,
-                        onComplete: { newHotkey in
-                            globalHotkey = newHotkey
-                            updateGlobalHotkey(newHotkey)
+                        onComplete: { result in
+                            applyRecordedHotkey(result)
                         }
                     )
                 } else {
                     HStack(spacing: 10) {
-                        Text(globalHotkey)
+                        Text(GlobalShortcutDisplay.text(for: globalHotkey))
                             .font(.system(.body, design: .monospaced))
                             .monospacedDigit()
 
                         Spacer()
 
-                        Button("Change…") {
+                        Button(L10n.RecordingSettings.changeHotkey) {
                             isRecordingHotkey = true
                             recordedModifiers = []
                             recordedKey = nil
@@ -61,16 +60,16 @@ internal struct DashboardRecordingView: View {
                     }
                 }
             } header: {
-                Text("Global Hotkey")
+                Text(L10n.RecordingSettings.globalHotkey)
             } footer: {
-                Text("Starts and stops recording system-wide.")
+                Text(L10n.RecordingSettings.globalHotkeyFooter)
             }
 
             Section {
                 Toggle(isOn: $pressAndHoldEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Enable Press & Hold")
-                        Text("Hold a modifier key to control recording.")
+                        Text(L10n.RecordingSettings.enablePressAndHold)
+                        Text(L10n.RecordingSettings.pressAndHoldDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -80,7 +79,7 @@ internal struct DashboardRecordingView: View {
                 }
 
                 if pressAndHoldEnabled {
-                    Picker("Behavior", selection: $pressAndHoldModeRaw) {
+                    Picker(L10n.RecordingSettings.behavior, selection: $pressAndHoldModeRaw) {
                         ForEach(PressAndHoldMode.allCases, id: \.rawValue) { mode in
                             Text(mode.displayName).tag(mode.rawValue)
                         }
@@ -90,7 +89,7 @@ internal struct DashboardRecordingView: View {
                         publishPressAndHoldConfiguration()
                     }
 
-                    Picker("Key", selection: $pressAndHoldKeyIdentifier) {
+                    Picker(L10n.RecordingSettings.key, selection: $pressAndHoldKeyIdentifier) {
                         ForEach(PressAndHoldKey.allCases, id: \.rawValue) { key in
                             Text(key.displayName).tag(key.rawValue)
                         }
@@ -101,9 +100,9 @@ internal struct DashboardRecordingView: View {
                     }
                 }
             } header: {
-                Text("Press & Hold")
+                Text(L10n.RecordingSettings.pressAndHold)
             } footer: {
-                Text("Requires Accessibility permission to work in other apps.")
+                Text(L10n.RecordingSettings.pressAndHoldFooter)
             }
         }
         .formStyle(.grouped)
@@ -136,10 +135,49 @@ internal struct DashboardRecordingView: View {
             object: newHotkey
         )
     }
+
+    private func applyRecordedHotkey(_ result: HotKeyRecordingResult) {
+        switch result {
+        case .keyCombo(let newHotkey):
+            let wasModifierOnly = GlobalShortcutDisplay.modifierOnlyKey(from: globalHotkey) != nil
+            globalHotkey = newHotkey
+            updateGlobalHotkey(newHotkey)
+
+            if wasModifierOnly {
+                pressAndHoldEnabled = false
+                publishPressAndHoldConfiguration(
+                    PressAndHoldConfiguration(
+                        enabled: false,
+                        key: PressAndHoldKey(rawValue: pressAndHoldKeyIdentifier) ?? PressAndHoldConfiguration.defaults.key,
+                        mode: PressAndHoldMode(rawValue: pressAndHoldModeRaw) ?? PressAndHoldConfiguration.defaults.mode
+                    )
+                )
+            }
+
+        case .modifierOnly(let key):
+            let storedValue = GlobalShortcutDisplay.storedValue(for: key)
+            globalHotkey = storedValue
+            pressAndHoldEnabled = true
+            pressAndHoldKeyIdentifier = key.rawValue
+            pressAndHoldModeRaw = PressAndHoldMode.hold.rawValue
+
+            updateGlobalHotkey(storedValue)
+            publishPressAndHoldConfiguration(
+                PressAndHoldConfiguration(
+                    enabled: true,
+                    key: key,
+                    mode: .hold
+                )
+            )
+        }
+    }
+
+    private func publishPressAndHoldConfiguration(_ configuration: PressAndHoldConfiguration) {
+        NotificationCenter.default.post(name: .pressAndHoldSettingsChanged, object: configuration)
+    }
 }
 
 #Preview {
     DashboardRecordingView()
         .frame(width: 900, height: 700)
 }
-
