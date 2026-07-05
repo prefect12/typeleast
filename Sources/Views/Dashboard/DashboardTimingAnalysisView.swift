@@ -56,7 +56,7 @@ private struct TimingRun: Identifiable {
     var id: UUID { record.id }
 
     var runLabel: String {
-        "\(index + 1). \(Self.shortFormatter.string(from: record.date))"
+        "#\(index + 1) · \(Self.shortFormatter.string(from: record.date))"
     }
 
     var chartKey: String {
@@ -128,7 +128,8 @@ private struct TimingRun: Identifiable {
 
     private static let shortFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.setLocalizedDateFormatFromTemplate("M/d HH:mm")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "M/d HH:mm"
         return formatter
     }()
 }
@@ -665,16 +666,20 @@ private struct TimingDetailRow: View {
         run.segments(includeRecording: includeRecording)
     }
 
+    private var transcriptText: String {
+        run.record.text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(run.runLabel)
                         .font(.headline)
                         .foregroundStyle(DashboardTheme.ink)
                     Text(run.detailLine)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(DashboardTheme.inkMuted)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(DashboardTheme.inkLight)
                 }
 
                 Spacer()
@@ -684,28 +689,78 @@ private struct TimingDetailRow: View {
                     .foregroundStyle(DashboardTheme.ink)
             }
 
-            HStack(spacing: 8) {
+            if !transcriptText.isEmpty {
+                Text(transcriptText)
+                    .font(.callout.weight(.medium))
+                    .lineSpacing(2)
+                    .foregroundStyle(DashboardTheme.ink)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(
+                        DashboardTheme.pageBg.opacity(0.55),
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(DashboardTheme.rule.opacity(0.65), lineWidth: 1)
+                    )
+            }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(segments) { segment in
-                    Label {
-                        Text("\(segment.stage.title) \(durationFormatter(segment.seconds))")
-                    } icon: {
-                        Circle()
-                            .fill(segment.stage.color)
-                            .frame(width: 7, height: 7)
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(DashboardTheme.inkLight)
+                    TimingSegmentPill(
+                        segment: segment,
+                        durationFormatter: durationFormatter
+                    )
                 }
             }
-            .lineLimit(2)
 
             if !run.record.hasDetailedTiming, run.record.transcriptionTime != nil {
                 Text(L10n.Timing.oldRecordHint)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(DashboardTheme.inkMuted)
+                    .foregroundStyle(DashboardTheme.inkLight)
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
+    }
+}
+
+private struct TimingSegmentPill: View {
+    let segment: TimingSegment
+    let durationFormatter: (TimeInterval) -> String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(segment.stage.color)
+                .frame(width: 7, height: 7)
+
+            Text(segment.stage.title)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(DashboardTheme.inkLight)
+                .lineLimit(1)
+
+            Spacer(minLength: 8)
+
+            Text(durationFormatter(segment.seconds))
+                .font(.caption.monospacedDigit().weight(.heavy))
+                .foregroundStyle(segment.stage.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .padding(.vertical, 7)
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .background(
+            segment.stage.color.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(segment.stage.color.opacity(0.24), lineWidth: 1)
+        )
     }
 }
 
