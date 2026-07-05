@@ -31,9 +31,10 @@ internal extension ContentView {
         if shouldHintThisRun { showFirstModelUseHint = true }
 
         processingTask = Task {
+            let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
-            progressMessage = "Preparing audio..."
+            progressMessage = L10n.Recording.preparingAudio
             
             do {
                 try Task.checkCancellation()
@@ -49,12 +50,23 @@ internal extension ContentView {
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
                 
+                var modelReadyTime: TimeInterval?
+                var asrTime: TimeInterval = 0
+                var correctionTime: TimeInterval = 0
+                var clipboardTime: TimeInterval = 0
+                let transcriptionStart = Date()
                 let text: String
                 if transcriptionProvider == .local {
+                    let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
+                    modelReadyTime = Date().timeIntervalSince(modelReadyStart)
+                    let asrStart = Date()
                     text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider, model: selectedWhisperModel)
+                    asrTime = Date().timeIntervalSince(asrStart)
                 } else {
+                    let asrStart = Date()
                     text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider)
+                    asrTime = Date().timeIntervalSince(asrStart)
                 }
                 
                 try Task.checkCancellation()
@@ -64,8 +76,10 @@ internal extension ContentView {
                 var finalText = text
                 let sourceBundleId: String? = await MainActor.run { currentSourceAppInfo().bundleIdentifier }
                 if mode != .off {
-                    await MainActor.run { progressMessage = "Semantic correction..." }
+                    await MainActor.run { progressMessage = L10n.Recording.semanticCorrection }
+                    let correctionStart = Date()
                     let outcome = await semanticCorrectionService.correctWithWarning(text: text, providerUsed: transcriptionProvider, sourceAppBundleId: sourceBundleId)
+                    correctionTime = Date().timeIntervalSince(correctionStart)
                     if let warning = outcome.warning {
                         await MainActor.run { progressMessage = warning }
                     }
@@ -74,12 +88,16 @@ internal extension ContentView {
                         finalText = outcome.text
                     }
                 }
+                let transcriptionElapsed = Date().timeIntervalSince(transcriptionStart)
                 let wordCount = UsageMetricsStore.estimatedWordCount(for: finalText)
                 let characterCount = finalText.count
 
+                let clipboardStart = Date()
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(finalText, forType: .string)
+                clipboardTime = Date().timeIntervalSince(clipboardStart)
                 let shouldSave: Bool = await MainActor.run { DataManager.shared.isHistoryEnabled }
+                var savedRecordID: UUID?
                 if shouldSave {
                     let modelUsed: String? = await MainActor.run { (transcriptionProvider == .local) ? self.selectedWhisperModel.rawValue : nil }
                     let sourceInfo: SourceAppInfo = await MainActor.run { currentSourceAppInfo() }
@@ -92,8 +110,15 @@ internal extension ContentView {
                         characterCount: characterCount,
                         sourceAppBundleId: sourceInfo.bundleIdentifier,
                         sourceAppName: sourceInfo.displayName,
-                        sourceAppIconData: sourceInfo.iconData
+                        sourceAppIconData: sourceInfo.iconData,
+                        transcriptionTime: transcriptionElapsed,
+                        modelReadyTime: modelReadyTime,
+                        asrTime: asrTime,
+                        correctionTime: correctionTime,
+                        clipboardTime: clipboardTime,
+                        endToEndTime: Date().timeIntervalSince(processStart)
                     )
+                    savedRecordID = record.id
                     await DataManager.shared.saveTranscriptionQuietly(record)
                 }
                 await MainActor.run {
@@ -104,7 +129,7 @@ internal extension ContentView {
                     )
                     recordSourceUsage(words: wordCount, characters: characterCount)
                     transcriptionStartTime = nil
-                    showConfirmationAndPaste(text: finalText)
+                    showConfirmationAndPaste(text: finalText, recordID: savedRecordID, processStart: processStart)
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch is CancellationError {
@@ -154,21 +179,33 @@ internal extension ContentView {
         if shouldHintThisRun { showFirstModelUseHint = true }
 
         processingTask = Task {
+            let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
-            progressMessage = "Transcribing file..."
+            progressMessage = L10n.Recording.transcribingFile
 
             do {
                 try Task.checkCancellation()
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
 
+                var modelReadyTime: TimeInterval?
+                var asrTime: TimeInterval = 0
+                var correctionTime: TimeInterval = 0
+                var clipboardTime: TimeInterval = 0
+                let transcriptionStart = Date()
                 let text: String
                 if transcriptionProvider == .local {
+                    let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
+                    modelReadyTime = Date().timeIntervalSince(modelReadyStart)
+                    let asrStart = Date()
                     text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider, model: selectedWhisperModel)
+                    asrTime = Date().timeIntervalSince(asrStart)
                 } else {
+                    let asrStart = Date()
                     text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider)
+                    asrTime = Date().timeIntervalSince(asrStart)
                 }
 
                 try Task.checkCancellation()
@@ -178,8 +215,10 @@ internal extension ContentView {
                 var finalText = text
                 let sourceBundleId: String? = await MainActor.run { currentSourceAppInfo().bundleIdentifier }
                 if mode != .off {
-                    await MainActor.run { progressMessage = "Semantic correction..." }
+                    await MainActor.run { progressMessage = L10n.Recording.semanticCorrection }
+                    let correctionStart = Date()
                     let outcome = await semanticCorrectionService.correctWithWarning(text: text, providerUsed: transcriptionProvider, sourceAppBundleId: sourceBundleId)
+                    correctionTime = Date().timeIntervalSince(correctionStart)
                     if let warning = outcome.warning {
                         await MainActor.run { progressMessage = warning }
                     }
@@ -188,6 +227,7 @@ internal extension ContentView {
                         finalText = outcome.text
                     }
                 }
+                let transcriptionElapsed = Date().timeIntervalSince(transcriptionStart)
                 let wordCount = UsageMetricsStore.estimatedWordCount(for: finalText)
                 let characterCount = finalText.count
 
@@ -195,9 +235,12 @@ internal extension ContentView {
                 let fileSize = (fileAttributes?[.size] as? Int64) ?? 0
                 let estimatedDuration = TimeInterval(fileSize) / 16000.0
 
+                let clipboardStart = Date()
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(finalText, forType: .string)
+                clipboardTime = Date().timeIntervalSince(clipboardStart)
                 let shouldSave: Bool = await MainActor.run { DataManager.shared.isHistoryEnabled }
+                var savedRecordID: UUID?
                 if shouldSave {
                     let modelUsed: String? = await MainActor.run { (transcriptionProvider == .local) ? self.selectedWhisperModel.rawValue : nil }
                     let sourceInfo: SourceAppInfo = await MainActor.run { currentSourceAppInfo() }
@@ -210,8 +253,15 @@ internal extension ContentView {
                         characterCount: characterCount,
                         sourceAppBundleId: sourceInfo.bundleIdentifier,
                         sourceAppName: sourceInfo.displayName,
-                        sourceAppIconData: sourceInfo.iconData
+                        sourceAppIconData: sourceInfo.iconData,
+                        transcriptionTime: transcriptionElapsed,
+                        modelReadyTime: modelReadyTime,
+                        asrTime: asrTime,
+                        correctionTime: correctionTime,
+                        clipboardTime: clipboardTime,
+                        endToEndTime: Date().timeIntervalSince(processStart)
                     )
+                    savedRecordID = record.id
                     await DataManager.shared.saveTranscriptionQuietly(record)
                 }
                 await MainActor.run {
@@ -222,7 +272,7 @@ internal extension ContentView {
                     )
                     recordSourceUsage(words: wordCount, characters: characterCount)
                     transcriptionStartTime = nil
-                    showConfirmationAndPaste(text: finalText)
+                    showConfirmationAndPaste(text: finalText, recordID: savedRecordID, processStart: processStart)
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch is CancellationError {
@@ -265,7 +315,7 @@ internal extension ContentView {
         }
     }
 
-    func showConfirmationAndPaste(text: String) {
+    func showConfirmationAndPaste(text: String, recordID: UUID? = nil, processStart: Date? = nil) {
         showSuccess = true
         isProcessing = false
         soundManager.playCompletionSound()
@@ -274,10 +324,11 @@ internal extension ContentView {
         if enableSmartPaste {
             if !awaitingSemanticPaste {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    performUserTriggeredPaste()
+                    performUserTriggeredPaste(recordID: recordID, processStart: processStart, pasteStart: Date())
                 }
             }
         } else {
+            updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: nil)
             NotificationCenter.default.post(name: .restoreFocusToPreviousApp, object: nil)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {

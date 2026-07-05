@@ -8,28 +8,46 @@ internal struct DashboardPreferencesView: View {
     @AppStorage("autoBoostMicrophoneVolume") private var autoBoostMicrophoneVolume = false
     @AppStorage("enableSmartPaste") private var enableSmartPaste = false
     @AppStorage("playCompletionSound") private var playCompletionSound = true
-    @AppStorage("transcriptionHistoryEnabled") private var transcriptionHistoryEnabled = false
-    @AppStorage("transcriptionRetentionPeriod") private var transcriptionRetentionPeriodRaw = RetentionPeriod.oneMonth.rawValue
+    @AppStorage("transcriptionHistoryEnabled") private var transcriptionHistoryEnabled = true
+    @AppStorage("transcriptionRetentionPeriod") private var transcriptionRetentionPeriodRaw = RetentionPeriod.forever.rawValue
     @AppStorage("maxModelStorageGB") private var maxModelStorageGB = 5.0
 
+    @ObservedObject private var languageManager = LanguageManager.shared
     @State private var loginItemError: String?
 
     private let storageOptions: [Double] = [1, 2, 5, 10, 20]
 
     private var retentionBinding: Binding<RetentionPeriod> {
         Binding(
-            get: { RetentionPeriod(rawValue: transcriptionRetentionPeriodRaw) ?? .oneMonth },
+            get: { RetentionPeriod(rawValue: transcriptionRetentionPeriodRaw) ?? .forever },
             set: { transcriptionRetentionPeriodRaw = $0.rawValue }
         )
     }
 
     var body: some View {
         Form {
-            Section("General") {
+            // Language setting at the top
+            Section {
+                Picker(L10n.Preferences.language, selection: $languageManager.current) {
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(lang.displayName).tag(lang)
+                    }
+                }
+                .pickerStyle(.menu)
+                .onChange(of: languageManager.current) { _, _ in
+                    (NSApp.delegate as? AppDelegate)?.refreshStatusMenu()
+                }
+            } header: {
+                Text(L10n.Preferences.language)
+            } footer: {
+                Text(L10n.Preferences.languageFooter)
+            }
+
+            Section(L10n.Preferences.general) {
                 Toggle(isOn: $startAtLogin) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Start at Login")
-                        Text("Launch AudioWhisper when you sign in.")
+                        Text(L10n.Preferences.startAtLogin)
+                        Text(L10n.Preferences.startAtLoginDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -40,8 +58,8 @@ internal struct DashboardPreferencesView: View {
 
                 Toggle(isOn: $immediateRecording) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Express Mode")
-                        Text("Hotkey immediately starts and stops recording.")
+                        Text(L10n.Preferences.expressMode)
+                        Text(L10n.Preferences.expressModeDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -49,8 +67,8 @@ internal struct DashboardPreferencesView: View {
 
                 Toggle(isOn: $autoBoostMicrophoneVolume) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Auto-Boost Microphone")
-                        Text("Temporarily maximize mic input while recording.")
+                        Text(L10n.Preferences.autoBoost)
+                        Text(L10n.Preferences.autoBoostDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -58,8 +76,8 @@ internal struct DashboardPreferencesView: View {
 
                 Toggle(isOn: $enableSmartPaste) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Smart Paste")
-                        Text("Automatically paste finished transcripts.")
+                        Text(L10n.Preferences.smartPaste)
+                        Text(L10n.Preferences.smartPasteDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -67,8 +85,8 @@ internal struct DashboardPreferencesView: View {
 
                 Toggle(isOn: $playCompletionSound) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Completion Sound")
-                        Text("Play a chime when transcription finishes.")
+                        Text(L10n.Preferences.completionSound)
+                        Text(L10n.Preferences.completionSoundDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -83,8 +101,8 @@ internal struct DashboardPreferencesView: View {
             Section {
                 Toggle(isOn: $transcriptionHistoryEnabled) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Save Transcription History")
-                        Text("Store transcripts locally so you can search and review them later.")
+                        Text(L10n.Preferences.saveHistory)
+                        Text(L10n.Preferences.saveHistoryDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -99,13 +117,11 @@ internal struct DashboardPreferencesView: View {
                     .pickerStyle(.menu)
                 }
             } header: {
-                Text("History")
-            } footer: {
-                Text("View saved transcripts in the Transcripts section in the sidebar.")
+                Text(L10n.Preferences.history)
             }
 
-            Section("Storage") {
-                Picker("Max Model Storage", selection: $maxModelStorageGB) {
+            Section(L10n.Preferences.storage) {
+                Picker(L10n.Preferences.maxModelStorage, selection: $maxModelStorageGB) {
                     ForEach(storageOptions, id: \.self) { option in
                         Text("\(Int(option)) GB").tag(option)
                     }
@@ -113,8 +129,8 @@ internal struct DashboardPreferencesView: View {
                 .pickerStyle(.menu)
             }
 
-            Section("About") {
-                LabeledContent("Version") {
+            Section(L10n.Preferences.about) {
+                LabeledContent(L10n.Preferences.version) {
                     Text(VersionInfo.fullVersionInfo)
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.secondary)

@@ -15,7 +15,7 @@ internal struct DashboardCategoriesView: View {
 
     var body: some View {
         Form {
-            Section("Category Types") {
+            Section(L10n.Categories.categoryTypes) {
                 ForEach(categoryStore.categories, id: \.id) { category in
                     Button {
                         editingCategory = category
@@ -27,18 +27,18 @@ internal struct DashboardCategoriesView: View {
 
                             VStack(alignment: .leading, spacing: 2) {
                                 HStack(spacing: 8) {
-                                    Text(category.displayName)
+                                    Text(category.localizedDisplayName)
                                         .font(.body.weight(.medium))
                                         .foregroundStyle(.primary)
 
                                     if category.isSystem {
-                                        Text("System")
+                                        Text(L10n.Categories.systemBadge)
                                             .font(.caption2.weight(.semibold))
                                             .foregroundStyle(.secondary)
                                     }
                                 }
 
-                                Text(category.promptDescription)
+                                Text(category.localizedPromptDescription)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
@@ -53,19 +53,19 @@ internal struct DashboardCategoriesView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .help("Edit \(category.displayName)")
+                    .help(L10n.Categories.editCategory(category.localizedDisplayName))
                 }
 
                 HStack(spacing: 10) {
                     Button {
                         isCreatingNew = true
                     } label: {
-                        Label("New Category…", systemImage: "plus")
+                        Label(L10n.Categories.newCategory, systemImage: "plus")
                     }
 
                     Spacer()
 
-                    Button("Reset to Defaults") {
+                    Button(L10n.Categories.resetToDefaults) {
                         categoryStore.resetToDefaults()
                     }
                 }
@@ -73,7 +73,7 @@ internal struct DashboardCategoriesView: View {
 
             Section {
                 if topSources.isEmpty {
-                    Text("No apps recorded yet.")
+                    Text(L10n.Categories.noAppsRecorded)
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(topSources) { source in
@@ -81,14 +81,14 @@ internal struct DashboardCategoriesView: View {
                             HStack(spacing: 8) {
                                 Picker("", selection: categoryBinding(for: source.bundleIdentifier)) {
                                     ForEach(categoryStore.categories, id: \.id) { category in
-                                        Text(category.displayName).tag(category.id)
+                                        Text(category.localizedDisplayName).tag(category.id)
                                     }
                                 }
                                 .labelsHidden()
                                 .pickerStyle(.menu)
 
                                 if categoryManager.isUserOverridden(source.bundleIdentifier) {
-                                    Button("Reset") {
+                                    Button(L10n.Common.reset) {
                                         categoryManager.resetToDefault(for: source.bundleIdentifier)
                                     }
                                     .controlSize(.small)
@@ -99,7 +99,7 @@ internal struct DashboardCategoriesView: View {
                         }
                         .contextMenu {
                             if categoryManager.isUserOverridden(source.bundleIdentifier) {
-                                Button("Reset to Default") {
+                                Button(L10n.Categories.resetToDefault) {
                                     categoryManager.resetToDefault(for: source.bundleIdentifier)
                                 }
                             }
@@ -107,9 +107,9 @@ internal struct DashboardCategoriesView: View {
                     }
                 }
             } header: {
-                Text("App Assignments")
+                Text(L10n.Categories.appAssignments)
             } footer: {
-                Text("Assignments are applied automatically when you paste a finished transcript.")
+                Text(L10n.Categories.assignmentsFooter)
             }
         }
         .formStyle(.grouped)

@@ -78,19 +78,34 @@ internal enum DashboardTheme {
 
 // MARK: - Navigation Item
 internal enum DashboardNavItem: String, CaseIterable, Identifiable, Hashable {
-    case dashboard = "Overview"
-    case transcripts = "Transcripts"
-    case categories = "Categories"
-    case recording = "Recording"
-    case providers = "Providers"
-    case preferences = "Preferences"
-    case permissions = "Permissions"
+    case dashboard
+    case timingAnalysis
+    case transcripts
+    case categories
+    case recording
+    case providers
+    case preferences
+    case permissions
 
     var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .dashboard: return L10n.Nav.overview
+        case .timingAnalysis: return L10n.Nav.timingAnalysis
+        case .transcripts: return L10n.Nav.transcripts
+        case .categories: return L10n.Nav.categories
+        case .recording: return L10n.Nav.recording
+        case .providers: return L10n.Nav.providers
+        case .preferences: return L10n.Nav.preferences
+        case .permissions: return L10n.Nav.permissions
+        }
+    }
 
     var icon: String {
         switch self {
         case .dashboard: return "square.text.square"
+        case .timingAnalysis: return "chart.bar.xaxis"
         case .transcripts: return "doc.text"
         case .categories: return "folder"
         case .recording: return "waveform"
@@ -109,24 +124,26 @@ internal struct DashboardView: View {
         self.selectionModel = selectionModel
     }
 
+    @ObservedObject private var languageManager = LanguageManager.shared
+
     var body: some View {
         NavigationSplitView {
             List(DashboardNavItem.allCases, selection: $selectionModel.selectedNav) { item in
-                Label(item.rawValue, systemImage: item.icon)
+                Label(item.displayName, systemImage: item.icon)
                     .tag(item)
             }
             .listStyle(.sidebar)
-            // Remove the built-in sidebar toggle to keep the titlebar clean.
             .toolbar(removing: .sidebarToggle)
         } detail: {
             if let selectedNav = selectionModel.selectedNav {
                 detailView(for: selectedNav)
-                    .navigationTitle(selectedNav.rawValue)
+                    .navigationTitle(selectedNav.displayName)
             } else {
-                Text("Select a section in the sidebar")
+                Text(L10n.Nav.selectSection)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .id(languageManager.current)
     }
 
     @ViewBuilder
@@ -134,6 +151,8 @@ internal struct DashboardView: View {
         switch item {
         case .dashboard:
             DashboardHomeView(selectedNav: Binding(get: { selectionModel.selectedNav ?? .dashboard }, set: { selectionModel.selectedNav = $0 }))
+        case .timingAnalysis:
+            DashboardTimingAnalysisView()
         case .transcripts:
             DashboardTranscriptsView()
         case .categories:

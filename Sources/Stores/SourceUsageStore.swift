@@ -73,6 +73,8 @@ internal final class SourceUsageStore {
     
     private let defaults: UserDefaults
     private let storageKey = "sourceUsage.stats"
+    private let importDevelopmentKey = "sourceUsage.didImportDevelopmentUsage"
+    private let developmentBundleIdentifier = "com.audiowhisper-dev.app"
     private let maxSources = 50
     
     private(set) var orderedStats: [SourceUsageStats] = []
@@ -80,6 +82,7 @@ internal final class SourceUsageStore {
     
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        importDevelopmentSourcesIfNeeded()
         if let data = defaults.data(forKey: storageKey) {
             let decoder = JSONDecoder()
             decoder.dateDecodingStrategy = .iso8601
@@ -146,6 +149,51 @@ internal final class SourceUsageStore {
         encoder.dateEncodingStrategy = .iso8601
         if let data = try? encoder.encode(statsByBundle) {
             defaults.set(data, forKey: storageKey)
+        }
+    }
+
+    private func importDevelopmentSourcesIfNeeded() {
+        guard defaults === UserDefaults.standard else { return }
+        guard defaults.object(forKey: importDevelopmentKey) == nil else { return }
+        guard let developmentDomain = defaults.persistentDomain(forName: developmentBundleIdentifier),
+              let developmentData = developmentDomain[storageKey] as? Data else {
+            return
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        guard let developmentStats = try? decoder.decode([String: SourceUsageStats].self, from: developmentData) else {
+            return
+        }
+
+        var mergedStats: [String: SourceUsageStats] = [:]
+        if let currentData = defaults.data(forKey: storageKey),
+           let currentStats = try? decoder.decode([String: SourceUsageStats].self, from: currentData) {
+            mergedStats = currentStats
+        }
+
+        for (bundleIdentifier, developmentStat) in developmentStats {
+            if let currentStat = mergedStats[bundleIdentifier] {
+                mergedStats[bundleIdentifier] = SourceUsageStats(
+                    bundleIdentifier: bundleIdentifier,
+                    displayName: currentStat.displayName.isEmpty ? developmentStat.displayName : currentStat.displayName,
+                    totalWords: currentStat.totalWords + developmentStat.totalWords,
+                    totalCharacters: currentStat.totalCharacters + developmentStat.totalCharacters,
+                    sessionCount: currentStat.sessionCount + developmentStat.sessionCount,
+                    lastUsed: max(currentStat.lastUsed, developmentStat.lastUsed),
+                    iconData: currentStat.iconData ?? developmentStat.iconData,
+                    fallbackSymbolName: currentStat.fallbackSymbolName ?? developmentStat.fallbackSymbolName
+                )
+            } else {
+                mergedStats[bundleIdentifier] = developmentStat
+            }
+        }
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(mergedStats) {
+            defaults.set(data, forKey: storageKey)
+            defaults.set(true, forKey: importDevelopmentKey)
         }
     }
     

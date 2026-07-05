@@ -39,6 +39,9 @@ internal final class AppCategoryManager {
         "ru.keepcoder.Telegram": "chat",
         "net.whatsapp.WhatsApp": "chat",
         "com.microsoft.teams2": "chat",
+        "com.tencent.xinWeChat": "chat",       // WeChat
+        "com.electron.lark": "chat",            // Feishu/Lark
+        "com.alibaba.DingTalkMac": "chat",      // DingTalk
 
         // Email
         "com.apple.mail": "email",

@@ -74,6 +74,7 @@ internal protocol DataManagerProtocol {
     func fetchRecords(matching searchQuery: String, limit: Int?, offset: Int?) async throws -> [TranscriptionRecord]
     func deleteRecord(_ record: TranscriptionRecord) async throws
     func deleteAllRecords() async throws
+    func updateTiming(for recordID: UUID, pasteTime: TimeInterval?, endToEndTime: TimeInterval?) async throws
     func cleanupExpiredRecords() async throws
     
     // Backward compatibility methods that don't throw
@@ -101,8 +102,8 @@ internal final class DataManager: DataManagerProtocol {
     
     var retentionPeriod: RetentionPeriod {
         get {
-            let rawValue = UserDefaults.standard.string(forKey: "transcriptionRetentionPeriod") ?? RetentionPeriod.oneMonth.rawValue
-            return RetentionPeriod(rawValue: rawValue) ?? .oneMonth
+            let rawValue = UserDefaults.standard.string(forKey: "transcriptionRetentionPeriod") ?? RetentionPeriod.forever.rawValue
+            return RetentionPeriod(rawValue: rawValue) ?? .forever
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "transcriptionRetentionPeriod")
@@ -298,6 +299,36 @@ internal final class DataManager: DataManagerProtocol {
             throw DataManagerError.deleteFailed(error)
         }
     }
+
+    func updateTiming(for recordID: UUID, pasteTime: TimeInterval?, endToEndTime: TimeInterval?) async throws {
+        guard let container = modelContainer else {
+            throw DataManagerError.modelContainerUnavailable
+        }
+
+        do {
+            let context = ModelContext(container)
+            let descriptor = FetchDescriptor<TranscriptionRecord>(
+                predicate: #Predicate { record in
+                    record.id == recordID
+                }
+            )
+            guard let record = try context.fetch(descriptor).first else {
+                Logger.dataManager.warning("Record with ID \(recordID) not found for timing update")
+                return
+            }
+
+            if let pasteTime {
+                record.pasteTime = pasteTime
+            }
+            if let endToEndTime {
+                record.endToEndTime = endToEndTime
+            }
+            try context.save()
+        } catch {
+            Logger.dataManager.error("Failed to update timing for record \(recordID): \(error.localizedDescription)")
+            throw DataManagerError.saveFailed(error)
+        }
+    }
     
     func cleanupExpiredRecords() async throws {
         guard let timeInterval = retentionPeriod.timeInterval else {
@@ -429,6 +460,16 @@ internal final class MockDataManager: DataManagerProtocol {
         // Reset usage metrics and source stats since all records are gone
         UsageMetricsStore.shared.reset()
         SourceUsageStore.shared.reset()
+    }
+
+    func updateTiming(for recordID: UUID, pasteTime: TimeInterval?, endToEndTime: TimeInterval?) async throws {
+        guard let record = records.first(where: { $0.id == recordID }) else { return }
+        if let pasteTime {
+            record.pasteTime = pasteTime
+        }
+        if let endToEndTime {
+            record.endToEndTime = endToEndTime
+        }
     }
     
     func cleanupExpiredRecords() async throws {

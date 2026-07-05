@@ -127,6 +127,12 @@ private final class TestDataManager: DataManagerProtocol {
         records.removeAll()
     }
 
+    func updateTiming(for recordID: UUID, pasteTime: TimeInterval?, endToEndTime: TimeInterval?) async throws {
+        guard let record = records.first(where: { $0.id == recordID }) else { return }
+        record.pasteTime = pasteTime
+        record.endToEndTime = endToEndTime
+    }
+
     func cleanupExpiredRecords() async throws {}
 
     func saveTranscriptionQuietly(_ record: TranscriptionRecord) async {

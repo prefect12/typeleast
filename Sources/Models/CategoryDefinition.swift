@@ -19,7 +19,7 @@ internal struct CategoryDefinition: Identifiable, Codable, Equatable, Hashable {
             displayName: "Terminal",
             icon: "terminal",
             colorHex: "#4CD966",
-            promptDescription: "Preserves CLI terms, flags, paths. Fixes: 'suit oh' → 'sudo', 'see dee' → 'cd'",
+            promptDescription: "Preserves CLI, GitHub, repo, deploy, monitoring terms, flags, and paths",
             promptTemplate: Self.terminalPrompt,
             isSystem: true
         ),
@@ -28,7 +28,7 @@ internal struct CategoryDefinition: Identifiable, Codable, Equatable, Hashable {
             displayName: "Coding",
             icon: "curlybraces",
             colorHex: "#66A6F2",
-            promptDescription: "Preserves syntax, naming conventions. Fixes: 'you state' → 'useState', 'a sink' → 'async'",
+            promptDescription: "Preserves code, GitHub, repo, PR, campaign, and monitoring vocabulary",
             promptTemplate: Self.codingPrompt,
             isSystem: true
         ),
@@ -37,7 +37,7 @@ internal struct CategoryDefinition: Identifiable, Codable, Equatable, Hashable {
             displayName: "Chat",
             icon: "bubble.left.and.bubble.right",
             colorHex: "#F3994C",
-            promptDescription: "Light corrections, keeps casual tone. Preserves slang, emoji refs, abbreviations",
+            promptDescription: "Light corrections, keeps casual tone and mixed Chinese/English tech terms",
             promptTemplate: Self.chatPrompt,
             isSystem: true
         ),
@@ -64,7 +64,7 @@ internal struct CategoryDefinition: Identifiable, Codable, Equatable, Hashable {
             displayName: "General",
             icon: "square.grid.2x2",
             colorHex: "#33D9D9",
-            promptDescription: "Balanced cleanup, adapts to context. Fixes common misrecognitions",
+            promptDescription: "Balanced cleanup, adapts to context, fixes common tech-term misrecognitions",
             promptTemplate: Self.generalPrompt,
             isSystem: true
         )
@@ -72,6 +72,20 @@ internal struct CategoryDefinition: Identifiable, Codable, Equatable, Hashable {
 
     static var fallback: CategoryDefinition {
         defaults.last!
+    }
+
+    var localizedDisplayName: String {
+        guard isSystem else {
+            return displayName
+        }
+        return L10n.Categories.name(for: id, fallback: displayName)
+    }
+
+    var localizedPromptDescription: String {
+        guard isSystem else {
+            return promptDescription
+        }
+        return L10n.Categories.promptDescription(for: id, fallback: promptDescription)
     }
 }
 
@@ -82,6 +96,8 @@ internal extension CategoryDefinition {
             - Remove filler words (um, uh, like, you know)
             - Preserve technical terms: CLI, sudo, grep, awk, sed, bash, zsh, tmux, vim, git, ssh, curl, wget, ls, cd, rm, mkdir, echo, apt, brew
             - Preserve app names: Ghostty, iTerm, Kitty, Wezterm, Hyper
+            - Preserve mixed Chinese/English technical vocabulary: GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, pipeline, queue, worker, webhook, monitoring, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT
+            - Normalize likely ASR variants in technical context: "Git Hub", "进 Hub", "金 Hub" -> "GitHub"; "瑞坡", "repo" -> "repo"; "批啊", "P R" -> "PR"; "康佩恩" -> "campaign"; "格拉法纳" -> "Grafana"; "普罗米修斯" -> "Prometheus"; "观测云" -> "Guance"
             - Preserve flags, paths, syntax, and multi-line elements (e.g., -v, --verbose, ~/Documents, |, >, &&, $VAR, \\ for line continuation)
             - Infer and correct common homophones, misrecognitions, or fragments based on context (e.g., 'eye term' -> 'iTerm', 'suit oh' -> 'sudo', 'see dee' -> 'cd', incomplete 'pipe to' -> '|')
             - Handle fragmented sentences by connecting logically without adding content
@@ -96,6 +112,8 @@ internal extension CategoryDefinition {
             - Preserve programming terms: function, class, method, variable, const, let, var, async, await, if, for, while, return, import, export
             - Preserve naming conventions: camelCase, snake_case, PascalCase, kebab-case
             - Preserve common abbreviations: API, SDK, CLI, UI, UX, JSON, XML, SQL, HTTP, REST, GraphQL
+            - Preserve mixed Chinese/English technical vocabulary: GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, creator, matching, pipeline, queue, worker, webhook, monitoring, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT
+            - Normalize likely ASR variants in technical context: "Git Hub", "进 Hub", "金 Hub" -> "GitHub"; "瑞坡", "repo" -> "repo"; "批啊", "P R" -> "PR"; "康佩恩" -> "campaign"; "格拉法纳" -> "Grafana"; "普罗米修斯" -> "Prometheus"; "观测云" -> "Guance"
             - Preserve code-related words, symbols, and blocks intact (e.g., useState, onClick, handleSubmit, ==, !=, +=, ```code blocks```, // comments)
             - Infer and correct common homophones, misrecognitions, or fragments based on context (e.g., 'you state' -> 'useState', 'a sink' -> 'async', 'four loop' -> 'for loop')
             - Handle mixed code and prose by separating logically if fragmented
@@ -104,13 +122,17 @@ internal extension CategoryDefinition {
             """
 
     static let chatPrompt = """
-            Clean up this speech transcription for a chat/messaging context like Slack.
-            - Fix obvious typos and unclear words
-            - Light punctuation cleanup
+            Clean up this speech transcription for a chat/messaging context (Slack, WeChat, Feishu, Telegram).
+            - Fix obvious typos, ASR errors, and unclear words
+            - For Chinese: use Chinese punctuation（，、？！：）for pauses and clause boundaries
+            - For Chinese: treat spaces inside a sentence as ASR artifacts — replace with comma if it's a pause, otherwise remove
+            - IMPORTANT: Do NOT end messages with a period/full stop (。or .). Chat messages should end naturally without a period. Question marks (？) and exclamation marks (！) are fine.
             - Remove excessive filler words but keep casual tone and rhythm
-            - Preserve informal language, expressions, slang, abbreviations, and tone (e.g., lol, brb, btw, imo, sarcasm like "sure thing /s")
+            - Preserve informal language, expressions, slang, abbreviations, and tone (e.g., lol, brb, btw, imo, 哈哈, 牛逼, 666, yyds)
+            - Preserve mixed Chinese/English technical terms when the chat is work-related: GitHub, repo, PR, campaign, CampaignStrategy, Arachne, deploy, rollback, monitoring, metrics, dashboard, logs, alert, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT
+            - Normalize likely ASR variants in technical context: "Git Hub", "进 Hub", "金 Hub" -> "GitHub"; "瑞坡", "repo" -> "repo"; "批啊", "P R" -> "PR"; "康佩恩" -> "campaign"; "格拉法纳" -> "Grafana"; "普罗米修斯" -> "Prometheus"; "观测云" -> "Guance"
             - Preserve emoji references (e.g., "smiley face", "thumbs up")
-            - Infer and correct common homophones, misrecognitions, or fragments based on context (e.g., 'wreck' -> 'rec' for recommendation, 'you are ell' -> 'URL')
+            - Infer and correct common homophones, misrecognitions, or fragments based on context
             - Handle short, fragmented messages by keeping them concise
             - Do not add or invent content; maintain original casual intent
             Output only the corrected text.
@@ -145,6 +167,8 @@ internal extension CategoryDefinition {
             - Fix typos, grammar, and punctuation appropriately
             - Remove filler words (um, uh, like, you know)
             - Preserve any technical or informal terms based on context
+            - Preserve mixed Chinese/English technical vocabulary when present: GitHub, repo, repository, PR, pull request, branch, commit, merge, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, pipeline, queue, worker, webhook, monitoring, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT
+            - Normalize likely ASR variants in technical context: "Git Hub", "进 Hub", "金 Hub" -> "GitHub"; "瑞坡", "repo" -> "repo"; "批啊", "P R" -> "PR"; "康佩恩" -> "campaign"; "格拉法纳" -> "Grafana"; "普罗米修斯" -> "Prometheus"; "观测云" -> "Guance"
             - Infer and correct common homophones or misrecognitions (e.g., 'weather' -> 'whether')
             - Handle fragments by connecting logically without adding content
             - Adapt tone to inferred context (casual or formal)

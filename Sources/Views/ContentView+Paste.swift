@@ -20,8 +20,9 @@ private final class ObserverBox: @unchecked Sendable {
 }
 
 internal extension ContentView {
-    func performUserTriggeredPaste() {
+    func performUserTriggeredPaste(recordID: UUID? = nil, processStart: Date? = nil, pasteStart: Date? = nil) {
         guard let targetApp = findValidTargetApp() else {
+            updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: pasteStart)
             showSuccess = false
             hideRecordingWindow()
             return
@@ -29,7 +30,12 @@ internal extension ContentView {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.hideRecordingWindow()
-            self.activateTargetAppAndPaste(targetApp)
+            self.activateTargetAppAndPaste(
+                targetApp,
+                recordID: recordID,
+                processStart: processStart,
+                pasteStart: pasteStart
+            )
         }
     }
     
@@ -73,15 +79,37 @@ internal extension ContentView {
         }
     }
     
-    func activateTargetAppAndPaste(_ target: NSRunningApplication) {
+    func activateTargetAppAndPaste(
+        _ target: NSRunningApplication,
+        recordID: UUID? = nil,
+        processStart: Date? = nil,
+        pasteStart: Date? = nil
+    ) {
         Task { @MainActor in
             do {
                 try await activateApplication(target)
                 await pasteManager.pasteWithCompletionHandler()
+                updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: pasteStart)
                 self.showSuccess = false
             } catch {
+                updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: pasteStart)
                 self.showSuccess = false
             }
+        }
+    }
+
+    func updateTimingAfterPaste(recordID: UUID?, processStart: Date?, pasteStart: Date?) {
+        guard let recordID else { return }
+        let now = Date()
+        let pasteTime = pasteStart.map { max(0, now.timeIntervalSince($0)) }
+        let endToEndTime = processStart.map { max(0, now.timeIntervalSince($0)) }
+
+        Task {
+            try? await DataManager.shared.updateTiming(
+                for: recordID,
+                pasteTime: pasteTime,
+                endToEndTime: endToEndTime
+            )
         }
     }
 

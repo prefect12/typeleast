@@ -81,6 +81,20 @@ final class TextCleaningTests: XCTestCase {
         let result = SpeechToTextService.cleanTranscriptionText(input)
         XCTAssertEqual(result, expected)
     }
+
+    func testTechnicalTermNormalization() {
+        let testCases = [
+            ("open git hub and check the p r", "open GitHub and check the PR"),
+            ("github repo is in open ai", "GitHub repo is in OpenAI"),
+            ("进 Hub 看一下 Chat GPT 的记录", "GitHub 看一下 ChatGPT 的记录"),
+            ("金 hub 里面的 P R", "GitHub 里面的 PR")
+        ]
+
+        for (input, expected) in testCases {
+            let result = SpeechToTextService.cleanTranscriptionText(input)
+            XCTAssertEqual(result, expected, "Failed to normalize: \(input)")
+        }
+    }
     
     func testValidTextPreservation() {
         let input = "This is valid transcription text that should remain unchanged."

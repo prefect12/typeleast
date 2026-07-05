@@ -176,4 +176,31 @@ final class TranscriptionRecordTests: XCTestCase {
         )
         XCTAssertNil(noModelRecord.whisperModel)
     }
+
+    func testDetailedTimingFields() {
+        let legacyRecord = TranscriptionRecord(
+            text: "Legacy",
+            provider: .openai,
+            transcriptionTime: 2.5
+        )
+        XCTAssertFalse(legacyRecord.hasDetailedTiming)
+
+        let detailedRecord = TranscriptionRecord(
+            text: "Detailed",
+            provider: .openai,
+            transcriptionTime: 2.5,
+            asrTime: 1.4,
+            correctionTime: 0.6,
+            clipboardTime: 0.1,
+            pasteTime: 0.4,
+            endToEndTime: 2.8
+        )
+
+        XCTAssertTrue(detailedRecord.hasDetailedTiming)
+        XCTAssertEqual(detailedRecord.asrTime, 1.4)
+        XCTAssertEqual(detailedRecord.correctionTime, 0.6)
+        XCTAssertEqual(detailedRecord.clipboardTime, 0.1)
+        XCTAssertEqual(detailedRecord.pasteTime, 0.4)
+        XCTAssertEqual(detailedRecord.endToEndTime, 2.8)
+    }
 }

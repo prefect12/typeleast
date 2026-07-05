@@ -35,6 +35,18 @@ internal class SpeechToTextService {
     private let parakeetService = ParakeetService()
     private let keychainService: KeychainServiceProtocol
     private let correctionService = SemanticCorrectionService()
+
+    private static let technicalASRPrompt = """
+    The speaker may mix Chinese with English technical terms. Preserve and correctly spell GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, creator, matching, pipeline, queue, worker, webhook, monitoring, monitor, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT.
+    Common speech variants: 进 Hub, 金 Hub, or Git Hub usually means GitHub; 瑞坡 usually means repo; 批啊 or P R usually means PR; 康佩恩 usually means campaign; 格拉法纳 means Grafana; 普罗米修斯 means Prometheus; 观测云 means Guance.
+    Return only the transcription without commentary.
+    """
+
+    private static let geminiTranscriptionPrompt = """
+    Transcribe this audio to text. Return only the transcription without any additional text.
+
+    \(technicalASRPrompt)
+    """
     
     init(keychainService: KeychainServiceProtocol = KeychainService.shared) {
         self.keychainService = keychainService
@@ -159,6 +171,7 @@ internal class SpeechToTextService {
                     multipartFormData.append(audioURL, withName: "file")
                     // Azure deployments already specify the model, but it doesn't hurt to include
                     multipartFormData.append("whisper-1".data(using: .utf8)!, withName: "model")
+                    multipartFormData.append(Self.technicalASRPrompt.data(using: .utf8)!, withName: "prompt")
                 },
                 to: transcriptionURL,
                 headers: headers
@@ -240,7 +253,7 @@ internal class SpeechToTextService {
                         "file_uri": uploadedFile.file.uri
                     ]
                 ], [
-                    "text": "Transcribe this audio to text. Return only the transcription without any additional text."
+                    "text": Self.geminiTranscriptionPrompt
                 ]]
             ]]
         ]
@@ -296,7 +309,7 @@ internal class SpeechToTextService {
                         "data": base64Audio
                     ]
                 ], [
-                    "text": "Transcribe this audio to text. Return only the transcription without any additional text."
+                    "text": Self.geminiTranscriptionPrompt
                 ]]
             ]]
         ]
@@ -388,10 +401,37 @@ internal class SpeechToTextService {
             )
         }
         
-        // Clean up whitespace and return
-        return cleanedText
+        // Clean up whitespace
+        cleanedText = cleanedText
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+
+        return normalizeTechnicalTerms(cleanedText)
+    }
+
+    private static func normalizeTechnicalTerms(_ text: String) -> String {
+        var normalizedText = text
+        let replacements: [(pattern: String, replacement: String)] = [
+            ("\\bgithub\\b", "GitHub"),
+            ("\\bgit\\s+hub\\b", "GitHub"),
+            ("进\\s*hub", "GitHub"),
+            ("金\\s*hub", "GitHub"),
+            ("\\bopen\\s+ai\\b", "OpenAI"),
+            ("\\bopenai\\b", "OpenAI"),
+            ("\\bchat\\s+gpt\\b", "ChatGPT"),
+            ("\\bchatgpt\\b", "ChatGPT"),
+            ("\\bp\\s+r\\b", "PR")
+        ]
+
+        for replacement in replacements {
+            normalizedText = normalizedText.replacingOccurrences(
+                of: replacement.pattern,
+                with: replacement.replacement,
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+
+        return normalizedText
     }
     
 }
