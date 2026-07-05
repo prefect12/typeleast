@@ -121,9 +121,7 @@ internal struct DashboardHomeView: View {
     @State private var trendHoverLocation: CGPoint?
 
     private let metricColumns = [
-        GridItem(.flexible(minimum: 170), spacing: 12),
-        GridItem(.flexible(minimum: 170), spacing: 12),
-        GridItem(.flexible(minimum: 170), spacing: 12)
+        GridItem(.adaptive(minimum: 160, maximum: 240), spacing: 12)
     ]
 
     private let detailColumns = [
@@ -179,27 +177,6 @@ internal struct DashboardHomeView: View {
             .sorted { $0.date > $1.date }
     }
 
-    private var selectedProviderRows: [BreakdownRow] {
-        let rows = makeBreakdown(records: selectedRecords, label: providerLabel(for:))
-        guard rows.isEmpty, selectedSummary.words > 0 else {
-            return rows
-        }
-        return [
-            legacyBreakdownRow(
-                words: selectedSummary.words,
-                characters: selectedSummary.characters,
-                sessions: selectedSummary.sessions,
-                recordingDuration: selectedSummary.recordingDuration,
-                processingDuration: selectedSummary.processingDuration,
-                processingSamples: selectedSummary.processingSamples
-            )
-        ]
-    }
-
-    private var allProviderRows: [BreakdownRow] {
-        rowsWithLegacySummary(makeBreakdown(records: recentRecords, label: providerLabel(for:)))
-    }
-
     private var allSourceRows: [BreakdownRow] {
         let sourceRows = makeBreakdown(sources: sourceStore.allSources())
         if !sourceRows.isEmpty {
@@ -248,26 +225,44 @@ internal struct DashboardHomeView: View {
     }
 
     private var headerSection: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L10n.Home.statsTitle)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(DashboardTheme.ink)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                dashboardTitle
 
-                Text(L10n.Home.statsSubtitle)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(DashboardTheme.inkLight)
+                Spacer()
+
+                viewAllButton
             }
 
-            Spacer()
-
-            Button {
-                selectedNav = .transcripts
-            } label: {
-                Label(L10n.Home.viewAll, systemImage: "doc.text.magnifyingglass")
+            VStack(alignment: .leading, spacing: 12) {
+                dashboardTitle
+                viewAllButton
             }
-            .buttonStyle(.bordered)
         }
+    }
+
+    private var dashboardTitle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L10n.Home.statsTitle)
+                .font(.system(size: 34, weight: .bold))
+                .foregroundStyle(DashboardTheme.ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+
+            Text(L10n.Home.statsSubtitle)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(DashboardTheme.inkLight)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var viewAllButton: some View {
+        Button {
+            selectedNav = .transcripts
+        } label: {
+            Label(L10n.Home.viewAll, systemImage: "doc.text.magnifyingglass")
+        }
+        .buttonStyle(.bordered)
     }
 
     private var overviewMetrics: some View {
@@ -340,15 +335,31 @@ internal struct DashboardHomeView: View {
                     }
                 )
 
-                HStack(spacing: 10) {
-                    Text(L10n.Home.calendarHint)
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(DashboardTheme.inkMuted)
-                    Spacer()
-                    HeatLegend(tint: DashboardTheme.success)
-                }
+                calendarFooter
             }
         }
+    }
+
+    private var calendarFooter: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                calendarHint
+                Spacer()
+                HeatLegend(tint: DashboardTheme.success)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                calendarHint
+                HeatLegend(tint: DashboardTheme.success)
+            }
+        }
+    }
+
+    private var calendarHint: some View {
+        Text(L10n.Home.calendarHint)
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(DashboardTheme.inkMuted)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var activityCalendarTitle: some View {
@@ -365,39 +376,7 @@ internal struct DashboardHomeView: View {
     private var selectedDaySection: some View {
         StatsPanel {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(Self.dayTitleFormatter.string(from: selectedDay))
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(DashboardTheme.ink)
-
-                        Text(L10n.Home.dayOverview)
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(DashboardTheme.success)
-
-                        Text(selectedDaySummaryLine)
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(DashboardTheme.inkLight)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(dayContextLine)
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(DashboardTheme.inkLight)
-                    }
-
-                    Spacer(minLength: 18)
-
-                    LazyVGrid(columns: detailColumns, spacing: 12) {
-                        CompactMetricTile(title: L10n.Home.words, value: formatCompactNumber(selectedSummary.words), tint: DashboardTheme.success)
-                        CompactMetricTile(title: L10n.Home.characters, value: formatCompactNumber(selectedSummary.characters), tint: DashboardTheme.accent)
-                        CompactMetricTile(title: L10n.Home.recordingDuration, value: formatDurationPrecise(selectedSummary.recordingDuration), tint: Color(nsColor: .systemCyan))
-                        CompactMetricTile(title: L10n.Home.processingDuration, value: formatDurationPrecise(selectedSummary.processingDuration), tint: Color(nsColor: .systemOrange))
-                        CompactMetricTile(title: L10n.Home.avgWPM, value: formatDecimal(selectedSummary.averageWPM), tint: Color(nsColor: .systemPurple))
-                        CompactMetricTile(title: L10n.Home.avgProcessing, value: formatDurationPrecise(selectedSummary.averageProcessingTime), tint: Color(nsColor: .systemTeal))
-                    }
-                    .frame(maxWidth: 520)
-                }
+                selectedDayOverviewLayout
 
                 if selectedSummary.words == 0 {
                     EmptyStatsRow(text: L10n.Home.noDataForDay)
@@ -406,56 +385,84 @@ internal struct DashboardHomeView: View {
                 } else {
                     Divider()
 
-                    HStack(alignment: .top, spacing: 22) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(L10n.Home.providerMix)
-                                .font(.headline)
-                            DonutBreakdownView(
-                                rows: selectedProviderRows,
-                                total: max(selectedSummary.words, 1),
-                                color: providerColor(for:)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(L10n.Home.modelBreakdown)
+                            .font(.headline)
+                        ForEach(makeBreakdown(records: selectedRecords, label: modelLabel(for:)).prefix(5)) { row in
+                            BreakdownLine(
+                                row: row,
+                                totalWords: max(selectedSummary.words, 1),
+                                tint: modelColor(for: row.label),
+                                value: formatDurationPrecise(row.averageProcessingTime)
                             )
-                            .frame(width: 128, height: 128)
                         }
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(L10n.Home.dayBreakdown)
-                                .font(.headline)
-                            ForEach(selectedProviderRows.prefix(5)) { row in
-                                BreakdownLine(
-                                    row: row,
-                                    totalWords: max(selectedSummary.words, 1),
-                                    tint: providerColor(for: row.label),
-                                    value: "\(formatCompactNumber(row.words)) · \(row.sessions)"
-                                )
-                            }
-                        }
-                        .frame(minWidth: 240, maxWidth: .infinity, alignment: .leading)
-
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(L10n.Home.modelBreakdown)
-                                .font(.headline)
-                            ForEach(makeBreakdown(records: selectedRecords, label: modelLabel(for:)).prefix(5)) { row in
-                                BreakdownLine(
-                                    row: row,
-                                    totalWords: max(selectedSummary.words, 1),
-                                    tint: modelColor(for: row.label),
-                                    value: formatDurationPrecise(row.averageProcessingTime)
-                                )
-                            }
-                        }
-                        .frame(minWidth: 260, maxWidth: .infinity, alignment: .leading)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+        }
+    }
+
+    private var selectedDayOverviewLayout: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                selectedDayOverviewText
+                    .frame(minWidth: 240, maxWidth: .infinity, alignment: .topLeading)
+
+                Spacer(minLength: 18)
+
+                selectedDayMetricsGrid
+                    .frame(minWidth: 330, maxWidth: 520, alignment: .topLeading)
+                    .layoutPriority(1)
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                selectedDayOverviewText
+                selectedDayMetricsGrid
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+        }
+    }
+
+    private var selectedDayOverviewText: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(Self.dayTitleFormatter.string(from: selectedDay))
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(DashboardTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+
+            Text(L10n.Home.dayOverview)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(DashboardTheme.success)
+
+            Text(selectedDaySummaryLine)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(DashboardTheme.inkLight)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(dayContextLine)
+                .font(.callout.weight(.semibold))
+                .foregroundStyle(DashboardTheme.inkLight)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var selectedDayMetricsGrid: some View {
+        LazyVGrid(columns: detailColumns, spacing: 12) {
+            CompactMetricTile(title: L10n.Home.words, value: formatCompactNumber(selectedSummary.words), tint: DashboardTheme.success)
+            CompactMetricTile(title: L10n.Home.characters, value: formatCompactNumber(selectedSummary.characters), tint: DashboardTheme.accent)
+            CompactMetricTile(title: L10n.Home.recordingDuration, value: formatDurationPrecise(selectedSummary.recordingDuration), tint: Color(nsColor: .systemCyan))
+            CompactMetricTile(title: L10n.Home.processingDuration, value: formatDurationPrecise(selectedSummary.processingDuration), tint: Color(nsColor: .systemOrange))
+            CompactMetricTile(title: L10n.Home.avgWPM, value: formatDecimal(selectedSummary.averageWPM), tint: Color(nsColor: .systemPurple))
+            CompactMetricTile(title: L10n.Home.avgProcessing, value: formatDurationPrecise(selectedSummary.averageProcessingTime), tint: Color(nsColor: .systemTeal))
         }
     }
 
     private var distributionSection: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 14) {
-                providerDistributionPanel
-                    .frame(minWidth: 280, maxWidth: .infinity, alignment: .topLeading)
                 sourceDistributionPanel
                     .frame(minWidth: 280, maxWidth: .infinity, alignment: .topLeading)
                 modelDistributionPanel
@@ -463,34 +470,13 @@ internal struct DashboardHomeView: View {
             }
 
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .top, spacing: 14) {
-                    providerDistributionPanel
-                        .frame(minWidth: 280, maxWidth: .infinity, alignment: .topLeading)
-                    sourceDistributionPanel
-                        .frame(minWidth: 280, maxWidth: .infinity, alignment: .topLeading)
-                }
-
+                sourceDistributionPanel
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 modelDistributionPanel
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-
-            VStack(alignment: .leading, spacing: 14) {
-                providerDistributionPanel
-                sourceDistributionPanel
-                modelDistributionPanel
-            }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    private var providerDistributionPanel: some View {
-        BreakdownPanel(
-            title: L10n.Home.providerMix,
-            rows: allProviderRows,
-            totalWords: max(aggregate.words, 1),
-            color: providerColor(for:),
-            valueFormatter: { row in "\(formatCompactNumber(row.words)) · \(row.sessions)" }
-        )
     }
 
     private var sourceDistributionPanel: some View {
@@ -1086,49 +1072,6 @@ private struct CompactMetricTile: View {
         .padding(.horizontal, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(DashboardTheme.accentSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-}
-
-private struct DonutBreakdownView: View {
-    let rows: [BreakdownRow]
-    let total: Int
-    let color: (String) -> Color
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(DashboardTheme.inkFaint.opacity(0.22), lineWidth: 18)
-
-            ForEach(Array(segments.enumerated()), id: \.offset) { _, segment in
-                Circle()
-                    .trim(from: segment.start, to: segment.end)
-                    .stroke(
-                        color(segment.row.label),
-                        style: StrokeStyle(lineWidth: 18, lineCap: .butt)
-                    )
-                    .rotationEffect(.degrees(-90))
-            }
-
-            VStack(spacing: 1) {
-                Text("\(rows.count)")
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .monospacedDigit()
-                Text(L10n.Home.providers)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(DashboardTheme.inkMuted)
-            }
-        }
-    }
-
-    private var segments: [(row: BreakdownRow, start: CGFloat, end: CGFloat)] {
-        guard total > 0 else { return [] }
-        var cursor: CGFloat = 0
-        return rows.prefix(6).map { row in
-            let share = CGFloat(Double(row.words) / Double(total))
-            let start = cursor
-            cursor += max(share, row.words > 0 ? 0.015 : 0)
-            return (row: row, start: start, end: min(cursor, 1))
-        }
     }
 }
 

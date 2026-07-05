@@ -48,6 +48,24 @@ class SpeechToTextServiceTests: XCTestCase {
     }
     
     // MARK: - Provider Selection Tests
+
+    func testOpenAITranscriptionModelDefaultsToGPT4OTranscribe() {
+        defaults.removeObject(forKey: AppDefaults.Keys.openAITranscriptionModel)
+
+        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
+    }
+
+    func testOpenAITranscriptionModelUsesConfiguredValue() {
+        defaults.set("whisper-1", forKey: AppDefaults.Keys.openAITranscriptionModel)
+
+        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "whisper-1")
+    }
+
+    func testOpenAITranscriptionModelFallsBackWhenBlank() {
+        defaults.set("   ", forKey: AppDefaults.Keys.openAITranscriptionModel)
+
+        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
+    }
     
     func testProviderSelectionDefaultsToOpenAI() async {
         // Create a fresh mock keychain with no keys

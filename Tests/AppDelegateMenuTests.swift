@@ -14,8 +14,7 @@ final class AppDelegateMenuTests: XCTestCase {
 
         let titles = visibleMenuTitles(from: AppDelegate().makeStatusMenu())
 
-        XCTAssertEqual(titles, ["录音", "转录音频文件...", "设置", "退出"])
-        XCTAssertFalse(titles.contains("仪表盘..."))
+        XCTAssertEqual(titles, ["录音", "转录音频文件...", "仪表盘...", "设置", "退出"])
         XCTAssertFalse(titles.contains("帮助"))
     }
 
@@ -25,8 +24,7 @@ final class AppDelegateMenuTests: XCTestCase {
 
         let titles = visibleMenuTitles(from: AppDelegate().makeStatusMenu())
 
-        XCTAssertEqual(titles, ["Record", "Transcribe Audio File...", "Settings", "Quit"])
-        XCTAssertFalse(titles.contains("Dashboard..."))
+        XCTAssertEqual(titles, ["Record", "Transcribe Audio File...", "Dashboard...", "Settings", "Quit"])
         XCTAssertFalse(titles.contains("Help"))
     }
 

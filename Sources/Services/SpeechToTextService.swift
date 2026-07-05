@@ -31,8 +31,8 @@ internal enum SpeechToTextError: Error, LocalizedError {
 
 @Observable
 internal class SpeechToTextService {
-    private let localWhisperService = LocalWhisperService()
-    private let parakeetService = ParakeetService()
+    private let localWhisperService: LocalWhisperService
+    private let parakeetService: ParakeetService
     private let keychainService: KeychainServiceProtocol
     private let userDefaults: UserDefaults
     private let correctionService = SemanticCorrectionService()
@@ -50,9 +50,13 @@ internal class SpeechToTextService {
     """
     
     init(
+        localWhisperService: LocalWhisperService = .shared,
+        parakeetService: ParakeetService = ParakeetService(),
         keychainService: KeychainServiceProtocol = KeychainService.shared,
         userDefaults: UserDefaults = .standard
     ) {
+        self.localWhisperService = localWhisperService
+        self.parakeetService = parakeetService
         self.keychainService = keychainService
         self.userDefaults = userDefaults
     }
@@ -148,6 +152,16 @@ internal class SpeechToTextService {
         return "\(base)/audio/transcriptions"
     }
 
+    var resolvedOpenAITranscriptionModel: String {
+        let configured = userDefaults
+            .string(forKey: AppDefaults.Keys.openAITranscriptionModel)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let configured, !configured.isEmpty else {
+            return AppDefaults.defaultOpenAITranscriptionModel
+        }
+        return configured
+    }
+
     /// Detects if the endpoint is Azure OpenAI based on the URL pattern
     private var isAzureOpenAI: Bool {
         let custom = userDefaults.string(forKey: "openAIBaseURL") ?? ""
@@ -169,14 +183,18 @@ internal class SpeechToTextService {
         }
 
         let transcriptionURL = openAITranscriptionEndpoint
+        guard let modelData = resolvedOpenAITranscriptionModel.data(using: .utf8),
+              let promptData = Self.technicalASRPrompt.data(using: .utf8) else {
+            throw SpeechToTextError.transcriptionFailed("Failed to encode OpenAI transcription request")
+        }
 
         return try await withCheckedThrowingContinuation { continuation in
             AF.upload(
                 multipartFormData: { multipartFormData in
                     multipartFormData.append(audioURL, withName: "file")
-                    // Azure deployments already specify the model, but it doesn't hurt to include
-                    multipartFormData.append("whisper-1".data(using: .utf8)!, withName: "model")
-                    multipartFormData.append(Self.technicalASRPrompt.data(using: .utf8)!, withName: "prompt")
+                    // Azure deployments already specify the model, but OpenAI-compatible APIs still expect the field.
+                    multipartFormData.append(modelData, withName: "model")
+                    multipartFormData.append(promptData, withName: "prompt")
                 },
                 to: transcriptionURL,
                 headers: headers
