@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class TimingAnalysisStoreTests: XCTestCase {
@@ -127,6 +127,15 @@ private final class CountingTimingDataManager: DataManagerProtocol {
         guard let record = records.first(where: { $0.id == recordID }) else { return }
         record.pasteTime = pasteTime
         record.endToEndTime = endToEndTime
+    }
+
+    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int {
+        let backfilledRecords = LegacyUsageBackfill.recordsToBackfill(
+            snapshot: snapshot,
+            existingRecords: records
+        )
+        records.append(contentsOf: backfilledRecords)
+        return backfilledRecords.count
     }
 
     func cleanupExpiredRecords() async throws {}

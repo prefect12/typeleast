@@ -11,53 +11,53 @@ internal struct DashboardPermissionsView: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Status") {
+                LabeledContent(L10n.Permissions.status) {
                     permissionLabel(
                         isGranted: microphoneStatus == .authorized,
-                        grantedText: "Granted",
-                        requiredText: microphoneStatus == .denied ? "Denied" : "Required"
+                        grantedText: L10n.Permissions.granted,
+                        requiredText: microphoneStatus == .denied ? L10n.Permissions.denied : L10n.Permissions.required
                     )
                 }
 
                 HStack(spacing: 10) {
-                    Button("Request Access") {
+                    Button(L10n.Permissions.requestAccess) {
                         requestMicrophonePermission()
                     }
                     .disabled(microphoneStatus == .authorized)
 
-                    Button("Open Settings") {
+                    Button(L10n.Permissions.openSettings) {
                         openSystemSettings(path: "Privacy_Microphone")
                     }
                 }
             } header: {
-                Text("Microphone")
+                Text(L10n.Permissions.microphone)
             } footer: {
-                Text("AudioWhisper needs microphone access to record audio for transcription.")
+                Text(L10n.Permissions.micDesc)
             }
 
             if enableSmartPaste {
                 Section {
-                    LabeledContent("Status") {
+                    LabeledContent(L10n.Permissions.status) {
                         permissionLabel(
                             isGranted: isAccessibilityTrusted,
-                            grantedText: "Granted",
-                            requiredText: "Required"
+                            grantedText: L10n.Permissions.granted,
+                            requiredText: L10n.Permissions.required
                         )
                     }
 
                     HStack(spacing: 10) {
-                        Button("Open Settings") {
+                        Button(L10n.Permissions.openSettings) {
                             openSystemSettings(path: "Privacy_Accessibility")
                         }
 
-                        Button("Refresh") {
+                        Button(L10n.Permissions.refresh) {
                             refreshStatuses()
                         }
                     }
                 } header: {
-                    Text("Accessibility")
+                    Text(L10n.Permissions.accessibility)
                 } footer: {
-                    Text("Accessibility permission is required for Smart Paste to type into other apps.")
+                    Text(L10n.Permissions.a11yDesc)
                 }
             }
         }
@@ -99,4 +99,3 @@ internal struct DashboardPermissionsView: View {
     DashboardPermissionsView()
         .frame(width: 900, height: 700)
 }
-

@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class UsageMetricsStoreTests: XCTestCase {
@@ -86,9 +86,21 @@ final class UsageMetricsStoreTests: XCTestCase {
 
         await store.bootstrapIfNeeded(dataManager: mockDataManager)
 
-        // Should remain unchanged because snapshot already had data.
         XCTAssertEqual(store.snapshot.totalSessions, 1)
         XCTAssertEqual(store.snapshot.totalWords, 10)
+    }
+
+    func testBootstrapKeepsAggregateWhenNoRecordsExist() async {
+        store.recordSession(duration: 5, wordCount: 10, characterCount: 50)
+
+        let mockDataManager = TestDataManager()
+        mockDataManager.isHistoryEnabled = true
+
+        await store.bootstrapIfNeeded(dataManager: mockDataManager)
+
+        XCTAssertEqual(store.snapshot.totalSessions, 1)
+        XCTAssertEqual(store.snapshot.totalWords, 10)
+        XCTAssertEqual(store.snapshot.totalCharacters, 50)
     }
 
 }
@@ -131,6 +143,15 @@ private final class TestDataManager: DataManagerProtocol {
         guard let record = records.first(where: { $0.id == recordID }) else { return }
         record.pasteTime = pasteTime
         record.endToEndTime = endToEndTime
+    }
+
+    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int {
+        let backfilledRecords = LegacyUsageBackfill.recordsToBackfill(
+            snapshot: snapshot,
+            existingRecords: records
+        )
+        records.append(contentsOf: backfilledRecords)
+        return backfilledRecords.count
     }
 
     func cleanupExpiredRecords() async throws {}

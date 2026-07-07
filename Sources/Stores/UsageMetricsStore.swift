@@ -52,6 +52,14 @@ internal struct UsageSnapshot: Equatable {
     var keystrokesSaved: Int {
         Int(round(Double(totalWords) * UsageMetricsConstants.averageCharactersPerWord))
     }
+
+    var hasUsageData: Bool {
+        totalSessions > 0 ||
+            totalDuration > 0 ||
+            totalWords > 0 ||
+            totalCharacters > 0 ||
+            !dailyActivity.isEmpty
+    }
 }
 
 @Observable
@@ -191,23 +199,21 @@ internal final class UsageMetricsStore {
     }
 
     func bootstrapIfNeeded(dataManager: DataManagerProtocol = DataManager.shared) async {
-        // If dailyActivity is empty but we have records, rebuild from records
-        let needsDailyActivityBootstrap = snapshot.dailyActivity.isEmpty && dataManager.isHistoryEnabled
-        let needsFullBootstrap = snapshot.totalSessions == 0 && snapshot.totalDuration == 0 && snapshot.totalWords == 0 && dataManager.isHistoryEnabled
-        
-        guard needsDailyActivityBootstrap || needsFullBootstrap else {
+        guard dataManager.isHistoryEnabled else {
+            return
+        }
+        guard !snapshot.hasUsageData else {
             return
         }
 
         let records = await dataManager.fetchAllRecordsQuietly()
+        reconcileWithHistory(records)
+    }
+
+    func reconcileWithHistory(_ records: [TranscriptionRecord]) {
         guard !records.isEmpty else { return }
-        
-        if needsFullBootstrap {
-            rebuild(using: records)
-        } else {
-            // Just rebuild daily activity
-            rebuildDailyActivity(using: records)
-        }
+
+        rebuild(using: records)
     }
     
     /// Rebuild only daily activity from records without resetting other stats
@@ -291,7 +297,7 @@ internal final class UsageMetricsStore {
         return 0
     }
 
-    static func estimatedWordCount(for text: String) -> Int {
+    nonisolated static func estimatedWordCount(for text: String) -> Int {
         let words = text.split { character in
             if character.isLetter || character.isNumber {
                 return false

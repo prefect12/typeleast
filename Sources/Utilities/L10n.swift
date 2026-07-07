@@ -110,6 +110,12 @@ internal enum L10n {
             isCN ? "旧记录可能只有总耗时。完成新的转录后，这里会开始显示分阶段拆分。" :
                 "Older records may only have total processing time. New runs will include stage breakdowns."
         }
+        static func aggregateOnlyTimingHint(sessions: Int, words: Int) -> String {
+            if isCN {
+                return "已有 \(sessions) 次 / \(words) 字的累计统计，但旧记录没有保存可分析的逐条耗时。完成新的转录后，这里会显示阶段拆分。"
+            }
+            return "\(sessions) sessions / \(words) words are counted in usage, but those older runs do not have saved timing details. New transcriptions will appear here."
+        }
         static var runBreakdown: String { isCN ? "单次耗时拆分" : "Run Breakdown" }
         static var slowestStage: String { isCN ? "主要瓶颈" : "Main Bottleneck" }
         static var slowestRun: String { isCN ? "最慢单次" : "Slowest Run" }
@@ -130,6 +136,41 @@ internal enum L10n {
         static var source: String { isCN ? "来源" : "Source" }
         static var words: String { isCN ? "字数" : "Words" }
         static var oldRecordHint: String { isCN ? "旧记录没有阶段字段" : "Legacy record without stage fields" }
+    }
+
+    // MARK: - Transcription History
+    enum History {
+        static var copy: String { isCN ? "复制" : "Copy" }
+        static var delete: String { isCN ? "删除" : "Delete" }
+        static var clearAll: String { isCN ? "全部清除" : "Clear All" }
+        static var deleteTranscriptions: String { isCN ? "删除转录记录" : "Delete Transcriptions" }
+        static var clearAllTranscriptionHistory: String { isCN ? "清除全部转录历史" : "Clear All Transcription History" }
+        static var irreversible: String { isCN ? "此操作无法撤销。" : "This action cannot be undone." }
+        static var clearAllWarning: String { isCN ? "这会永久删除所有转录记录。" : "This will permanently delete all transcriptions." }
+        static var date: String { isCN ? "日期" : "Date" }
+        static var provider: String { isCN ? "引擎" : "Provider" }
+        static var duration: String { isCN ? "时长" : "Duration" }
+        static var text: String { isCN ? "文本" : "Text" }
+        static var selectTranscript: String { isCN ? "选择一条转录记录" : "Select a Transcript" }
+        static var selectTranscriptHint: String { isCN ? "在上方选择一条转录，查看完整内容。" : "Choose a transcription above to view details." }
+        static var noTranscriptsYet: String { isCN ? "暂无转录记录" : "No Transcripts Yet" }
+        static var noSavedTranscripts: String { isCN ? "暂无保存的转录明细" : "No Saved Transcripts" }
+        static var historyWillAppear: String {
+            isCN ? "完成新的转录后，转录历史会显示在这里。" :
+                "Your transcription history will appear here after new transcriptions."
+        }
+        static func aggregateOnlyHistoryHint(sessions: Int, words: Int) -> String {
+            if isCN {
+                return "已有 \(sessions) 次 / \(words) 字的累计统计，但旧转录没有保存文本明细。开启历史后完成的新转录会显示在这里。"
+            }
+            return "\(sessions) sessions / \(words) words are counted in usage, but those older transcripts were not saved as text records. New saved transcriptions will appear here."
+        }
+        static var noResults: String { isCN ? "没有结果" : "No Results" }
+        static var noResultsHint: String { isCN ? "换一个搜索词试试。" : "Try a different search term." }
+        static var error: String { isCN ? "错误" : "Error" }
+        static var failedToDelete: String { isCN ? "删除记录失败" : "Failed to delete records" }
+        static var failedToClear: String { isCN ? "清除记录失败" : "Failed to clear records" }
+        static var model: String { isCN ? "模型" : "Model" }
     }
 
     // MARK: - Weekdays
@@ -185,10 +226,12 @@ internal enum L10n {
         static func displayName(for provider: String) -> String {
             switch provider.lowercased() {
             case "openai": return "OpenAI"
+            case "mimo": return "MiMo"
             case "gemini": return "Gemini"
             case "local": return isCN ? "本地 Whisper" : "Local Whisper"
             case "parakeet": return "Parakeet"
             case "funasr": return "FunASR"
+            case "legacysummary": return isCN ? "旧版汇总" : "Legacy Summary"
             default: return provider.capitalized
             }
         }
@@ -317,7 +360,7 @@ internal enum L10n {
         static var languageFooter: String { isCN ? "更改界面显示语言" : "Change the display language of the interface." }
         static var general: String { isCN ? "通用" : "General" }
         static var startAtLogin: String { isCN ? "开机启动" : "Start at Login" }
-        static var startAtLoginDesc: String { isCN ? "登录时自动启动 AudioWhisper" : "Launch AudioWhisper when you sign in." }
+        static var startAtLoginDesc: String { isCN ? "登录时自动启动 Typeleast" : "Launch Typeleast when you sign in." }
         static var expressMode: String { isCN ? "快捷模式" : "Express Mode" }
         static var expressModeDesc: String { isCN ? "快捷键直接开始/停止录音" : "Hotkey immediately starts and stops recording." }
         static var configureShortcut: String { isCN ? "设置快捷键..." : "Configure Shortcut..." }
@@ -347,8 +390,237 @@ internal enum L10n {
         static var requestAccess: String { isCN ? "请求权限" : "Request Access" }
         static var openSettings: String { isCN ? "打开设置" : "Open Settings" }
         static var refresh: String { isCN ? "刷新" : "Refresh" }
-        static var micDesc: String { isCN ? "AudioWhisper 需要麦克风权限来录制音频进行转录。" : "AudioWhisper needs microphone access to record audio for transcription." }
+        static var micDesc: String { isCN ? "Typeleast 需要麦克风权限来录制音频进行转录。" : "Typeleast needs microphone access to record audio for transcription." }
         static var a11yDesc: String { isCN ? "智能粘贴需要辅助功能权限才能在其他应用中输入文本。" : "Accessibility permission is required for Smart Paste to type into other apps." }
+    }
+
+    // MARK: - Smart Paste Permission Alerts
+    enum SmartPastePermission {
+        static var requestTitle: String {
+            isCN ? "智能粘贴需要辅助功能权限" : "Accessibility Permission Required for SmartPaste"
+        }
+        static var requestMessage: String {
+            if isCN {
+                return """
+                Typeleast 的智能粘贴需要辅助功能权限，才能把转录文本自动粘贴到你录音前正在使用的应用中。
+
+                智能粘贴会做什么：
+                • 把转录文本粘贴回原来的应用
+                • 尝试把焦点切回录音前的应用
+                • 省去手动切换和按 ⌘V
+
+                隐私说明：
+                • Typeleast 只发送粘贴快捷键（⌘V）
+                • 不读取、监控或访问其他应用内容
+                • 不录屏、不记录键盘输入
+                • 转录在你的设备上完成
+
+                接下来：
+                • 点击“授予权限”打开系统设置
+                • 在“隐私与安全性 → 辅助功能”里找到 Typeleast
+                • 打开开关，然后回到 Typeleast
+
+                如果你想手动控制，可以点“暂不启用智能粘贴”，转录文本仍会复制到剪贴板。
+                """
+            }
+            return """
+            Typeleast's SmartPaste feature needs Accessibility permission to automatically paste transcribed text into your applications.
+
+            What SmartPaste does:
+            • Pastes transcribed text into the app you were using before recording
+            • Switches focus back to your original application
+            • Provides a hands-free voice-to-text workflow
+
+            Privacy protection:
+            • Typeleast only sends paste commands (⌘V) to applications
+            • It never reads, monitors, or accesses content from other applications
+            • No screen recording or keylogging occurs
+            • Transcription happens on your device
+
+            What happens next:
+            • Click "Grant Permission" to open System Settings
+            • Find Typeleast in Privacy & Security → Accessibility
+            • Toggle the switch to enable the permission
+            • Return to Typeleast to use SmartPaste
+
+            If you prefer manual control, click "Continue Without SmartPaste" and use ⌘V yourself.
+            """
+        }
+        static var grantPermission: String { isCN ? "授予权限" : "Grant Permission" }
+        static var continueWithout: String { isCN ? "暂不启用智能粘贴" : "Continue Without SmartPaste" }
+        static var learnMore: String { isCN ? "了解辅助功能权限" : "Learn More About Accessibility Permissions" }
+
+        static var enabledTitle: String { isCN ? "智能粘贴已启用" : "SmartPaste Enabled!" }
+        static var enabledMessage: String {
+            isCN
+                ? "辅助功能权限已授权。智能粘贴现在可以把转录文本自动粘贴到其他应用中。\n\n如果你之后想手动粘贴，可以随时在 Typeleast 设置里关闭智能粘贴。"
+                : "Accessibility permission has been granted successfully.\n\nSmartPaste is now enabled and will automatically paste transcribed text into your applications.\n\nYou can disable SmartPaste anytime in Typeleast Settings if you prefer manual control."
+        }
+        static var great: String { isCN ? "好的" : "Great!" }
+
+        static var incompleteTitle: String { isCN ? "权限设置尚未生效" : "Permission Setup Incomplete" }
+        static var incompleteMessage: String {
+            if isCN {
+                return """
+                Typeleast 还没有检测到可用的辅助功能权限。
+
+                这通常是因为：
+                • 系统设置窗口关闭前没有完成授权
+                • 你已经打开开关，但 macOS 还没刷新到当前运行的 App
+                • 列表里的 Typeleast 对应旧签名或旧 App bundle
+
+                接下来可以这样处理：
+                • 点“显示手动步骤”，删除列表里的 Typeleast 后重新添加 /Applications/Typeleast.app
+                • 重启 Typeleast 后再试一次
+                • 转录文本仍会复制到剪贴板，你也可以手动按 ⌘V 粘贴
+                """
+            }
+            return """
+            Typeleast has not detected active Accessibility permission yet.
+
+            This might happen if:
+            • System Settings was closed without making changes
+            • The permission was granted but macOS has not refreshed the running app yet
+            • The Typeleast entry points to an older signature or app bundle
+
+            What to do next:
+            • Click "Show Manual Instructions", remove Typeleast, and re-add /Applications/Typeleast.app
+            • Restart Typeleast and try again
+            • Transcribed text is still copied to your clipboard, so you can paste manually with ⌘V
+            """
+        }
+        static var showManualInstructions: String { isCN ? "显示手动步骤" : "Show Manual Instructions" }
+
+        static var educationTitle: String { isCN ? "为什么需要辅助功能权限" : "Understanding macOS Accessibility Permissions" }
+        static var educationMessage: String {
+            if isCN {
+                return """
+                macOS 的辅助功能权限允许自动化工具与其他应用交互。屏幕阅读器、语音控制、Keyboard Maestro、文本扩展工具也会使用同一类权限。
+
+                Typeleast 只需要发送一次等同于按下 ⌘V 的粘贴命令，把转录文本放回你录音前所在的位置。没有这个权限时，你需要自己切回原应用并手动粘贴。
+
+                Typeleast 不读取其他应用内容，不录屏，也不记录键盘输入。这个权限可以随时在系统设置里撤销。
+                """
+            }
+            return """
+            macOS Accessibility permissions allow assistive technologies and automation tools to interact with other applications. This is the same permission used by screen readers, voice control, Keyboard Maestro, text expanders, and similar tools.
+
+            Typeleast only needs to send a paste command, equivalent to pressing ⌘V, so it can place transcribed text back where you were working. Without this permission, you need to switch back and paste manually.
+
+            Typeleast does not read other app content, record your screen, or log keystrokes. You can revoke this permission anytime in System Settings.
+            """
+        }
+        static var iUnderstand: String { isCN ? "我知道了" : "I Understand" }
+
+        static var manualTitle: String { isCN ? "启用辅助功能权限" : "Enable Accessibility Permission" }
+        static var manualMessage: String {
+            if isCN {
+                return """
+                手动启用智能粘贴：
+
+                1. 点击下面的“打开系统设置”
+                2. 进入“隐私与安全性 → 辅助功能”
+                3. 找到 Typeleast 并打开开关
+                4. 如果已经打开但仍不能粘贴，先从列表里删除 Typeleast，再用“+”重新添加 /Applications/Typeleast.app
+                5. 重启 Typeleast 后再试一次
+                """
+            }
+            return """
+            To enable SmartPaste manually:
+
+            1. Click "Open System Settings" below
+            2. Go to Privacy & Security → Accessibility
+            3. Find Typeleast and enable it
+            4. If it is already enabled but paste still fails, remove Typeleast from the list and re-add /Applications/Typeleast.app with the "+" button
+            5. Restart Typeleast and try again
+            """
+        }
+        static var openSystemSettings: String { isCN ? "打开系统设置" : "Open System Settings" }
+
+        static var statusGranted: String {
+            isCN ? "✅ 辅助功能权限已授权，智能粘贴可用" : "✅ Accessibility permission granted - SmartPaste is enabled"
+        }
+        static var statusRequired: String {
+            isCN ? "⚠️ 智能粘贴需要辅助功能权限" : "⚠️ Accessibility permission required for SmartPaste functionality"
+        }
+        static var detailedConfigured: String {
+            isCN ? "辅助功能权限已正确配置" : "Accessibility permission is properly configured"
+        }
+        static var detailedNotGranted: String {
+            isCN ? "辅助功能权限尚未授权" : "Accessibility permission is not granted"
+        }
+        static var troubleshootingInfo: String {
+            if isCN {
+                return """
+                启用智能粘贴：
+                1. 打开“系统设置 → 隐私与安全性 → 辅助功能”
+                2. 添加 Typeleast（需要时用 + 按钮选择 /Applications/Typeleast.app）
+                3. 打开 Typeleast 的开关
+                4. 如果仍失败，删除旧条目、重新添加并重启 Typeleast
+                """
+            }
+            return """
+            To enable SmartPaste:
+            1. Open System Settings → Privacy & Security → Accessibility
+            2. Add Typeleast to the list, using the + button to choose /Applications/Typeleast.app if needed
+            3. Toggle the switch to enable Typeleast
+            4. If it still fails, remove the old entry, re-add it, and restart Typeleast
+            """
+        }
+
+        static var errorTitle: String { isCN ? "权限请求出错" : "Permission Request Error" }
+        static func errorMessage(_ description: String) -> String {
+            if isCN {
+                return """
+                请求辅助功能权限时出现错误：
+
+                \(description)
+
+                你仍然可以手动启用智能粘贴：
+                1. 打开系统设置
+                2. 进入“隐私与安全性 → 辅助功能”
+                3. 添加 Typeleast 并打开开关
+
+                或者暂不启用智能粘贴，转录文本会继续复制到剪贴板。
+                """
+            }
+            return """
+            An error occurred while requesting Accessibility permission:
+
+            \(description)
+
+            You can still enable SmartPaste manually:
+            1. Open System Settings
+            2. Go to Privacy & Security → Accessibility
+            3. Add Typeleast and enable it
+
+            Or continue using Typeleast without SmartPaste - transcribed text will be copied to your clipboard for manual pasting.
+            """
+        }
+
+        static var disabledTitle: String { isCN ? "智能粘贴未启用" : "SmartPaste Disabled" }
+        static var disabledMessage: String {
+            isCN
+                ? "Typeleast 会继续复制转录文本到剪贴板，你可以手动按 ⌘V 粘贴。\n\n之后可以在 Typeleast 设置 → 通用 → 智能粘贴中重新启用。"
+                : "Typeleast will continue to copy transcribed text to your clipboard, and you can paste it manually using ⌘V.\n\nYou can enable SmartPaste anytime in Typeleast Settings → General → Smart Paste."
+        }
+    }
+
+    enum PasteErrors {
+        static var accessibilityPermissionDenied: String {
+            isCN
+                ? "智能粘贴需要辅助功能权限。请在系统设置 → 隐私与安全性 → 辅助功能中启用 Typeleast。"
+                : "Accessibility permission is required for SmartPaste. Please enable it in System Settings > Privacy & Security > Accessibility."
+        }
+        static var eventSourceCreationFailed: String {
+            isCN ? "无法创建粘贴事件源。" : "Could not create event source for paste operation."
+        }
+        static var keyboardEventCreationFailed: String {
+            isCN ? "无法创建粘贴快捷键事件。" : "Could not create keyboard events for paste operation."
+        }
+        static var targetAppNotAvailable: String {
+            isCN ? "目标应用不可用，无法粘贴。" : "Target application is not available for pasting."
+        }
     }
 
     // MARK: - Common
