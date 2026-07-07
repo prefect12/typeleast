@@ -351,6 +351,235 @@ internal enum L10n {
         static var a11yDesc: String { isCN ? "智能粘贴需要辅助功能权限才能在其他应用中输入文本。" : "Accessibility permission is required for Smart Paste to type into other apps." }
     }
 
+    // MARK: - Smart Paste Permission Alerts
+    enum SmartPastePermission {
+        static var requestTitle: String {
+            isCN ? "智能粘贴需要辅助功能权限" : "Accessibility Permission Required for SmartPaste"
+        }
+        static var requestMessage: String {
+            if isCN {
+                return """
+                AudioWhisper 的智能粘贴需要辅助功能权限，才能把转录文本自动粘贴到你录音前正在使用的应用中。
+
+                智能粘贴会做什么：
+                • 把转录文本粘贴回原来的应用
+                • 尝试把焦点切回录音前的应用
+                • 省去手动切换和按 ⌘V
+
+                隐私说明：
+                • AudioWhisper 只发送粘贴快捷键（⌘V）
+                • 不读取、监控或访问其他应用内容
+                • 不录屏、不记录键盘输入
+                • 转录在你的设备上完成
+
+                接下来：
+                • 点击“授予权限”打开系统设置
+                • 在“隐私与安全性 → 辅助功能”里找到 AudioWhisper
+                • 打开开关，然后回到 AudioWhisper
+
+                如果你想手动控制，可以点“暂不启用智能粘贴”，转录文本仍会复制到剪贴板。
+                """
+            }
+            return """
+            AudioWhisper's SmartPaste feature needs Accessibility permission to automatically paste transcribed text into your applications.
+
+            What SmartPaste does:
+            • Pastes transcribed text into the app you were using before recording
+            • Switches focus back to your original application
+            • Provides a hands-free voice-to-text workflow
+
+            Privacy protection:
+            • AudioWhisper only sends paste commands (⌘V) to applications
+            • It never reads, monitors, or accesses content from other applications
+            • No screen recording or keylogging occurs
+            • Transcription happens on your device
+
+            What happens next:
+            • Click "Grant Permission" to open System Settings
+            • Find AudioWhisper in Privacy & Security → Accessibility
+            • Toggle the switch to enable the permission
+            • Return to AudioWhisper to use SmartPaste
+
+            If you prefer manual control, click "Continue Without SmartPaste" and use ⌘V yourself.
+            """
+        }
+        static var grantPermission: String { isCN ? "授予权限" : "Grant Permission" }
+        static var continueWithout: String { isCN ? "暂不启用智能粘贴" : "Continue Without SmartPaste" }
+        static var learnMore: String { isCN ? "了解辅助功能权限" : "Learn More About Accessibility Permissions" }
+
+        static var enabledTitle: String { isCN ? "智能粘贴已启用" : "SmartPaste Enabled!" }
+        static var enabledMessage: String {
+            isCN
+                ? "辅助功能权限已授权。智能粘贴现在可以把转录文本自动粘贴到其他应用中。\n\n如果你之后想手动粘贴，可以随时在 AudioWhisper 设置里关闭智能粘贴。"
+                : "Accessibility permission has been granted successfully.\n\nSmartPaste is now enabled and will automatically paste transcribed text into your applications.\n\nYou can disable SmartPaste anytime in AudioWhisper Settings if you prefer manual control."
+        }
+        static var great: String { isCN ? "好的" : "Great!" }
+
+        static var incompleteTitle: String { isCN ? "权限设置尚未生效" : "Permission Setup Incomplete" }
+        static var incompleteMessage: String {
+            if isCN {
+                return """
+                AudioWhisper 还没有检测到可用的辅助功能权限。
+
+                这通常是因为：
+                • 系统设置窗口关闭前没有完成授权
+                • 你已经打开开关，但 macOS 还没刷新到当前运行的 App
+                • 列表里的 AudioWhisper 对应旧签名或旧 App bundle
+
+                接下来可以这样处理：
+                • 点“显示手动步骤”，删除列表里的 AudioWhisper 后重新添加 /Applications/AudioWhisper.app
+                • 重启 AudioWhisper 后再试一次
+                • 转录文本仍会复制到剪贴板，你也可以手动按 ⌘V 粘贴
+                """
+            }
+            return """
+            AudioWhisper has not detected active Accessibility permission yet.
+
+            This might happen if:
+            • System Settings was closed without making changes
+            • The permission was granted but macOS has not refreshed the running app yet
+            • The AudioWhisper entry points to an older signature or app bundle
+
+            What to do next:
+            • Click "Show Manual Instructions", remove AudioWhisper, and re-add /Applications/AudioWhisper.app
+            • Restart AudioWhisper and try again
+            • Transcribed text is still copied to your clipboard, so you can paste manually with ⌘V
+            """
+        }
+        static var showManualInstructions: String { isCN ? "显示手动步骤" : "Show Manual Instructions" }
+
+        static var educationTitle: String { isCN ? "为什么需要辅助功能权限" : "Understanding macOS Accessibility Permissions" }
+        static var educationMessage: String {
+            if isCN {
+                return """
+                macOS 的辅助功能权限允许自动化工具与其他应用交互。屏幕阅读器、语音控制、Keyboard Maestro、文本扩展工具也会使用同一类权限。
+
+                AudioWhisper 只需要发送一次等同于按下 ⌘V 的粘贴命令，把转录文本放回你录音前所在的位置。没有这个权限时，你需要自己切回原应用并手动粘贴。
+
+                AudioWhisper 不读取其他应用内容，不录屏，也不记录键盘输入。这个权限可以随时在系统设置里撤销。
+                """
+            }
+            return """
+            macOS Accessibility permissions allow assistive technologies and automation tools to interact with other applications. This is the same permission used by screen readers, voice control, Keyboard Maestro, text expanders, and similar tools.
+
+            AudioWhisper only needs to send a paste command, equivalent to pressing ⌘V, so it can place transcribed text back where you were working. Without this permission, you need to switch back and paste manually.
+
+            AudioWhisper does not read other app content, record your screen, or log keystrokes. You can revoke this permission anytime in System Settings.
+            """
+        }
+        static var iUnderstand: String { isCN ? "我知道了" : "I Understand" }
+
+        static var manualTitle: String { isCN ? "启用辅助功能权限" : "Enable Accessibility Permission" }
+        static var manualMessage: String {
+            if isCN {
+                return """
+                手动启用智能粘贴：
+
+                1. 点击下面的“打开系统设置”
+                2. 进入“隐私与安全性 → 辅助功能”
+                3. 找到 AudioWhisper 并打开开关
+                4. 如果已经打开但仍不能粘贴，先从列表里删除 AudioWhisper，再用“+”重新添加 /Applications/AudioWhisper.app
+                5. 重启 AudioWhisper 后再试一次
+                """
+            }
+            return """
+            To enable SmartPaste manually:
+
+            1. Click "Open System Settings" below
+            2. Go to Privacy & Security → Accessibility
+            3. Find AudioWhisper and enable it
+            4. If it is already enabled but paste still fails, remove AudioWhisper from the list and re-add /Applications/AudioWhisper.app with the "+" button
+            5. Restart AudioWhisper and try again
+            """
+        }
+        static var openSystemSettings: String { isCN ? "打开系统设置" : "Open System Settings" }
+
+        static var statusGranted: String {
+            isCN ? "✅ 辅助功能权限已授权，智能粘贴可用" : "✅ Accessibility permission granted - SmartPaste is enabled"
+        }
+        static var statusRequired: String {
+            isCN ? "⚠️ 智能粘贴需要辅助功能权限" : "⚠️ Accessibility permission required for SmartPaste functionality"
+        }
+        static var detailedConfigured: String {
+            isCN ? "辅助功能权限已正确配置" : "Accessibility permission is properly configured"
+        }
+        static var detailedNotGranted: String {
+            isCN ? "辅助功能权限尚未授权" : "Accessibility permission is not granted"
+        }
+        static var troubleshootingInfo: String {
+            if isCN {
+                return """
+                启用智能粘贴：
+                1. 打开“系统设置 → 隐私与安全性 → 辅助功能”
+                2. 添加 AudioWhisper（需要时用 + 按钮选择 /Applications/AudioWhisper.app）
+                3. 打开 AudioWhisper 的开关
+                4. 如果仍失败，删除旧条目、重新添加并重启 AudioWhisper
+                """
+            }
+            return """
+            To enable SmartPaste:
+            1. Open System Settings → Privacy & Security → Accessibility
+            2. Add AudioWhisper to the list, using the + button to choose /Applications/AudioWhisper.app if needed
+            3. Toggle the switch to enable AudioWhisper
+            4. If it still fails, remove the old entry, re-add it, and restart AudioWhisper
+            """
+        }
+
+        static var errorTitle: String { isCN ? "权限请求出错" : "Permission Request Error" }
+        static func errorMessage(_ description: String) -> String {
+            if isCN {
+                return """
+                请求辅助功能权限时出现错误：
+
+                \(description)
+
+                你仍然可以手动启用智能粘贴：
+                1. 打开系统设置
+                2. 进入“隐私与安全性 → 辅助功能”
+                3. 添加 AudioWhisper 并打开开关
+
+                或者暂不启用智能粘贴，转录文本会继续复制到剪贴板。
+                """
+            }
+            return """
+            An error occurred while requesting Accessibility permission:
+
+            \(description)
+
+            You can still enable SmartPaste manually:
+            1. Open System Settings
+            2. Go to Privacy & Security → Accessibility
+            3. Add AudioWhisper and enable it
+
+            Or continue using AudioWhisper without SmartPaste - transcribed text will be copied to your clipboard for manual pasting.
+            """
+        }
+
+        static var disabledTitle: String { isCN ? "智能粘贴未启用" : "SmartPaste Disabled" }
+        static var disabledMessage: String {
+            isCN
+                ? "AudioWhisper 会继续复制转录文本到剪贴板，你可以手动按 ⌘V 粘贴。\n\n之后可以在 AudioWhisper 设置 → 通用 → 智能粘贴中重新启用。"
+                : "AudioWhisper will continue to copy transcribed text to your clipboard, and you can paste it manually using ⌘V.\n\nYou can enable SmartPaste anytime in AudioWhisper Settings → General → Smart Paste."
+        }
+    }
+
+    enum PasteErrors {
+        static var accessibilityPermissionDenied: String {
+            isCN
+                ? "智能粘贴需要辅助功能权限。请在系统设置 → 隐私与安全性 → 辅助功能中启用 AudioWhisper。"
+                : "Accessibility permission is required for SmartPaste. Please enable it in System Settings > Privacy & Security > Accessibility."
+        }
+        static var eventSourceCreationFailed: String {
+            isCN ? "无法创建粘贴事件源。" : "Could not create event source for paste operation."
+        }
+        static var keyboardEventCreationFailed: String {
+            isCN ? "无法创建粘贴快捷键事件。" : "Could not create keyboard events for paste operation."
+        }
+        static var targetAppNotAvailable: String {
+            isCN ? "目标应用不可用，无法粘贴。" : "Target application is not available for pasting."
+        }
+    }
+
     // MARK: - Common
     enum Common {
         static var cancel: String { isCN ? "取消" : "Cancel" }

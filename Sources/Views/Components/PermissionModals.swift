@@ -7,6 +7,8 @@ internal struct PermissionEducationModal: View {
     private var enableSmartPaste: Bool {
         UserDefaults.standard.bool(forKey: "enableSmartPaste")
     }
+
+    private var isCN: Bool { L10n.isChinese }
     
     var body: some View {
         VStack(spacing: 20) {
@@ -20,27 +22,29 @@ internal struct PermissionEducationModal: View {
                         .foregroundStyle(.green)
                 }
             }
-            .accessibilityLabel("Permissions required")
+            .accessibilityLabel(isCN ? "需要权限" : "Permissions required")
             
             VStack(spacing: 12) {
-                Text(enableSmartPaste ? "Permissions Required" : "Microphone Permission Required")
+                Text(enableSmartPaste
+                    ? (isCN ? "需要权限" : "Permissions Required")
+                    : (isCN ? "需要麦克风权限" : "Microphone Permission Required"))
                     .font(.title2)
                     .fontWeight(.semibold)
                 
                 Text(enableSmartPaste ? 
-                     "AudioWhisper needs permissions to work properly:" :
-                     "AudioWhisper needs microphone access to record audio:")
+                     (isCN ? "AudioWhisper 需要以下权限才能正常工作：" : "AudioWhisper needs permissions to work properly:") :
+                     (isCN ? "AudioWhisper 需要麦克风权限来录音：" : "AudioWhisper needs microphone access to record audio:"))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Microphone access to record audio", systemImage: "mic.circle.fill")
+                    Label(isCN ? "麦克风权限用于录制音频" : "Microphone access to record audio", systemImage: "mic.circle.fill")
                         .foregroundStyle(.blue)
                     if enableSmartPaste {
-                        Label("Accessibility access to paste transcribed text", systemImage: "accessibility.circle.fill")
+                        Label(isCN ? "辅助功能权限用于粘贴转录文本" : "Accessibility access to paste transcribed text", systemImage: "accessibility.circle.fill")
                             .foregroundStyle(.green)
                     }
-                    Label("Your audio is never stored permanently", systemImage: "lock.circle.fill")
+                    Label(isCN ? "你的音频不会被永久保存" : "Your audio is never stored permanently", systemImage: "lock.circle.fill")
                         .foregroundStyle(.secondary)
                 }
                 .font(.callout)
@@ -48,17 +52,21 @@ internal struct PermissionEducationModal: View {
             }
             
             HStack(spacing: 12) {
-                Button("Not Now") {
+                Button(isCN ? "暂不" : "Not Now") {
                     onCancel()
                 }
                 .buttonStyle(.bordered)
-                .accessibilityHint("Dismiss this dialog without granting permissions")
+                .accessibilityHint(isCN ? "关闭此对话框且不授予权限" : "Dismiss this dialog without granting permissions")
                 
-                Button(enableSmartPaste ? "Allow Permissions" : "Allow Microphone Access") {
+                Button(enableSmartPaste
+                    ? (isCN ? "允许权限" : "Allow Permissions")
+                    : (isCN ? "允许麦克风权限" : "Allow Microphone Access")) {
                     onProceed()
                 }
                 .buttonStyle(.borderedProminent)
-                .accessibilityHint(enableSmartPaste ? "Grant microphone and accessibility permissions" : "Grant microphone permission")
+                .accessibilityHint(enableSmartPaste
+                    ? (isCN ? "授予麦克风和辅助功能权限" : "Grant microphone and accessibility permissions")
+                    : (isCN ? "授予麦克风权限" : "Grant microphone permission"))
             }
         }
         .padding(24)
@@ -72,20 +80,22 @@ internal struct PermissionEducationModal: View {
 internal struct PermissionRecoveryModal: View {
     let onOpenSettings: () -> Void
     let onCancel: () -> Void
+
+    private var isCN: Bool { L10n.isChinese }
     
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(.largeTitle))
                 .foregroundStyle(.orange)
-                .accessibilityLabel("Warning: Permissions denied")
+                .accessibilityLabel(isCN ? "警告：权限未授权" : "Warning: Permissions denied")
             
             VStack(spacing: 12) {
-                Text("Permissions Required")
+                Text(isCN ? "需要权限" : "Permissions Required")
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                Text("AudioWhisper needs microphone and accessibility permissions to work properly.")
+                Text(isCN ? "AudioWhisper 需要麦克风和辅助功能权限才能正常工作。" : "AudioWhisper needs microphone and accessibility permissions to work properly.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)
                 
@@ -93,19 +103,19 @@ internal struct PermissionRecoveryModal: View {
                     HStack {
                         Text("1.")
                             .fontWeight(.semibold)
-                        Text("Click 'Open System Settings' below")
+                        Text(isCN ? "点击下面的“打开系统设置”" : "Click 'Open System Settings' below")
                     }
                     
                     HStack {
                         Text("2.")
                             .fontWeight(.semibold)
-                        Text("Enable AudioWhisper in 'Microphone' section")
+                        Text(isCN ? "在“麦克风”中启用 AudioWhisper" : "Enable AudioWhisper in 'Microphone' section")
                     }
                     
                     HStack {
                         Text("3.")
                             .fontWeight(.semibold)
-                        Text("Enable AudioWhisper in 'Accessibility' section")
+                        Text(isCN ? "在“辅助功能”中启用 AudioWhisper" : "Enable AudioWhisper in 'Accessibility' section")
                     }
                 }
                 .font(.callout)
@@ -113,17 +123,17 @@ internal struct PermissionRecoveryModal: View {
             }
             
             HStack(spacing: 12) {
-                Button("Cancel") {
+                Button(L10n.Common.cancel) {
                     onCancel()
                 }
                 .buttonStyle(.bordered)
-                .accessibilityHint("Dismiss this dialog without opening System Settings")
+                .accessibilityHint(isCN ? "关闭此对话框且不打开系统设置" : "Dismiss this dialog without opening System Settings")
                 
-                Button("Open System Settings") {
+                Button(L10n.SmartPastePermission.openSystemSettings) {
                     onOpenSettings()
                 }
                 .buttonStyle(.borderedProminent)
-                .accessibilityHint("Open macOS System Settings to enable permissions")
+                .accessibilityHint(isCN ? "打开 macOS 系统设置以启用权限" : "Open macOS System Settings to enable permissions")
             }
         }
         .padding(24)

@@ -289,7 +289,7 @@ sign_app() {
     codesign --force --sign "$identity" --options runtime --entitlements AudioWhisper.entitlements AudioWhisper.app/Contents/Resources/bin/uv
   fi
 
-  codesign --force --deep --sign "$identity" --options runtime --entitlements AudioWhisper.entitlements AudioWhisper.app
+  codesign --force --deep --sign "$identity" --options runtime --entitlements AudioWhisper.entitlements --identifier "com.audiowhisper.app" AudioWhisper.app
   if [ $? -eq 0 ]; then
     echo "🔍 Verifying signature..."
     codesign --verify --verbose AudioWhisper.app
@@ -305,13 +305,39 @@ sign_app() {
 SIGNING_IDENTITY=""
 SIGNING_NAME=""
 
-if [ -n "$CODE_SIGN_IDENTITY" ]; then
+if [ -n "${AUDIO_WHISPER_CODE_SIGN_IDENTITY:-}" ]; then
+  SIGNING_IDENTITY="$AUDIO_WHISPER_CODE_SIGN_IDENTITY"
+elif [ -n "${CODE_SIGN_IDENTITY:-}" ]; then
   SIGNING_IDENTITY="$CODE_SIGN_IDENTITY"
 else
-  # Try to auto-detect Developer ID (use the first one found)
-  DETECTED_HASH=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk '{print $2}')
-  DETECTED_NAME=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk '{print $3}' | tr -d '"')
+  find_identity_by_name() {
+    local identity_name="$1"
+    security find-identity -v -p codesigning 2>/dev/null |
+      grep "\"$identity_name\"" |
+      head -1 |
+      awk '{print $2}'
+  }
+
+  identity_display_name() {
+    local identity_hash="$1"
+    security find-identity -v -p codesigning 2>/dev/null |
+      awk -v hash="$identity_hash" '$2 == hash { print; exit }' |
+      sed -E 's/^[[:space:]]*[0-9]+\) [A-F0-9]+ "(.+)"/\1/'
+  }
+
+  # Prefer distribution signing when available. For local iterative installs,
+  # fall back to a stable local identity so macOS TCC does not see every build
+  # as a new ad-hoc binary with a different CDHash.
+  DETECTED_HASH=$(find_identity_by_name "Developer ID Application")
+  if [ -z "$DETECTED_HASH" ]; then
+    DETECTED_HASH=$(find_identity_by_name "AudioWhisper Local Development")
+  fi
+  if [ -z "$DETECTED_HASH" ]; then
+    DETECTED_HASH=$(find_identity_by_name "AudioWhisperDev")
+  fi
+
   if [ -n "$DETECTED_HASH" ]; then
+    DETECTED_NAME=$(identity_display_name "$DETECTED_HASH")
     echo "🔍 Auto-detected signing identity: $DETECTED_NAME"
     SIGNING_IDENTITY="$DETECTED_HASH"
     SIGNING_NAME="$DETECTED_NAME"
@@ -321,8 +347,8 @@ fi
 if [ -n "$SIGNING_IDENTITY" ]; then
   sign_app "$SIGNING_IDENTITY" "$SIGNING_NAME"
 else
-  echo "💡 No Developer ID found. App will be unsigned."
-  echo "💡 To sign the app, get a Developer ID certificate from Apple Developer Portal."
+  echo "💡 No Developer ID found. Using ad-hoc signing with com.audiowhisper.app."
+  sign_app "-" "ad-hoc com.audiowhisper.app"
 fi
 
 # Clean up entitlements file
@@ -333,8 +359,12 @@ if [ "$NOTARIZE" = true ]; then
   echo ""
   echo "🔐 Starting notarization process..."
 
+  APPLE_ID="${AUDIO_WHISPER_APPLE_ID:-}"
+  APPLE_PASSWORD="${AUDIO_WHISPER_APPLE_PASSWORD:-}"
+  TEAM_ID="${AUDIO_WHISPER_TEAM_ID:-}"
+
   # Check for required environment variables
-  if [ -z "$AUDIO_WHISPER_APPLE_ID" ] || [ -z "$AUDIO_WHISPER_APPLE_PASSWORD" ] || [ -z "$AUDIO_WHISPER_TEAM_ID" ]; then
+  if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$TEAM_ID" ]; then
     echo "❌ Notarization requires the following environment variables:"
     echo "   AUDIO_WHISPER_APPLE_ID - Your Apple ID email"
     echo "   AUDIO_WHISPER_APPLE_PASSWORD - App-specific password for notarization"
@@ -362,9 +392,9 @@ if [ "$NOTARIZE" = true ]; then
   # Submit for notarization
   echo "📤 Submitting to Apple for notarization..."
   xcrun notarytool submit AudioWhisper.zip \
-    --apple-id "$AUDIO_WHISPER_APPLE_ID" \
-    --password "$AUDIO_WHISPER_APPLE_PASSWORD" \
-    --team-id "$AUDIO_WHISPER_TEAM_ID" \
+    --apple-id "$APPLE_ID" \
+    --password "$APPLE_PASSWORD" \
+    --team-id "$TEAM_ID" \
     --wait 2>&1 | tee notarization.log
 
   # Check if notarization was successful
