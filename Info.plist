@@ -7,17 +7,17 @@
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.audiowhisper.app</string>
+	<string>com.typeleast.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>AudioWhisper</string>
+	<string>Typeleast</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.1.0</string>
+	<string>2.1.2</string>
 	<key>CFBundleVersion</key>
-	<string>210</string>
+	<string>212</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
@@ -28,6 +28,6 @@
 		<true/>
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>AudioWhisper needs access to your microphone to record audio for transcription.</string>
+	<string>Typeleast needs access to your microphone to record audio for transcription.</string>
 </dict>
 </plist>

@@ -35,13 +35,13 @@ internal enum PasteError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .accessibilityPermissionDenied:
-            return "Accessibility permission is required for SmartPaste. Please enable it in System Settings > Privacy & Security > Accessibility."
+            return L10n.PasteErrors.accessibilityPermissionDenied
         case .eventSourceCreationFailed:
-            return "Could not create event source for paste operation."
+            return L10n.PasteErrors.eventSourceCreationFailed
         case .keyboardEventCreationFailed:
-            return "Could not create keyboard events for paste operation."
+            return L10n.PasteErrors.keyboardEventCreationFailed
         case .targetAppNotAvailable:
-            return "Target application is not available for pasting."
+            return L10n.PasteErrors.targetAppNotAvailable
         }
     }
 }
@@ -154,8 +154,7 @@ internal class PasteManager {
                     // Permission was granted - attempt paste operation
                     self.performCGEventPaste(completion: completion)
                 } else {
-                    // User declined permission - show appropriate message and fail gracefully
-                    self.accessibilityManager.showPermissionDeniedMessage()
+                    // The permission manager already presented the relevant opt-out or timeout guidance.
                     self.handlePasteResult(.failure(PasteError.accessibilityPermissionDenied))
                     completion?(.failure(PasteError.accessibilityPermissionDenied))
                 }

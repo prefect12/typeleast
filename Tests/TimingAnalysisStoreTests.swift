@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class TimingAnalysisStoreTests: XCTestCase {
@@ -50,6 +50,36 @@ final class TimingAnalysisStoreTests: XCTestCase {
         XCTAssertEqual(dataManager.fetchCount, 2)
         XCTAssertEqual(store.records.count, 2)
     }
+
+    func testLoadIfNeededReusesRecordsWhenCachedLimitCoversRequest() async {
+        dataManager.records = (0..<60).map { index in
+            TranscriptionRecord(text: "record \(index)", provider: .openai, duration: 1, modelUsed: nil)
+        }
+
+        await store.loadIfNeeded(recordLimit: 50, dataManager: dataManager)
+
+        XCTAssertEqual(dataManager.fetchCount, 1)
+        XCTAssertEqual(dataManager.lastLimit, 50)
+        XCTAssertEqual(store.records.count, 50)
+
+        await store.loadIfNeeded(recordLimit: 20, dataManager: dataManager)
+
+        XCTAssertEqual(dataManager.fetchCount, 1)
+        XCTAssertEqual(store.records.count, 50)
+    }
+
+    func testLoadIfNeededReloadsWhenRequestNeedsMoreRecords() async {
+        dataManager.records = (0..<80).map { index in
+            TranscriptionRecord(text: "record \(index)", provider: .openai, duration: 1, modelUsed: nil)
+        }
+
+        await store.loadIfNeeded(recordLimit: 20, dataManager: dataManager)
+        await store.loadIfNeeded(recordLimit: 50, dataManager: dataManager)
+
+        XCTAssertEqual(dataManager.fetchCount, 2)
+        XCTAssertEqual(dataManager.lastLimit, 50)
+        XCTAssertEqual(store.records.count, 50)
+    }
 }
 
 @MainActor
@@ -59,6 +89,7 @@ private final class CountingTimingDataManager: DataManagerProtocol {
     var sharedModelContainer: ModelContainer? { nil }
     var records: [TranscriptionRecord] = []
     private(set) var fetchCount = 0
+    private(set) var lastLimit: Int?
 
     func initialize() throws {}
 
@@ -76,7 +107,12 @@ private final class CountingTimingDataManager: DataManagerProtocol {
     }
 
     func fetchRecords(matching searchQuery: String, limit: Int?, offset: Int?) async throws -> [TranscriptionRecord] {
-        records
+        fetchCount += 1
+        lastLimit = limit
+        if let limit {
+            return Array(records.prefix(limit))
+        }
+        return records
     }
 
     func deleteRecord(_ record: TranscriptionRecord) async throws {
@@ -91,6 +127,15 @@ private final class CountingTimingDataManager: DataManagerProtocol {
         guard let record = records.first(where: { $0.id == recordID }) else { return }
         record.pasteTime = pasteTime
         record.endToEndTime = endToEndTime
+    }
+
+    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int {
+        let backfilledRecords = LegacyUsageBackfill.recordsToBackfill(
+            snapshot: snapshot,
+            existingRecords: records
+        )
+        records.append(contentsOf: backfilledRecords)
+        return backfilledRecords.count
     }
 
     func cleanupExpiredRecords() async throws {}

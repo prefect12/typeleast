@@ -7,7 +7,7 @@ internal class AccessibilityPermissionManager {
     private let isTestEnvironment: Bool
     private let permissionCheck: () -> Bool
     
-    init(permissionCheck: @escaping () -> Bool = { AXIsProcessTrustedWithOptions(nil) }) {
+    init(permissionCheck: @escaping () -> Bool = { AXIsProcessTrusted() }) {
         isTestEnvironment = NSClassFromString("XCTestCase") != nil
         self.permissionCheck = permissionCheck
     }
@@ -37,6 +37,7 @@ internal class AccessibilityPermissionManager {
         // Show explanation alert before requesting permission (runtime only)
         showPermissionExplanationAlert { [weak self] userWantsToGrant in
             guard userWantsToGrant else {
+                self?.showPermissionDeniedMessage()
                 completion(false)
                 return
             }
@@ -51,34 +52,12 @@ internal class AccessibilityPermissionManager {
         if isTestEnvironment { completion(false); return }
         Task { @MainActor in
             let alert = NSAlert()
-            alert.messageText = "Accessibility Permission Required for SmartPaste"
-            alert.informativeText = """
-            AudioWhisper's SmartPaste feature needs Accessibility permission to automatically paste transcribed text into your applications.
-            
-            🎯 What SmartPaste Does:
-            • Automatically pastes transcribed text into the app you were using before recording
-            • Switches focus back to your original application seamlessly
-            • Provides a hands-free voice-to-text workflow
-            
-            🔒 Privacy Protection:
-            • AudioWhisper ONLY sends paste commands (⌘V) to applications
-            • It never reads, monitors, or accesses content from other applications
-            • No screen recording or keylogging occurs
-            • All transcription happens locally on your device
-            
-            ⚙️ What Happens Next:
-            • Click "Grant Permission" to open System Settings
-            • Find AudioWhisper in Privacy & Security → Accessibility
-            • Toggle the switch to enable the permission
-            • Return to AudioWhisper to use SmartPaste
-            
-            ✋ Alternative:
-            If you prefer manual control, click "Continue Without SmartPaste" and use ⌘V to paste transcribed text yourself.
-            """
+            alert.messageText = L10n.SmartPastePermission.requestTitle
+            alert.informativeText = L10n.SmartPastePermission.requestMessage
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "Grant Permission")
-            alert.addButton(withTitle: "Continue Without SmartPaste")
-            alert.addButton(withTitle: "Learn More About Accessibility Permissions")
+            alert.addButton(withTitle: L10n.SmartPastePermission.grantPermission)
+            alert.addButton(withTitle: L10n.SmartPastePermission.continueWithout)
+            alert.addButton(withTitle: L10n.SmartPastePermission.learnMore)
             
             let response = alert.runModal()
             
@@ -154,16 +133,10 @@ internal class AccessibilityPermissionManager {
     private func showPermissionGrantedConfirmation() {
         if isTestEnvironment { return }
         let alert = NSAlert()
-        alert.messageText = "SmartPaste Enabled!"
-        alert.informativeText = """
-        ✅ Accessibility permission has been granted successfully.
-        
-        SmartPaste is now enabled and will automatically paste transcribed text into your applications.
-        
-        You can disable SmartPaste anytime in AudioWhisper's Settings if you prefer manual control.
-        """
+        alert.messageText = L10n.SmartPastePermission.enabledTitle
+        alert.informativeText = L10n.SmartPastePermission.enabledMessage
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Great!")
+        alert.addButton(withTitle: L10n.SmartPastePermission.great)
         alert.runModal()
     }
     
@@ -171,25 +144,11 @@ internal class AccessibilityPermissionManager {
     private func showPermissionTimeoutMessage() {
         if isTestEnvironment { return }
         let alert = NSAlert()
-        alert.messageText = "Permission Setup Incomplete"
-        alert.informativeText = """
-        The accessibility permission setup didn't complete within the expected timeframe.
-        
-        This might happen if:
-        • System Settings was closed without making changes
-        • The permission was granted but needs a moment to take effect
-        • There was an issue with the system settings dialog
-        
-        💡 What to do next:
-        • Try using SmartPaste - it might work now
-        • Use Settings → Show Manual Instructions to set it up manually
-        • Restart AudioWhisper if the permission still doesn't work
-        
-        You can always paste transcribed text manually using ⌘V.
-        """
+        alert.messageText = L10n.SmartPastePermission.incompleteTitle
+        alert.informativeText = L10n.SmartPastePermission.incompleteMessage
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
-        alert.addButton(withTitle: "Show Manual Instructions")
+        alert.addButton(withTitle: L10n.Common.done)
+        alert.addButton(withTitle: L10n.SmartPastePermission.showManualInstructions)
         
         let response = alert.runModal()
         if response == .alertSecondButtonReturn {
@@ -202,35 +161,10 @@ internal class AccessibilityPermissionManager {
         if isTestEnvironment { return }
         Task { @MainActor in
             let alert = NSAlert()
-            alert.messageText = "Understanding macOS Accessibility Permissions"
-            alert.informativeText = """
-            🛡️ What Are Accessibility Permissions?
-            
-            Accessibility permissions in macOS allow assistive technologies and automation tools to interact with other applications. This is the same permission used by:
-            • Screen readers for visually impaired users
-            • Voice control software
-            • Automation tools like Keyboard Maestro
-            • Text expanders and productivity apps
-            
-            🔍 Why AudioWhisper Needs This Permission:
-            
-            AudioWhisper needs to send a simple "paste" command (equivalent to pressing ⌘V) to place transcribed text in the right location. Without this permission, you'd need to manually:
-            1. Remember which app you were using
-            2. Switch back to that app
-            3. Find the right text field
-            4. Press ⌘V yourself
-            
-            🔒 Security Safeguards:
-            
-            • AudioWhisper is sandboxed and can't access other app's data
-            • It only sends paste commands, never reads content
-            • All permissions are revocable in System Settings
-            • You maintain full control over when recordings happen
-            
-            This permission makes voice transcription seamless while maintaining your privacy and security.
-            """
+            alert.messageText = L10n.SmartPastePermission.educationTitle
+            alert.informativeText = L10n.SmartPastePermission.educationMessage
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "I Understand")
+            alert.addButton(withTitle: L10n.SmartPastePermission.iUnderstand)
             alert.runModal()
         }
     }
@@ -239,26 +173,11 @@ internal class AccessibilityPermissionManager {
     func showManualPermissionInstructions() {
         Task { @MainActor in
             let alert = NSAlert()
-            alert.messageText = "Enable Accessibility Permission"
-            alert.informativeText = """
-            To enable SmartPaste functionality:
-            
-            1. Open System Settings (click "Open Settings" below)
-            2. Go to Privacy & Security → Accessibility
-            3. Find AudioWhisper in the list
-            4. Toggle the switch to enable it
-            5. Return to AudioWhisper
-            
-            If AudioWhisper isn't in the list, you may need to add it manually using the "+" button.
-            
-            💡 Troubleshooting:
-            • If the toggle appears grayed out, click the lock icon and enter your password
-            • If AudioWhisper doesn't appear in the list, try restarting AudioWhisper
-            • You may need to remove and re-add AudioWhisper if it's not working
-            """
+            alert.messageText = L10n.SmartPastePermission.manualTitle
+            alert.informativeText = L10n.SmartPastePermission.manualMessage
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Cancel")
+            alert.addButton(withTitle: L10n.SmartPastePermission.openSystemSettings)
+            alert.addButton(withTitle: L10n.Common.cancel)
             
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
@@ -286,9 +205,9 @@ internal class AccessibilityPermissionManager {
     /// Returns a user-friendly status message for the current permission state
     var permissionStatusMessage: String {
         if checkPermission() {
-            return "✅ Accessibility permission granted - SmartPaste is enabled"
+            return L10n.SmartPastePermission.statusGranted
         } else {
-            return "⚠️ Accessibility permission required for SmartPaste functionality"
+            return L10n.SmartPastePermission.statusRequired
         }
     }
     
@@ -299,20 +218,14 @@ internal class AccessibilityPermissionManager {
         if isGranted {
             return (
                 isGranted: true,
-                statusMessage: "Accessibility permission is properly configured",
+                statusMessage: L10n.SmartPastePermission.detailedConfigured,
                 troubleshootingInfo: nil
             )
         } else {
             return (
                 isGranted: false,
-                statusMessage: "Accessibility permission is not granted",
-                troubleshootingInfo: """
-                To enable SmartPaste:
-                1. Open System Settings → Privacy & Security → Accessibility
-                2. Add AudioWhisper to the list (using + button if needed)
-                3. Toggle the switch to enable AudioWhisper
-                4. Restart AudioWhisper if needed
-                """
+                statusMessage: L10n.SmartPastePermission.detailedNotGranted,
+                troubleshootingInfo: L10n.SmartPastePermission.troubleshootingInfo
             )
         }
     }
@@ -321,22 +234,11 @@ internal class AccessibilityPermissionManager {
     func handlePermissionError(_ error: Error) {
         Task { @MainActor in
             let alert = NSAlert()
-            alert.messageText = "Permission Request Error"
-            alert.informativeText = """
-            An error occurred while requesting Accessibility permission:
-            
-            \(error.localizedDescription)
-            
-            You can still enable SmartPaste manually:
-            1. Open System Settings
-            2. Go to Privacy & Security → Accessibility
-            3. Add AudioWhisper and enable it
-            
-            Or continue using AudioWhisper without SmartPaste - transcribed text will be copied to your clipboard for manual pasting.
-            """
+            alert.messageText = L10n.SmartPastePermission.errorTitle
+            alert.informativeText = L10n.SmartPastePermission.errorMessage(error.localizedDescription)
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "Open System Settings")
-            alert.addButton(withTitle: "Continue Without SmartPaste")
+            alert.addButton(withTitle: L10n.SmartPastePermission.openSystemSettings)
+            alert.addButton(withTitle: L10n.SmartPastePermission.continueWithout)
             
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
@@ -349,16 +251,10 @@ internal class AccessibilityPermissionManager {
     func showPermissionDeniedMessage() {
         Task { @MainActor in
             let alert = NSAlert()
-            alert.messageText = "SmartPaste Disabled"
-            alert.informativeText = """
-            AudioWhisper will continue to work without SmartPaste functionality.
-            
-            Transcribed text will be copied to your clipboard, and you can paste it manually using ⌘V.
-            
-            You can enable SmartPaste anytime in AudioWhisper Settings → General → Accessibility Permissions.
-            """
+            alert.messageText = L10n.SmartPastePermission.disabledTitle
+            alert.informativeText = L10n.SmartPastePermission.disabledMessage
             alert.alertStyle = .informational
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: L10n.Common.done)
             alert.runModal()
         }
     }
