@@ -63,7 +63,7 @@ internal enum L10n {
         static var activityFooter: String { isCN ? "全部已保存记录的转录字数" : "Words transcribed across all saved records." }
         static var calendarTitle: String { isCN ? "转录活动" : "Transcription Activity" }
         static var calendarSubtitle: String { isCN ? "按天查看综合活跃度，点击日期查看完整指标" : "Daily combined activity. Click a date to inspect all metrics." }
-        static var calendarHint: String { isCN ? "旧版只有汇总，轮次和耗时按总量估算；长记录会横向滚动" : "Legacy rows use aggregate estimates for sessions and time. Long history scrolls horizontally." }
+        static var calendarHint: String { isCN ? "累计计数会补足没有逐条记录的日期；长记录会横向滚动" : "Summary counters fill days without saved transcript details. Long history scrolls horizontally." }
         static var less: String { isCN ? "少" : "Less" }
         static var more: String { isCN ? "多" : "More" }
         static var dayOverview: String { isCN ? "当日概览" : "Day Overview" }
@@ -74,8 +74,7 @@ internal enum L10n {
         static var sourceMix: String { isCN ? "来源分布" : "Source Mix" }
         static var modelBreakdown: String { isCN ? "模型" : "Models" }
         static var noDataForDay: String { isCN ? "这一天暂无保存的转录记录" : "No saved transcripts for this day." }
-        static var aggregateOnlyDay: String { isCN ? "这一天只有旧版汇总数据，没有逐条转录明细" : "Only legacy aggregate data is available for this day; individual transcripts were not saved." }
-        static var legacySummary: String { isCN ? "旧版汇总" : "Legacy Summary" }
+        static var summaryCountersOnlyDay: String { isCN ? "这一天只有累计计数，没有逐条转录明细" : "Only summary counters are available for this day; individual transcripts were not saved." }
         static var noBreakdownData: String { isCN ? "暂无可拆分数据" : "No breakdown data yet." }
         static var trendTitle: String { isCN ? "近期趋势" : "Recent Trend" }
         static var trendSubtitle: String { isCN ? "最近 45 天的日级变化" : "Daily movement over the last 45 visible days" }
@@ -107,14 +106,14 @@ internal enum L10n {
         static var allRecords: String { isCN ? "全部" : "All" }
         static var noTimingData: String { isCN ? "暂无可分析的耗时数据" : "No timing data yet." }
         static var noTimingDataHint: String {
-            isCN ? "旧记录可能只有总耗时。完成新的转录后，这里会开始显示分阶段拆分。" :
-                "Older records may only have total processing time. New runs will include stage breakdowns."
+            isCN ? "部分记录可能只有总耗时。完成新的转录后，这里会开始显示分阶段拆分。" :
+                "Some records may only have total processing time. New runs will include stage breakdowns."
         }
         static func aggregateOnlyTimingHint(sessions: Int, words: Int) -> String {
             if isCN {
-                return "已有 \(sessions) 次 / \(words) 字的累计统计，但旧记录没有保存可分析的逐条耗时。完成新的转录后，这里会显示阶段拆分。"
+                return "已有 \(sessions) 次 / \(words) 字的累计统计，但没有保存可分析的逐条耗时。完成新的转录后，这里会显示阶段拆分。"
             }
-            return "\(sessions) sessions / \(words) words are counted in usage, but those older runs do not have saved timing details. New transcriptions will appear here."
+            return "\(sessions) sessions / \(words) words are counted in usage, but saved timing details are unavailable. New transcriptions will appear here."
         }
         static var runBreakdown: String { isCN ? "单次耗时拆分" : "Run Breakdown" }
         static var slowestStage: String { isCN ? "主要瓶颈" : "Main Bottleneck" }
@@ -123,7 +122,6 @@ internal enum L10n {
         static var analyzedRuns: String { isCN ? "分析记录" : "Runs" }
         static var stageDistribution: String { isCN ? "阶段占比" : "Stage Distribution" }
         static var recordDetails: String { isCN ? "记录明细" : "Record Details" }
-        static var legacyProcessing: String { isCN ? "处理总耗时（旧记录）" : "Processing Total (Legacy)" }
         static var untrackedProcessing: String { isCN ? "未拆分处理" : "Untracked Processing" }
         static var modelReady: String { isCN ? "模型准备" : "Model Prep" }
         static var asr: String { isCN ? "ASR 转录" : "ASR" }
@@ -135,7 +133,7 @@ internal enum L10n {
         static var provider: String { isCN ? "引擎" : "Provider" }
         static var source: String { isCN ? "来源" : "Source" }
         static var words: String { isCN ? "字数" : "Words" }
-        static var oldRecordHint: String { isCN ? "旧记录没有阶段字段" : "Legacy record without stage fields" }
+        static var totalOnlyRecordHint: String { isCN ? "该记录只有总耗时，没有阶段字段" : "This record has total processing time only." }
     }
 
     // MARK: - Transcription History
@@ -161,7 +159,7 @@ internal enum L10n {
         }
         static func aggregateOnlyHistoryHint(sessions: Int, words: Int) -> String {
             if isCN {
-                return "已有 \(sessions) 次 / \(words) 字的累计统计，但旧转录没有保存文本明细。开启历史后完成的新转录会显示在这里。"
+                return "已有 \(sessions) 次 / \(words) 字的累计统计，但此前转录没有保存文本明细。开启历史后完成的新转录会显示在这里。"
             }
             return "\(sessions) sessions / \(words) words are counted in usage, but those older transcripts were not saved as text records. New saved transcriptions will appear here."
         }
@@ -231,7 +229,6 @@ internal enum L10n {
             case "local": return isCN ? "本地 Whisper" : "Local Whisper"
             case "parakeet": return "Parakeet"
             case "funasr": return "FunASR"
-            case "legacysummary": return isCN ? "旧版汇总" : "Legacy Summary"
             default: return provider.capitalized
             }
         }
@@ -467,7 +464,7 @@ internal enum L10n {
                 这通常是因为：
                 • 系统设置窗口关闭前没有完成授权
                 • 你已经打开开关，但 macOS 还没刷新到当前运行的 App
-                • 列表里的 Typeleast 对应旧签名或旧 App bundle
+                • 列表里的 Typeleast 对应先前签名或先前 App bundle
 
                 接下来可以这样处理：
                 • 点“显示手动步骤”，删除列表里的 Typeleast 后重新添加 /Applications/Typeleast.app
@@ -556,7 +553,7 @@ internal enum L10n {
                 1. 打开“系统设置 → 隐私与安全性 → 辅助功能”
                 2. 添加 Typeleast（需要时用 + 按钮选择 /Applications/Typeleast.app）
                 3. 打开 Typeleast 的开关
-                4. 如果仍失败，删除旧条目、重新添加并重启 Typeleast
+                4. 如果仍失败，删除原有条目、重新添加并重启 Typeleast
                 """
             }
             return """

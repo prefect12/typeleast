@@ -6,6 +6,7 @@ import os.log
 internal final class SemanticCorrectionService {
     private let mlxService = MLXCorrectionService()
     private let keychainService: KeychainServiceProtocol
+    private let settingsStore: TranscriptionSettingsReadable
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "SemanticCorrection")
     
     // Chunking configuration for 32k context window
@@ -19,8 +20,12 @@ internal final class SemanticCorrectionService {
         return AppCategoryManager.shared.category(for: id)
     }
 
-    init(keychainService: KeychainServiceProtocol = KeychainService.shared) {
+    init(
+        keychainService: KeychainServiceProtocol = KeychainService.shared,
+        settingsStore: TranscriptionSettingsReadable = TranscriptionSettingsStore.shared
+    ) {
         self.keychainService = keychainService
+        self.settingsStore = settingsStore
     }
 
     func correct(text: String, providerUsed: TranscriptionProvider, sourceAppBundleId: String? = nil) async -> String {
@@ -32,8 +37,7 @@ internal final class SemanticCorrectionService {
     ///
     /// This is used by the recording UI to reduce "silent failure" confusion for local MLX correction.
     func correctWithWarning(text: String, providerUsed: TranscriptionProvider, sourceAppBundleId: String? = nil) async -> (text: String, warning: String?) {
-        let modeRaw = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionMode) ?? SemanticCorrectionMode.off.rawValue
-        let mode = SemanticCorrectionMode(rawValue: modeRaw) ?? .off
+        let mode = settingsStore.semanticCorrectionMode
 
         let category = categoryFor(bundleId: sourceAppBundleId)
         logger.info("Correction category: \(category.id) for bundleId: \(sourceAppBundleId ?? "nil")")
@@ -65,7 +69,7 @@ internal final class SemanticCorrectionService {
         guard Arch.isAppleSilicon else {
             return (text, "Local semantic correction requires an Apple Silicon Mac.")
         }
-        let modelRepo = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionModelRepo) ?? AppDefaults.defaultSemanticCorrectionModelRepo
+        let modelRepo = settingsStore.semanticCorrectionModelRepo
         do {
             let pyURL = try UvBootstrap.ensureVenv(userPython: nil)
             let prompt = loadPrompt(for: category)

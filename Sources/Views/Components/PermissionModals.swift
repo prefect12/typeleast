@@ -5,7 +5,7 @@ internal struct PermissionEducationModal: View {
     let onCancel: () -> Void
     
     private var enableSmartPaste: Bool {
-        UserDefaults.standard.bool(forKey: "enableSmartPaste")
+        TranscriptionSettingsStore.shared.isSmartPasteEnabled
     }
 
     private var isCN: Bool { L10n.isChinese }

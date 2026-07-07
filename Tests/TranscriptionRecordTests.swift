@@ -178,12 +178,12 @@ final class TranscriptionRecordTests: XCTestCase {
     }
 
     func testDetailedTimingFields() {
-        let legacyRecord = TranscriptionRecord(
-            text: "Legacy",
+        let totalOnlyRecord = TranscriptionRecord(
+            text: "Total only",
             provider: .openai,
             transcriptionTime: 2.5
         )
-        XCTAssertFalse(legacyRecord.hasDetailedTiming)
+        XCTAssertFalse(totalOnlyRecord.hasDetailedTiming)
 
         let detailedRecord = TranscriptionRecord(
             text: "Detailed",

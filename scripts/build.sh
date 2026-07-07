@@ -30,7 +30,7 @@ BUILD_DATE=$(date '+%Y-%m-%d')
 
 # Read version from VERSION file or use environment variable
 DEFAULT_VERSION=$(cat VERSION | tr -d '[:space:]')
-VERSION="${TYPELEAST_VERSION:-${AUDIO_WHISPER_VERSION:-$DEFAULT_VERSION}}"
+VERSION="${TYPELEAST_VERSION:-$DEFAULT_VERSION}"
 
 echo "Building Typeleast version $VERSION..."
 
@@ -332,13 +332,6 @@ else
   if [ -z "$DETECTED_HASH" ]; then
     DETECTED_HASH=$(find_identity_by_name "Typeleast Local Development")
   fi
-  if [ -z "$DETECTED_HASH" ]; then
-    DETECTED_HASH=$(find_identity_by_name "AudioWhisper Local Development")
-  fi
-  if [ -z "$DETECTED_HASH" ]; then
-    DETECTED_HASH=$(find_identity_by_name "AudioWhisperDev")
-  fi
-
   if [ -n "$DETECTED_HASH" ]; then
     DETECTED_NAME=$(identity_display_name "$DETECTED_HASH")
     echo "🔍 Auto-detected signing identity: $DETECTED_NAME"
@@ -362,9 +355,9 @@ if [ "$NOTARIZE" = true ]; then
   echo ""
   echo "🔐 Starting notarization process..."
 
-  APPLE_ID="${TYPELEAST_APPLE_ID:-${AUDIO_WHISPER_APPLE_ID:-}}"
-  APPLE_PASSWORD="${TYPELEAST_APPLE_PASSWORD:-${AUDIO_WHISPER_APPLE_PASSWORD:-}}"
-  TEAM_ID="${TYPELEAST_TEAM_ID:-${AUDIO_WHISPER_TEAM_ID:-}}"
+  APPLE_ID="${TYPELEAST_APPLE_ID:-}"
+  APPLE_PASSWORD="${TYPELEAST_APPLE_PASSWORD:-}"
+  TEAM_ID="${TYPELEAST_TEAM_ID:-}"
 
   # Check for required environment variables
   if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$TEAM_ID" ]; then
@@ -372,7 +365,6 @@ if [ "$NOTARIZE" = true ]; then
     echo "   TYPELEAST_APPLE_ID - Your Apple ID email"
     echo "   TYPELEAST_APPLE_PASSWORD - App-specific password for notarization"
     echo "   TYPELEAST_TEAM_ID - Your Apple Developer Team ID"
-    echo "   Legacy AUDIO_WHISPER_* variables are accepted during the rebrand transition"
     echo ""
     echo "To create an app-specific password:"
     echo "1. Go to https://appleid.apple.com/account/manage"

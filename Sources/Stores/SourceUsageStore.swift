@@ -116,7 +116,7 @@ internal final class SourceUsageStore {
     private let developmentBundleIdentifier = AppIdentity.developmentBundleIdentifier
     private static let maxSources = 50
     private static let maxPersistedPayloadBytes = 512 * 1024
-    private static let legacyIconDataField = Data(#""iconData""#.utf8)
+    private static let persistedIconDataField = Data(#""iconData""#.utf8)
     
     private(set) var orderedStats: [SourceUsageStats] = []
     private var statsByBundle: [String: SourceUsageStats] = [:]
@@ -283,7 +283,7 @@ internal final class SourceUsageStore {
 
     private func shouldRewritePersistedPayload(data: Data, originalCount: Int) -> Bool {
         data.count > Self.maxPersistedPayloadBytes ||
-            data.range(of: Self.legacyIconDataField) != nil ||
+            data.range(of: Self.persistedIconDataField) != nil ||
             statsByBundle.count != originalCount
     }
 
@@ -293,8 +293,8 @@ internal final class SourceUsageStore {
         if let persisted = try? decoder.decode([String: PersistedSourceUsageStats].self, from: data) {
             return persisted.mapValues(\.stats)
         }
-        if let legacy = try? decoder.decode([String: SourceUsageStats].self, from: data) {
-            return legacy.mapValues { stat in
+        if let decodedStats = try? decoder.decode([String: SourceUsageStats].self, from: data) {
+            return decodedStats.mapValues { stat in
                 var lightweight = stat
                 lightweight.iconData = nil
                 return lightweight

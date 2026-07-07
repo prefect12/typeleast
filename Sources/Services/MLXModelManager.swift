@@ -28,8 +28,7 @@ internal final class MLXModelManager {
     private let cacheDirectory: URL
 
     static var parakeetRepo: String {
-        let rawValue = UserDefaults.standard.string(forKey: "selectedParakeetModel") ?? ParakeetModel.v3Multilingual.rawValue
-        return rawValue
+        TranscriptionSettingsStore.shared.selectedParakeetModel.rawValue
     }
     
     // Curated list of quality MLX models for semantic correction
