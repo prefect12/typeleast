@@ -129,15 +129,6 @@ private final class CountingTimingDataManager: DataManagerProtocol {
         record.endToEndTime = endToEndTime
     }
 
-    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int {
-        let backfilledRecords = LegacyUsageBackfill.recordsToBackfill(
-            snapshot: snapshot,
-            existingRecords: records
-        )
-        records.append(contentsOf: backfilledRecords)
-        return backfilledRecords.count
-    }
-
     func cleanupExpiredRecords() async throws {}
 
     func saveTranscriptionQuietly(_ record: TranscriptionRecord) async {

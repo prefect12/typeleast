@@ -30,7 +30,7 @@ internal extension ContentView {
         let shouldHintThisRun = !hasShownFirstModelUseHint && isLocalModelInvocationPlanned()
         if shouldHintThisRun { showFirstModelUseHint = true }
 
-        processingTask = Task {
+        processingTask = Task { @MainActor in
             let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
@@ -51,85 +51,33 @@ internal extension ContentView {
                 try Task.checkCancellation()
                 
                 var modelReadyTime: TimeInterval?
-                var asrTime: TimeInterval = 0
-                var correctionTime: TimeInterval = 0
-                var clipboardTime: TimeInterval = 0
-                let transcriptionStart = Date()
-                let text: String
                 if transcriptionProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
-                    let asrStart = Date()
-                    text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider, model: selectedWhisperModel)
-                    asrTime = Date().timeIntervalSince(asrStart)
-                } else {
-                    let asrStart = Date()
-                    text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider)
-                    asrTime = Date().timeIntervalSince(asrStart)
                 }
-                
-                try Task.checkCancellation()
-                
-                let modeRaw = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionMode) ?? SemanticCorrectionMode.off.rawValue
-                let mode = SemanticCorrectionMode(rawValue: modeRaw) ?? .off
-                var finalText = text
-                let sourceBundleId: String? = await MainActor.run { currentSourceAppInfo().bundleIdentifier }
-                if mode != .off {
-                    await MainActor.run { progressMessage = L10n.Recording.semanticCorrection }
-                    let correctionStart = Date()
-                    let outcome = await semanticCorrectionService.correctWithWarning(text: text, providerUsed: transcriptionProvider, sourceAppBundleId: sourceBundleId)
-                    correctionTime = Date().timeIntervalSince(correctionStart)
-                    if let warning = outcome.warning {
-                        await MainActor.run { progressMessage = warning }
-                    }
-                    let trimmed = outcome.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        finalText = outcome.text
-                    }
-                }
-                let transcriptionElapsed = Date().timeIntervalSince(transcriptionStart)
-                let wordCount = UsageMetricsStore.estimatedWordCount(for: finalText)
-                let characterCount = finalText.count
 
-                let clipboardStart = Date()
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(finalText, forType: .string)
-                clipboardTime = Date().timeIntervalSince(clipboardStart)
-                let shouldSave: Bool = await MainActor.run { DataManager.shared.isHistoryEnabled }
-                var savedRecordID: UUID?
-                if shouldSave {
-                    let modelUsed: String? = await MainActor.run { (transcriptionProvider == .local) ? self.selectedWhisperModel.rawValue : nil }
-                    let sourceInfo: SourceAppInfo = await MainActor.run { currentSourceAppInfo() }
-                    let record = TranscriptionRecord(
-                        text: finalText,
+                let result = try await transcriptionPipeline.run(
+                    TranscriptionPipelineRequest(
+                        audioURL: audioURL,
                         provider: transcriptionProvider,
+                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
                         duration: sessionDuration,
-                        modelUsed: modelUsed,
-                        wordCount: wordCount,
-                        characterCount: characterCount,
-                        sourceAppBundleId: sourceInfo.bundleIdentifier,
-                        sourceAppName: sourceInfo.displayName,
-                        sourceAppIconData: sourceInfo.iconData,
-                        transcriptionTime: transcriptionElapsed,
+                        estimatedDuration: nil,
+                        sourceAppInfo: currentSourceAppInfo(),
                         modelReadyTime: modelReadyTime,
-                        asrTime: asrTime,
-                        correctionTime: correctionTime,
-                        clipboardTime: clipboardTime,
-                        endToEndTime: Date().timeIntervalSince(processStart)
-                    )
-                    savedRecordID = record.id
-                    await DataManager.shared.saveTranscriptionQuietly(record)
-                }
+                        processStart: processStart
+                    ),
+                    progressHandler: { progressMessage = $0 }
+                )
+
                 await MainActor.run {
-                    UsageMetricsStore.shared.recordSession(
-                        duration: sessionDuration,
-                        wordCount: wordCount,
-                        characterCount: characterCount
-                    )
-                    recordSourceUsage(words: wordCount, characters: characterCount)
                     transcriptionStartTime = nil
-                    showConfirmationAndPaste(text: finalText, recordID: savedRecordID, processStart: processStart)
+                    showConfirmationAndPaste(
+                        text: result.text,
+                        recordID: result.savedRecordID,
+                        processStart: result.processStart
+                    )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch is CancellationError {
@@ -178,7 +126,7 @@ internal extension ContentView {
         let shouldHintThisRun = !hasShownFirstModelUseHint && isLocalModelInvocationPlanned()
         if shouldHintThisRun { showFirstModelUseHint = true }
 
-        processingTask = Task {
+        processingTask = Task { @MainActor in
             let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
@@ -190,89 +138,39 @@ internal extension ContentView {
                 try Task.checkCancellation()
 
                 var modelReadyTime: TimeInterval?
-                var asrTime: TimeInterval = 0
-                var correctionTime: TimeInterval = 0
-                var clipboardTime: TimeInterval = 0
-                let transcriptionStart = Date()
-                let text: String
                 if transcriptionProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
-                    let asrStart = Date()
-                    text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider, model: selectedWhisperModel)
-                    asrTime = Date().timeIntervalSince(asrStart)
-                } else {
-                    let asrStart = Date()
-                    text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider)
-                    asrTime = Date().timeIntervalSince(asrStart)
                 }
 
                 try Task.checkCancellation()
-
-                let modeRaw = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionMode) ?? SemanticCorrectionMode.off.rawValue
-                let mode = SemanticCorrectionMode(rawValue: modeRaw) ?? .off
-                var finalText = text
-                let sourceBundleId: String? = await MainActor.run { currentSourceAppInfo().bundleIdentifier }
-                if mode != .off {
-                    await MainActor.run { progressMessage = L10n.Recording.semanticCorrection }
-                    let correctionStart = Date()
-                    let outcome = await semanticCorrectionService.correctWithWarning(text: text, providerUsed: transcriptionProvider, sourceAppBundleId: sourceBundleId)
-                    correctionTime = Date().timeIntervalSince(correctionStart)
-                    if let warning = outcome.warning {
-                        await MainActor.run { progressMessage = warning }
-                    }
-                    let trimmed = outcome.text.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        finalText = outcome.text
-                    }
-                }
-                let transcriptionElapsed = Date().timeIntervalSince(transcriptionStart)
-                let wordCount = UsageMetricsStore.estimatedWordCount(for: finalText)
-                let characterCount = finalText.count
 
                 let fileAttributes = try? FileManager.default.attributesOfItem(atPath: audioURL.path)
                 let fileSize = (fileAttributes?[.size] as? Int64) ?? 0
                 let estimatedDuration = TimeInterval(fileSize) / 16000.0
 
-                let clipboardStart = Date()
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(finalText, forType: .string)
-                clipboardTime = Date().timeIntervalSince(clipboardStart)
-                let shouldSave: Bool = await MainActor.run { DataManager.shared.isHistoryEnabled }
-                var savedRecordID: UUID?
-                if shouldSave {
-                    let modelUsed: String? = await MainActor.run { (transcriptionProvider == .local) ? self.selectedWhisperModel.rawValue : nil }
-                    let sourceInfo: SourceAppInfo = await MainActor.run { currentSourceAppInfo() }
-                    let record = TranscriptionRecord(
-                        text: finalText,
+                let result = try await transcriptionPipeline.run(
+                    TranscriptionPipelineRequest(
+                        audioURL: audioURL,
                         provider: transcriptionProvider,
-                        duration: estimatedDuration,
-                        modelUsed: modelUsed,
-                        wordCount: wordCount,
-                        characterCount: characterCount,
-                        sourceAppBundleId: sourceInfo.bundleIdentifier,
-                        sourceAppName: sourceInfo.displayName,
-                        sourceAppIconData: sourceInfo.iconData,
-                        transcriptionTime: transcriptionElapsed,
+                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                        duration: nil,
+                        estimatedDuration: estimatedDuration,
+                        sourceAppInfo: currentSourceAppInfo(),
                         modelReadyTime: modelReadyTime,
-                        asrTime: asrTime,
-                        correctionTime: correctionTime,
-                        clipboardTime: clipboardTime,
-                        endToEndTime: Date().timeIntervalSince(processStart)
-                    )
-                    savedRecordID = record.id
-                    await DataManager.shared.saveTranscriptionQuietly(record)
-                }
+                        processStart: processStart
+                    ),
+                    progressHandler: { progressMessage = $0 }
+                )
+
                 await MainActor.run {
-                    UsageMetricsStore.shared.recordSession(
-                        duration: estimatedDuration,
-                        wordCount: wordCount,
-                        characterCount: characterCount
-                    )
-                    recordSourceUsage(words: wordCount, characters: characterCount)
                     transcriptionStartTime = nil
-                    showConfirmationAndPaste(text: finalText, recordID: savedRecordID, processStart: processStart)
+                    showConfirmationAndPaste(
+                        text: result.text,
+                        recordID: result.savedRecordID,
+                        processStart: result.processStart
+                    )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch is CancellationError {
@@ -320,8 +218,7 @@ internal extension ContentView {
         isProcessing = false
         soundManager.playCompletionSound()
         
-        let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-        if enableSmartPaste {
+        if TranscriptionSettingsStore.shared.isSmartPasteEnabled {
             if !awaitingSemanticPaste {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     performUserTriggeredPaste(recordID: recordID, processStart: processStart, pasteStart: Date())
@@ -366,101 +263,39 @@ internal extension ContentView {
         
         processingTask?.cancel()
         
-        processingTask = Task {
+        processingTask = Task { @MainActor in
+            let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
             progressMessage = "Retrying transcription..."
             
             do {
                 try Task.checkCancellation()
-                
-                let text: String
+
                 if transcriptionProvider == .local {
-                    text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider, model: selectedWhisperModel)
-                } else {
-                    text = try await speechService.transcribeRaw(audioURL: audioURL, provider: transcriptionProvider)
+                    try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                 }
-                
-                try Task.checkCancellation()
-                
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
 
-                let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-                let modeRaw = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionMode) ?? SemanticCorrectionMode.off.rawValue
-                let mode = SemanticCorrectionMode(rawValue: modeRaw) ?? .off
-                let shouldAwaitSemanticForPaste = enableSmartPaste && ((mode == .localMLX) || (mode == .cloud && (transcriptionProvider == .openai || transcriptionProvider == .gemini)))
+                let result = try await transcriptionPipeline.run(
+                    TranscriptionPipelineRequest(
+                        audioURL: audioURL,
+                        provider: transcriptionProvider,
+                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                        duration: nil,
+                        estimatedDuration: nil,
+                        sourceAppInfo: currentSourceAppInfo(),
+                        modelReadyTime: nil,
+                        processStart: processStart
+                    ),
+                    progressHandler: { progressMessage = $0 }
+                )
 
-                if shouldAwaitSemanticForPaste {
-                    await MainActor.run {
-                        awaitingSemanticPaste = true
-                        progressMessage = "Semantic correction..."
-                    }
-                    let capturedBundleId: String? = await MainActor.run { currentSourceAppInfo().bundleIdentifier }
-                    Task.detached { [text, transcriptionProvider, capturedBundleId] in
-                        let outcome = await semanticCorrectionService.correctWithWarning(text: text, providerUsed: transcriptionProvider, sourceAppBundleId: capturedBundleId)
-                        if let warning = outcome.warning {
-                            await MainActor.run { progressMessage = warning }
-                        }
-                        let corrected = outcome.text
-                        let shouldSave2: Bool = await MainActor.run { DataManager.shared.isHistoryEnabled }
-                        if shouldSave2 {
-                            let modelUsed: String? = await MainActor.run { (transcriptionProvider == .local) ? self.selectedWhisperModel.rawValue : nil }
-                            let sourceInfo: SourceAppInfo = await MainActor.run { self.currentSourceAppInfo() }
-                            let record = TranscriptionRecord(
-                                text: corrected,
-                                provider: transcriptionProvider,
-                                duration: nil,
-                                modelUsed: modelUsed,
-                                sourceAppBundleId: sourceInfo.bundleIdentifier,
-                                sourceAppName: sourceInfo.displayName,
-                                sourceAppIconData: sourceInfo.iconData
-                            )
-                            await DataManager.shared.saveTranscriptionQuietly(record)
-                        }
-                        await MainActor.run {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(corrected, forType: .string)
-                            transcriptionStartTime = nil
-                            isProcessing = false
-                            showConfirmationAndPaste(text: corrected)
-                            if awaitingSemanticPaste {
-                                performUserTriggeredPaste()
-                                awaitingSemanticPaste = false
-                            }
-                        }
-                    }
-                } else {
-                    await MainActor.run {
-                        transcriptionStartTime = nil
-                        showConfirmationAndPaste(text: text)
-                    }
-                    let capturedBundleId2: String? = await MainActor.run { currentSourceAppInfo().bundleIdentifier }
-                    Task.detached { [text, transcriptionProvider, capturedBundleId2] in
-                        let outcome = await semanticCorrectionService.correctWithWarning(text: text, providerUsed: transcriptionProvider, sourceAppBundleId: capturedBundleId2)
-                        if let warning = outcome.warning {
-                            await MainActor.run { progressMessage = warning }
-                        }
-                        let corrected = outcome.text
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(corrected, forType: .string)
-                        let shouldSave3: Bool = await MainActor.run { DataManager.shared.isHistoryEnabled }
-                        if shouldSave3 {
-                            let modelUsed: String? = await MainActor.run { (transcriptionProvider == .local) ? self.selectedWhisperModel.rawValue : nil }
-                            let sourceInfo: SourceAppInfo = await MainActor.run { self.currentSourceAppInfo() }
-                            let record = TranscriptionRecord(
-                                text: corrected,
-                                provider: transcriptionProvider,
-                                duration: nil,
-                                modelUsed: modelUsed,
-                                sourceAppBundleId: sourceInfo.bundleIdentifier,
-                                sourceAppName: sourceInfo.displayName,
-                                sourceAppIconData: sourceInfo.iconData
-                            )
-                            await DataManager.shared.saveTranscriptionQuietly(record)
-                        }
-                    }
-                }
+                transcriptionStartTime = nil
+                showConfirmationAndPaste(
+                    text: result.text,
+                    recordID: result.savedRecordID,
+                    processStart: result.processStart
+                )
             } catch is CancellationError {
                 await MainActor.run {
                     isProcessing = false
@@ -496,8 +331,7 @@ internal extension ContentView {
     
     private func isLocalModelInvocationPlanned() -> Bool {
         if transcriptionProvider == .local || transcriptionProvider == .parakeet { return true }
-        let modeRaw = UserDefaults.standard.string(forKey: AppDefaults.Keys.semanticCorrectionMode) ?? SemanticCorrectionMode.off.rawValue
-        let mode = SemanticCorrectionMode(rawValue: modeRaw) ?? .off
+        let mode = TranscriptionSettingsStore.shared.semanticCorrectionMode
         if mode == .localMLX { return true }
         return false
     }

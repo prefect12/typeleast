@@ -243,12 +243,12 @@ internal struct DashboardHomeView: View {
     }
 
     private var allModelRows: [BreakdownRow] {
-        rowsWithLegacySummary(makeBreakdown(records: recentRecords) { record in
+        makeBreakdown(records: recentRecords) { record in
             if let model = record.modelUsed, !model.isEmpty {
                 return model
             }
             return providerLabel(for: record)
-        })
+        }
     }
 
     private var trendPoints: [ActivityDataPoint] {
@@ -434,7 +434,7 @@ internal struct DashboardHomeView: View {
                 if selectedSummary.words == 0 {
                     EmptyStatsRow(text: L10n.Home.noDataForDay)
                 } else if selectedRecords.isEmpty {
-                    EmptyStatsRow(text: L10n.Home.aggregateOnlyDay)
+                    EmptyStatsRow(text: L10n.Home.summaryCountersOnlyDay)
                 } else {
                     Divider()
 
@@ -682,7 +682,7 @@ internal struct DashboardHomeView: View {
 
     private var dayContextLine: String {
         if selectedRecords.isEmpty, selectedSummary.words > 0 {
-            return L10n.Home.aggregateOnlyDay
+            return L10n.Home.summaryCountersOnlyDay
         }
         let peakShare = aggregate.peakDailyWords > 0
             ? Double(selectedSummary.words) / Double(aggregate.peakDailyWords) * 100
@@ -1412,38 +1412,38 @@ private extension DashboardHomeView {
             ? 0
             : processingValues.reduce(0, +) / Double(processingValues.count)
 
-        let legacyTotalWords = max(0, snapshot.totalWords - recordWords)
-        let legacyTotalCharacters = max(0, snapshot.totalCharacters - recordCharacters)
-        let legacyTotalSessions = max(0, snapshot.totalSessions - records.count)
-        let legacyTotalDuration = max(0, snapshot.totalDuration - recordDuration)
+        let summaryOnlyTotalWords = max(0, snapshot.totalWords - recordWords)
+        let summaryOnlyTotalCharacters = max(0, snapshot.totalCharacters - recordCharacters)
+        let summaryOnlyTotalSessions = max(0, snapshot.totalSessions - records.count)
+        let summaryOnlyTotalDuration = max(0, snapshot.totalDuration - recordDuration)
 
         for (day, words) in dailyWords(from: snapshot) {
-            let legacyWords = max(0, words - (detailedWordsByDay[day] ?? 0))
-            guard legacyWords > 0 else { continue }
+            let summaryOnlyWords = max(0, words - (detailedWordsByDay[day] ?? 0))
+            guard summaryOnlyWords > 0 else { continue }
 
             let estimatedSessions = proportionalCount(
-                total: legacyTotalSessions,
-                value: legacyWords,
-                denominator: legacyTotalWords,
+                total: summaryOnlyTotalSessions,
+                value: summaryOnlyWords,
+                denominator: summaryOnlyTotalWords,
                 minimumWhenPositive: 1
             )
             let estimatedCharacters = proportionalCount(
-                total: legacyTotalCharacters,
-                value: legacyWords,
-                denominator: legacyTotalWords,
-                minimumWhenPositive: legacyWords
+                total: summaryOnlyTotalCharacters,
+                value: summaryOnlyWords,
+                denominator: summaryOnlyTotalWords,
+                minimumWhenPositive: summaryOnlyWords
             )
             let estimatedRecordingDuration = proportionalDuration(
-                total: legacyTotalDuration,
-                value: legacyWords,
-                denominator: legacyTotalWords
+                total: summaryOnlyTotalDuration,
+                value: summaryOnlyWords,
+                denominator: summaryOnlyTotalWords
             )
             let estimatedProcessingDuration = averageProcessingTime * Double(estimatedSessions)
 
             let existing = output[day] ?? .empty(date: day)
             output[day] = DailyTranscriptionSummary(
                 date: day,
-                words: existing.words + legacyWords,
+                words: existing.words + summaryOnlyWords,
                 characters: existing.characters + estimatedCharacters,
                 sessions: existing.sessions + estimatedSessions,
                 recordingDuration: existing.recordingDuration + estimatedRecordingDuration,
@@ -1542,48 +1542,6 @@ private extension DashboardHomeView {
                 processingSamples: 0
             )
         }
-    }
-
-    func rowsWithLegacySummary(_ rows: [BreakdownRow]) -> [BreakdownRow] {
-        let detailedWords = recentRecords.reduce(0) { $0 + wordCount(for: $1) }
-        let detailedCharacters = recentRecords.reduce(0) { $0 + characterCount(for: $1) }
-        let legacyWords = max(0, aggregate.words - detailedWords)
-        let legacyCharacters = max(0, aggregate.characters - detailedCharacters)
-        let legacySessions = max(0, aggregate.sessions - recentRecords.count)
-        let legacyProcessingDuration = aggregate.averageProcessingTime * Double(legacySessions)
-        guard legacyWords > 0 || legacySessions > 0 else {
-            return rows
-        }
-
-        return rows + [
-            legacyBreakdownRow(
-                words: legacyWords,
-                characters: legacyCharacters,
-                sessions: legacySessions,
-                recordingDuration: max(0, aggregate.recordingDuration - recentRecords.reduce(0) { $0 + ($1.duration ?? 0) }),
-                processingDuration: legacyProcessingDuration,
-                processingSamples: legacySessions
-            )
-        ]
-    }
-
-    func legacyBreakdownRow(
-        words: Int,
-        characters: Int,
-        sessions: Int,
-        recordingDuration: TimeInterval = 0,
-        processingDuration: TimeInterval = 0,
-        processingSamples: Int = 0
-    ) -> BreakdownRow {
-        BreakdownRow(
-            label: L10n.Home.legacySummary,
-            words: words,
-            characters: characters,
-            sessions: sessions,
-            recordingDuration: recordingDuration,
-            processingDuration: processingDuration,
-            processingSamples: processingSamples
-        )
     }
 
     func generateActivityWeeks() -> [[Date]] {

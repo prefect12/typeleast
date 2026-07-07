@@ -35,7 +35,15 @@ internal class SpeechToTextService {
     private let parakeetService: ParakeetService
     private let keychainService: KeychainServiceProtocol
     private let userDefaults: UserDefaults
+    private let settingsStore: TranscriptionSettingsReadable
     private let correctionService = SemanticCorrectionService()
+    @ObservationIgnored private lazy var providerRegistry = TranscriptionProviderClientRegistry(clients: [
+        OpenAITranscriptionProviderClient(service: self),
+        MiMoTranscriptionProviderClient(service: self),
+        GeminiTranscriptionProviderClient(service: self),
+        LocalWhisperTranscriptionProviderClient(service: self),
+        ParakeetTranscriptionProviderClient(service: self)
+    ])
 
     internal static func technicalASRPrompt(language: TranscriptionLanguage = .auto) -> String {
         """
@@ -58,12 +66,14 @@ internal class SpeechToTextService {
         localWhisperService: LocalWhisperService = .shared,
         parakeetService: ParakeetService = ParakeetService(),
         keychainService: KeychainServiceProtocol = KeychainService.shared,
-        userDefaults: UserDefaults = .standard
+        userDefaults: UserDefaults = .standard,
+        settingsStore: TranscriptionSettingsReadable? = nil
     ) {
         self.localWhisperService = localWhisperService
         self.parakeetService = parakeetService
         self.keychainService = keychainService
         self.userDefaults = userDefaults
+        self.settingsStore = settingsStore ?? TranscriptionSettingsStore(defaults: userDefaults)
     }
     
     // Raw transcription without semantic correction
@@ -75,21 +85,8 @@ internal class SpeechToTextService {
         case .invalid(let error):
             throw SpeechToTextError.transcriptionFailed(error.localizedDescription)
         }
-        switch provider {
-        case .openai:
-            return try await transcribeWithOpenAI(audioURL: audioURL)
-        case .mimo:
-            return try await transcribeWithMiMo(audioURL: audioURL)
-        case .gemini:
-            return try await transcribeWithGemini(audioURL: audioURL)
-        case .local:
-            guard let model = model else {
-                throw SpeechToTextError.transcriptionFailed("Whisper model required for local transcription")
-            }
-            return try await transcribeWithLocal(audioURL: audioURL, model: model)
-        case .parakeet:
-            return try await transcribeWithParakeet(audioURL: audioURL)
-        }
+        let request = TranscriptionProviderRequest(audioURL: audioURL, whisperModel: model)
+        return try await providerRegistry.client(for: provider).transcribe(request)
     }
 
     func transcribe(audioURL: URL) async throws -> String {
@@ -113,26 +110,10 @@ internal class SpeechToTextService {
             throw SpeechToTextError.transcriptionFailed(error.localizedDescription)
         }
         
-        switch provider {
-        case .openai:
-            let text = try await transcribeWithOpenAI(audioURL: audioURL)
-            return await correctionService.correct(text: text, providerUsed: .openai)
-        case .mimo:
-            let text = try await transcribeWithMiMo(audioURL: audioURL)
-            return await correctionService.correct(text: text, providerUsed: .mimo)
-        case .gemini:
-            let text = try await transcribeWithGemini(audioURL: audioURL)
-            return await correctionService.correct(text: text, providerUsed: .gemini)
-        case .local:
-            guard let model = model else {
-                throw SpeechToTextError.transcriptionFailed("Whisper model required for local transcription")
-            }
-            let text = try await transcribeWithLocal(audioURL: audioURL, model: model)
-            return await correctionService.correct(text: text, providerUsed: .local)
-        case .parakeet:
-            let text = try await transcribeWithParakeet(audioURL: audioURL)
-            return await correctionService.correct(text: text, providerUsed: .parakeet)
-        }
+        let text = try await providerRegistry
+            .client(for: provider)
+            .transcribe(TranscriptionProviderRequest(audioURL: audioURL, whisperModel: model))
+        return await correctionService.correct(text: text, providerUsed: provider)
     }
     
     private var geminiBaseURL: String {
@@ -178,28 +159,15 @@ internal class SpeechToTextService {
     }
 
     var resolvedOpenAITranscriptionModel: String {
-        let configured = userDefaults
-            .string(forKey: AppDefaults.Keys.openAITranscriptionModel)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let configured, !configured.isEmpty else {
-            return AppDefaults.defaultOpenAITranscriptionModel
-        }
-        return configured
+        settingsStore.openAITranscriptionModel
     }
 
     var resolvedMiMoASRModel: String {
-        let configured = userDefaults
-            .string(forKey: AppDefaults.Keys.miMoASRModel)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let configured, !configured.isEmpty else {
-            return AppDefaults.defaultMiMoASRModel
-        }
-        return configured
+        settingsStore.miMoASRModel
     }
 
     var resolvedTranscriptionLanguage: TranscriptionLanguage {
-        let raw = userDefaults.string(forKey: AppDefaults.Keys.transcriptionLanguage) ?? AppDefaults.defaultTranscriptionLanguage.rawValue
-        return TranscriptionLanguage(rawValue: raw) ?? AppDefaults.defaultTranscriptionLanguage
+        settingsStore.transcriptionLanguage
     }
 
     /// Detects if the endpoint is Azure OpenAI based on the URL pattern
@@ -208,7 +176,7 @@ internal class SpeechToTextService {
         return custom.contains(".openai.azure.com")
     }
 
-    private func transcribeWithOpenAI(audioURL: URL) async throws -> String {
+    func transcribeWithOpenAI(audioURL: URL) async throws -> String {
         // Get API key from keychain
         guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") else {
             throw SpeechToTextError.apiKeyMissing("OpenAI")
@@ -256,7 +224,7 @@ internal class SpeechToTextService {
         }
     }
 
-    private func transcribeWithMiMo(audioURL: URL) async throws -> String {
+    func transcribeWithMiMo(audioURL: URL) async throws -> String {
         guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "MiMo") else {
             throw SpeechToTextError.apiKeyMissing("MiMo")
         }
@@ -305,7 +273,7 @@ internal class SpeechToTextService {
         }
     }
     
-    private func transcribeWithGemini(audioURL: URL) async throws -> String {
+    func transcribeWithGemini(audioURL: URL) async throws -> String {
         // Get API key from keychain
         guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "Gemini") else {
             throw SpeechToTextError.apiKeyMissing("Gemini")
@@ -449,7 +417,7 @@ internal class SpeechToTextService {
         }
     }
     
-    private func transcribeWithLocal(audioURL: URL, model: WhisperModel) async throws -> String {
+    func transcribeWithLocal(audioURL: URL, model: WhisperModel) async throws -> String {
         do {
             let text = try await localWhisperService.transcribe(audioFileURL: audioURL, model: model, language: resolvedTranscriptionLanguage) { progress in
                 NotificationCenter.default.post(name: .transcriptionProgress, object: progress)
@@ -460,7 +428,7 @@ internal class SpeechToTextService {
         }
     }
     
-    private func transcribeWithParakeet(audioURL: URL) async throws -> String {
+    func transcribeWithParakeet(audioURL: URL) async throws -> String {
         guard Arch.isAppleSilicon else {
             throw SpeechToTextError.transcriptionFailed("Parakeet requires an Apple Silicon Mac.")
         }

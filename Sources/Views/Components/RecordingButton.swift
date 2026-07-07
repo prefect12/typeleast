@@ -26,15 +26,14 @@ internal struct RecordingButton: View {
         .focusable(false)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint(accessibilityHint)
-        .disabled(isProcessing || !hasPermission || (showSuccess && !UserDefaults.standard.bool(forKey: "enableSmartPaste")))
+        .disabled(isProcessing || !hasPermission || (showSuccess && !smartPasteEnabled))
         .help(transcriptionProvider.displayName)
         .onHover(perform: onHover)
     }
     
     private var buttonIcon: String {
         if showSuccess {
-            let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-            return enableSmartPaste ? "arrow.down.doc.on.clipboard" : "checkmark"
+            return smartPasteEnabled ? "arrow.down.doc.on.clipboard" : "checkmark"
         } else if isRecording {
             return "stop.fill"
         } else if hasPermission {
@@ -46,8 +45,7 @@ internal struct RecordingButton: View {
     
     private var buttonColor: Color {
         if showSuccess {
-            let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-            return enableSmartPaste ? .green : .green  // Green for both paste and success
+            return smartPasteEnabled ? .green : .green  // Green for both paste and success
         } else if isRecording {
             return .red
         } else if hasPermission {
@@ -59,8 +57,7 @@ internal struct RecordingButton: View {
     
     private var accessibilityLabel: String {
         if showSuccess {
-            let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-            return enableSmartPaste ? "Paste transcribed text" : "Transcription completed successfully"
+            return smartPasteEnabled ? "Paste transcribed text" : "Transcription completed successfully"
         } else if isRecording {
             return "Stop recording"
         } else if !hasPermission {
@@ -84,5 +81,9 @@ internal struct RecordingButton: View {
         } else {
             return "Tap to start recording audio for transcription"
         }
+    }
+
+    private var smartPasteEnabled: Bool {
+        TranscriptionSettingsStore.shared.isSmartPasteEnabled
     }
 }

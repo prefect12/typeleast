@@ -91,11 +91,8 @@ internal extension ContentView {
             queue: .main
         ) { _ in
             Task { @MainActor in
-                if showSuccess {
-                    let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-                    if enableSmartPaste {
-                        performUserTriggeredPaste()
-                    }
+                if showSuccess, TranscriptionSettingsStore.shared.isSmartPasteEnabled {
+                    performUserTriggeredPaste()
                 }
             }
         }
@@ -186,9 +183,6 @@ internal extension ContentView {
     }
     
     private func loadStoredTranscriptionProvider() {
-        if let storedProvider = UserDefaults.standard.string(forKey: "transcriptionProvider"),
-           let provider = TranscriptionProvider(rawValue: storedProvider) {
-            transcriptionProvider = provider
-        }
+        transcriptionProvider = TranscriptionSettingsStore.shared.transcriptionProvider
     }
 }

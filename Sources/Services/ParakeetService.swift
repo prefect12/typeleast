@@ -59,7 +59,7 @@ internal class ParakeetService {
     }
 
     private var selectedRepo: String {
-        UserDefaults.standard.string(forKey: "selectedParakeetModel") ?? ParakeetModel.v3Multilingual.rawValue
+        TranscriptionSettingsStore.shared.selectedParakeetModel.rawValue
     }
 
     private func isModelCached() -> Bool {

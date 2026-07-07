@@ -92,11 +92,6 @@ internal struct UvBootstrap {
             return projectPython
         }
 
-        if let legacyPython = legacyRuntimePython(fileManager: fm) {
-            log?("Using existing AudioWhisper Python runtime…")
-            return legacyPython
-        }
-
         let uv = try findUv()
 
         // Ensure .venv exists using specified Python (or default)
@@ -220,8 +215,7 @@ internal struct UvBootstrap {
     private static func userToolsDirectories() -> [URL] {
         guard let base = try? applicationSupportBaseDirectory() else { return [] }
         return [
-            base.appendingPathComponent("\(AppIdentity.appSupportDirectoryName)/bin", isDirectory: true),
-            base.appendingPathComponent("\(AppIdentity.legacyAppSupportDirectoryName)/bin", isDirectory: true)
+            base.appendingPathComponent("\(AppIdentity.appSupportDirectoryName)/bin", isDirectory: true)
         ]
     }
 
@@ -229,18 +223,6 @@ internal struct UvBootstrap {
         let candidates = [
             project.appendingPathComponent(".venv/bin/python3"),
             project.appendingPathComponent(".venv/bin/python")
-        ]
-        return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
-    }
-
-    private static func legacyRuntimePython(fileManager: FileManager) -> URL? {
-        guard let base = try? applicationSupportBaseDirectory() else { return nil }
-        let legacySupport = base.appendingPathComponent(AppIdentity.legacyAppSupportDirectoryName, isDirectory: true)
-        let candidates = [
-            legacySupport.appendingPathComponent("python_project/.venv/bin/python3"),
-            legacySupport.appendingPathComponent("python_project/.venv/bin/python"),
-            legacySupport.appendingPathComponent("venv/bin/python3"),
-            legacySupport.appendingPathComponent("venv/bin/python")
         ]
         return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
     }

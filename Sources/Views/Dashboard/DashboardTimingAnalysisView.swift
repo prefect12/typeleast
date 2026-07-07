@@ -6,7 +6,6 @@ internal enum TimingStage: String, CaseIterable, Identifiable {
     case modelReady
     case asr
     case correction
-    case legacyProcessing
     case untrackedProcessing
     case clipboard
     case paste
@@ -19,7 +18,6 @@ internal enum TimingStage: String, CaseIterable, Identifiable {
         case .modelReady: return L10n.Timing.modelReady
         case .asr: return L10n.Timing.asr
         case .correction: return L10n.Timing.correction
-        case .legacyProcessing: return L10n.Timing.legacyProcessing
         case .untrackedProcessing: return L10n.Timing.untrackedProcessing
         case .clipboard: return L10n.Timing.clipboard
         case .paste: return L10n.Timing.paste
@@ -32,7 +30,6 @@ internal enum TimingStage: String, CaseIterable, Identifiable {
         case .modelReady: return Color(nsColor: .systemIndigo)
         case .asr: return DashboardTheme.success
         case .correction: return Color(nsColor: .systemPurple)
-        case .legacyProcessing: return Color(nsColor: .systemOrange)
         case .untrackedProcessing: return Color(nsColor: .systemYellow)
         case .clipboard: return DashboardTheme.accent
         case .paste: return Color(nsColor: .systemRed)
@@ -40,7 +37,7 @@ internal enum TimingStage: String, CaseIterable, Identifiable {
     }
 
     var canSummarizeAsBottleneck: Bool {
-        self != .legacyProcessing
+        true
     }
 }
 
@@ -100,7 +97,7 @@ private struct TimingRun: Identifiable {
             appendPositive(record.clipboardTime, stage: .clipboard, to: &output)
             appendPositive(record.pasteTime, stage: .paste, to: &output)
         } else if let total = record.transcriptionTime, total > 0 {
-            output.append(segment(.legacyProcessing, total))
+            output.append(segment(.untrackedProcessing, total))
         }
 
         return output
@@ -422,7 +419,6 @@ internal struct DashboardTimingAnalysisView: View {
             L10n.Timing.modelReady: Color(nsColor: .systemIndigo),
             L10n.Timing.asr: DashboardTheme.success,
             L10n.Timing.correction: Color(nsColor: .systemPurple),
-            L10n.Timing.legacyProcessing: Color(nsColor: .systemOrange),
             L10n.Timing.untrackedProcessing: Color(nsColor: .systemYellow),
             L10n.Timing.clipboard: DashboardTheme.accent,
             L10n.Timing.paste: Color(nsColor: .systemRed)
@@ -772,7 +768,7 @@ private struct TimingDetailRow: View {
             }
 
             if !run.record.hasDetailedTiming, run.record.transcriptionTime != nil {
-                Text(L10n.Timing.oldRecordHint)
+                Text(L10n.Timing.totalOnlyRecordHint)
                     .font(.caption.weight(.medium))
                     .foregroundStyle(DashboardTheme.inkLight)
             }

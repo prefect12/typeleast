@@ -8,11 +8,11 @@ internal struct ContentView: View {
     @AppStorage(AppDefaults.Keys.immediateRecording) var immediateRecording = false
     @State var modelManager = ModelManager.shared
     @State var speechService: SpeechToTextService
+    @State var transcriptionPipeline: TranscriptionPipeline
     @State var pasteManager = PasteManager()
     @State var statusViewModel = StatusViewModel()
     @State var permissionManager = PermissionManager()
     @StateObject var soundManager = SoundManager()
-    let semanticCorrectionService = SemanticCorrectionService()
     @State var isProcessing = false
     @State var progressMessage = "Processing..."
     @State var transcriptionStartTime: Date?
@@ -40,7 +40,9 @@ internal struct ContentView: View {
     @State var showFirstModelUseHint = false
     
     init(speechService: SpeechToTextService = SpeechToTextService(), audioRecorder: AudioRecorder) {
+        let speechService = speechService
         self._speechService = State(initialValue: speechService)
+        self._transcriptionPipeline = State(initialValue: TranscriptionPipeline(speechService: speechService))
         self.audioRecorder = audioRecorder
     }
     
@@ -57,8 +59,7 @@ internal struct ContentView: View {
                 if audioRecorder.isRecording {
                     stopAndProcess()
                 } else if showSuccess {
-                    let enableSmartPaste = UserDefaults.standard.bool(forKey: "enableSmartPaste")
-                    if enableSmartPaste {
+                    if TranscriptionSettingsStore.shared.isSmartPasteEnabled {
                         performUserTriggeredPaste()
                     } else {
                         showSuccess = false

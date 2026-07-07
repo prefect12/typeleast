@@ -127,7 +127,7 @@ final class SourceUsageStoreTests: XCTestCase {
         XCTAssertEqual(restored.count, 2)
         XCTAssertEqual(restored.first?.bundleIdentifier, "com.persist.b", "Higher word count should be ordered first on load")
         XCTAssertEqual(restored.first?.fallbackSymbolName, "tray")
-        XCTAssertNil(restored.last?.iconData, "Legacy persisted icons should be stripped during load")
+        XCTAssertNil(restored.last?.iconData, "Persisted icons should be stripped during load")
 
         let rewrittenData = defaults.data(forKey: "sourceUsage.stats")
         XCTAssertNotNil(rewrittenData)

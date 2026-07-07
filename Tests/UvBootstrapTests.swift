@@ -74,20 +74,6 @@ final class UvBootstrapTests: XCTestCase {
         XCTAssertEqual(found, uvURL)
     }
 
-    func testEnsureVenvReusesLegacyAudioWhisperRuntimeWhenTypeleastRuntimeIsMissing() throws {
-        let legacyBin = tempAppSupport.appendingPathComponent("AudioWhisper/python_project/.venv/bin", isDirectory: true)
-        try FileManager.default.createDirectory(at: legacyBin, withIntermediateDirectories: true)
-        let legacyPython = legacyBin.appendingPathComponent("python3")
-        try writeExecutable("#!/bin/bash\necho legacy-python\n", to: legacyPython)
-
-        var logMessages: [String] = []
-        let pythonURL = try UvBootstrap.ensureVenv(userPython: nil) { logMessages.append($0) }
-
-        XCTAssertEqual(pythonURL, legacyPython)
-        XCTAssertEqual(logMessages, ["Using existing AudioWhisper Python runtime…"])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: tempAppSupport.appendingPathComponent("Typeleast/python_project/.venv").path))
-    }
-
     func testEnsureVenvCreatesAndSyncsWithDefaultPython() throws {
         let logURL = tempHome.appendingPathComponent("uv_invocations.log")
         let uvURL = try writeUvStub(version: "0.8.6", logFile: logURL)

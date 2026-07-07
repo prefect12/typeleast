@@ -207,7 +207,7 @@ internal struct WaveformRecordingView: View {
     }
 
     private var smartPasteEnabled: Bool {
-        UserDefaults.standard.bool(forKey: AppDefaults.Keys.enableSmartPaste)
+        TranscriptionSettingsStore.shared.isSmartPasteEnabled
     }
 }
 

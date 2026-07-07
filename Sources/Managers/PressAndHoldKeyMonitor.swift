@@ -132,7 +132,7 @@ internal enum PressAndHoldSettings {
         let keyIdentifier = defaults.string(forKey: keyIdentifierKey) ?? PressAndHoldConfiguration.defaults.key.rawValue
         let modeIdentifier = defaults.string(forKey: modeKey) ?? PressAndHoldConfiguration.defaults.mode.rawValue
 
-        let key = PressAndHoldKey(rawValue: keyIdentifier) ?? legacyKey(from: keyIdentifier) ?? PressAndHoldConfiguration.defaults.key
+        let key = PressAndHoldKey(rawValue: keyIdentifier) ?? migratedKey(from: keyIdentifier) ?? PressAndHoldConfiguration.defaults.key
         let mode = PressAndHoldMode(rawValue: modeIdentifier) ?? PressAndHoldConfiguration.defaults.mode
 
         return PressAndHoldConfiguration(enabled: enabled, key: key, mode: mode)
@@ -147,7 +147,7 @@ internal enum PressAndHoldSettings {
         NotificationCenter.default.post(name: .pressAndHoldSettingsChanged, object: configuration)
     }
 
-    private static func legacyKey(from rawValue: String) -> PressAndHoldKey? {
+    private static func migratedKey(from rawValue: String) -> PressAndHoldKey? {
         switch rawValue {
         case "option":
             return .leftOption

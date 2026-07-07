@@ -14,7 +14,7 @@ internal extension DashboardProvidersView {
         else { keychainService.saveQuietly(trimmed, service: service, account: account) }
     }
 
-    // MARK: - Cloud Access UI (Legacy - kept for backward compatibility)
+    // MARK: - Cloud Access UI
     @ViewBuilder
     func cloudKeyBlock(
         title: String,

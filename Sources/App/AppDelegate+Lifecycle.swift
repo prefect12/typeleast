@@ -12,7 +12,6 @@ internal extension AppDelegate {
 
         // Ensure a single, consistent set of defaults before any UI/services read from UserDefaults/AppStorage.
         AppDefaults.register()
-        AppMigration.migrateIfNeeded()
         _ = AppSetupHelper.checkFirstRun()
 
         do {
@@ -25,16 +24,6 @@ internal extension AppDelegate {
 
         Task {
             await UsageMetricsStore.shared.bootstrapIfNeeded()
-            do {
-                let count = try await DataManager.shared.backfillLegacyUsageSummaries(
-                    snapshot: UsageMetricsStore.shared.snapshot
-                )
-                if count > 0 {
-                    Logger.dataManager.info("Backfilled \(count) legacy usage summary records on launch")
-                }
-            } catch {
-                Logger.dataManager.error("Legacy usage backfill failed: \(error.localizedDescription)")
-            }
             let records = await DataManager.shared.fetchAllRecordsQuietly()
             SourceUsageStore.shared.rebuild(using: records)
         }
