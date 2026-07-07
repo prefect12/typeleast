@@ -333,6 +333,9 @@ else
     DETECTED_HASH=$(find_identity_by_name "Typeleast Local Development")
   fi
   if [ -z "$DETECTED_HASH" ]; then
+    DETECTED_HASH=$(find_identity_by_name "AudioWhisper Local Development")
+  fi
+  if [ -z "$DETECTED_HASH" ]; then
     DETECTED_HASH=$(find_identity_by_name "AudioWhisperDev")
   fi
 
