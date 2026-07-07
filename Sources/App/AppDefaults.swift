@@ -27,6 +27,7 @@ internal enum AppDefaults {
         static let transcriptionRetentionPeriod = "transcriptionRetentionPeriod"
         static let maxModelStorageGB = "maxModelStorageGB"
         static let enableSmartPaste = "enableSmartPaste"
+        static let enableStreamingTranscription = "enableStreamingTranscription"
         static let immediateRecording = "immediateRecording"
         static let globalHotkey = "globalHotkey"
 
@@ -72,6 +73,7 @@ internal enum AppDefaults {
             Keys.transcriptionRetentionPeriod: RetentionPeriod.forever.rawValue,
             Keys.maxModelStorageGB: 5.0,
             Keys.enableSmartPaste: true,
+            Keys.enableStreamingTranscription: true,
             Keys.immediateRecording: false,
             Keys.globalHotkey: "⌘⇧Space",
 

@@ -15,11 +15,23 @@ internal extension ContentView {
         }
         
         lastAudioURL = nil
+        streamingDraftText = ""
         
         let success = audioRecorder.startRecording()
         if !success {
             errorMessage = LocalizedStrings.Errors.failedToStartRecording
             showError = true
+            streamingTranscriber.cancel()
+            return
+        }
+
+        if TranscriptionSettingsStore.shared.isStreamingTranscriptionEnabled {
+            streamingTranscriber.start(
+                language: TranscriptionSettingsStore.shared.transcriptionLanguage,
+                updateHandler: { text, _ in
+                    streamingDraftText = text
+                }
+            )
         }
     }
     
@@ -49,30 +61,45 @@ internal extension ContentView {
                 
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
+
+                let streamedText = await streamingTranscriber.finish()
                 
                 var modelReadyTime: TimeInterval?
-                if transcriptionProvider == .local {
+                if streamedText == nil, transcriptionProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
                 }
 
-                let result = try await transcriptionPipeline.run(
-                    TranscriptionPipelineRequest(
-                        audioURL: audioURL,
-                        provider: transcriptionProvider,
-                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
-                        duration: sessionDuration,
-                        estimatedDuration: nil,
-                        sourceAppInfo: currentSourceAppInfo(),
-                        modelReadyTime: modelReadyTime,
-                        processStart: processStart
-                    ),
-                    progressHandler: { progressMessage = $0 }
+                let request = TranscriptionPipelineRequest(
+                    audioURL: audioURL,
+                    provider: transcriptionProvider,
+                    whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                    duration: sessionDuration,
+                    estimatedDuration: nil,
+                    sourceAppInfo: currentSourceAppInfo(),
+                    modelReadyTime: modelReadyTime,
+                    processStart: processStart
                 )
+
+                let result: TranscriptionPipelineResult
+                if let streamedText {
+                    progressMessage = L10n.Recording.finalizingStreaming
+                    result = try await transcriptionPipeline.runPretranscribed(
+                        request,
+                        rawText: streamedText,
+                        progressHandler: { progressMessage = $0 }
+                    )
+                } else {
+                    result = try await transcriptionPipeline.run(
+                        request,
+                        progressHandler: { progressMessage = $0 }
+                    )
+                }
 
                 await MainActor.run {
                     transcriptionStartTime = nil
+                    streamingDraftText = ""
                     showConfirmationAndPaste(
                         text: result.text,
                         recordID: result.savedRecordID,
@@ -82,11 +109,15 @@ internal extension ContentView {
                 }
             } catch is CancellationError {
                 await MainActor.run {
+                    streamingTranscriber.cancel()
+                    streamingDraftText = ""
                     isProcessing = false
                     transcriptionStartTime = nil
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch {
+                streamingTranscriber.cancel()
+                streamingDraftText = ""
                 if case let SpeechToTextError.localTranscriptionFailed(inner) = error,
                    let lwError = inner as? LocalWhisperError,
                    lwError == .modelNotDownloaded {

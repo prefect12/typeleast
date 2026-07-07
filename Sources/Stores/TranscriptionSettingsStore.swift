@@ -12,6 +12,7 @@ internal protocol TranscriptionSettingsReadable: AnyObject {
     var isTranscriptionHistoryEnabled: Bool { get }
     var transcriptionRetentionPeriod: RetentionPeriod { get set }
     var isSmartPasteEnabled: Bool { get }
+    var isStreamingTranscriptionEnabled: Bool { get }
     var maxModelStorageGB: Double { get }
 }
 
@@ -27,6 +28,7 @@ internal struct TranscriptionSettingsSnapshot: Equatable {
     let isTranscriptionHistoryEnabled: Bool
     let transcriptionRetentionPeriod: RetentionPeriod
     let isSmartPasteEnabled: Bool
+    let isStreamingTranscriptionEnabled: Bool
     let maxModelStorageGB: Double
 }
 
@@ -109,6 +111,10 @@ internal final class TranscriptionSettingsStore: TranscriptionSettingsReadable {
         defaults.bool(forKey: AppDefaults.Keys.enableSmartPaste)
     }
 
+    var isStreamingTranscriptionEnabled: Bool {
+        defaults.bool(forKey: AppDefaults.Keys.enableStreamingTranscription)
+    }
+
     var maxModelStorageGB: Double {
         let value = defaults.object(forKey: AppDefaults.Keys.maxModelStorageGB) as? Double
         guard let value, value > 0 else { return 5.0 }
@@ -128,6 +134,7 @@ internal final class TranscriptionSettingsStore: TranscriptionSettingsReadable {
             isTranscriptionHistoryEnabled: isTranscriptionHistoryEnabled,
             transcriptionRetentionPeriod: transcriptionRetentionPeriod,
             isSmartPasteEnabled: isSmartPasteEnabled,
+            isStreamingTranscriptionEnabled: isStreamingTranscriptionEnabled,
             maxModelStorageGB: maxModelStorageGB
         )
     }

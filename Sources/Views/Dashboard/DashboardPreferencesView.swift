@@ -8,6 +8,7 @@ internal struct DashboardPreferencesView: View {
     @AppStorage("globalHotkey") private var globalHotkey = "⌘⇧Space"
     @AppStorage("autoBoostMicrophoneVolume") private var autoBoostMicrophoneVolume = false
     @AppStorage("enableSmartPaste") private var enableSmartPaste = true
+    @AppStorage(AppDefaults.Keys.enableStreamingTranscription) private var enableStreamingTranscription = true
     @AppStorage("playCompletionSound") private var playCompletionSound = true
     @AppStorage("transcriptionHistoryEnabled") private var transcriptionHistoryEnabled = true
     @AppStorage("transcriptionRetentionPeriod") private var transcriptionRetentionPeriodRaw = RetentionPeriod.forever.rawValue
@@ -97,6 +98,15 @@ internal struct DashboardPreferencesView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L10n.Preferences.smartPaste)
                         Text(L10n.Preferences.smartPasteDesc)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Toggle(isOn: $enableStreamingTranscription) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.Preferences.streamingTranscription)
+                        Text(L10n.Preferences.streamingTranscriptionDesc)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

@@ -183,6 +183,7 @@ internal enum L10n {
         static var preparingAudio: String { isCN ? "准备音频..." : "Preparing audio..." }
         static var semanticCorrection: String { isCN ? "语义纠正中..." : "Semantic correction..." }
         static var transcribingFile: String { isCN ? "正在转录文件..." : "Transcribing file..." }
+        static var finalizingStreaming: String { isCN ? "整理流式结果..." : "Finalizing streaming transcript..." }
         static var retrying: String { isCN ? "重新转录中..." : "Retrying transcription..." }
     }
 
@@ -367,6 +368,11 @@ internal enum L10n {
         static var autoBoostDesc: String { isCN ? "录音时暂时最大化麦克风输入" : "Temporarily maximize mic input while recording." }
         static var smartPaste: String { isCN ? "智能粘贴" : "Smart Paste" }
         static var smartPasteDesc: String { isCN ? "自动粘贴完成的转录文本" : "Automatically paste finished transcripts." }
+        static var streamingTranscription: String { isCN ? "流式识别" : "Streaming Recognition" }
+        static var streamingTranscriptionDesc: String {
+            isCN ? "录音时实时准备文本，停录后优先粘贴流式结果；不可用时回退到所选引擎。" :
+                "Prepare text while recording, paste the streaming result first, and fall back to the selected provider when unavailable."
+        }
         static var completionSound: String { isCN ? "完成提示音" : "Completion Sound" }
         static var completionSoundDesc: String { isCN ? "转录完成时播放提示音" : "Play a chime when transcription finishes." }
         static var history: String { isCN ? "历史记录" : "History" }

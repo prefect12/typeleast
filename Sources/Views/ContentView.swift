@@ -13,8 +13,10 @@ internal struct ContentView: View {
     @State var statusViewModel = StatusViewModel()
     @State var permissionManager = PermissionManager()
     @StateObject var soundManager = SoundManager()
+    @StateObject var streamingTranscriber = StreamingSpeechTranscriber()
     @State var isProcessing = false
     @State var progressMessage = "Processing..."
+    @State var streamingDraftText = ""
     @State var transcriptionStartTime: Date?
     @State var showError = false
     @State var errorMessage = ""

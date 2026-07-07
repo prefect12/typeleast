@@ -61,6 +61,46 @@ internal final class TranscriptionPipeline {
 
         try Task.checkCancellation()
 
+        return try await finish(
+            request,
+            rawText: rawText,
+            transcriptionStart: transcriptionStart,
+            asrTime: asrTime,
+            progressHandler: progressHandler
+        )
+    }
+
+    func runPretranscribed(
+        _ request: TranscriptionPipelineRequest,
+        rawText: String,
+        asrTime: TimeInterval = 0,
+        progressHandler: ProgressHandler? = nil
+    ) async throws -> TranscriptionPipelineResult {
+        let transcriptionStart = Date()
+        let cleanedText = SpeechToTextService.cleanTranscriptionText(rawText)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedText.isEmpty else {
+            throw SpeechToTextError.transcriptionFailed("No streaming transcription text")
+        }
+
+        try Task.checkCancellation()
+
+        return try await finish(
+            request,
+            rawText: cleanedText,
+            transcriptionStart: transcriptionStart,
+            asrTime: asrTime,
+            progressHandler: progressHandler
+        )
+    }
+
+    private func finish(
+        _ request: TranscriptionPipelineRequest,
+        rawText: String,
+        transcriptionStart: Date,
+        asrTime: TimeInterval,
+        progressHandler: ProgressHandler?
+    ) async throws -> TranscriptionPipelineResult {
         var correctionTime: TimeInterval = 0
         var finalText = rawText
         if settingsStore.semanticCorrectionMode != .off {

@@ -133,6 +133,58 @@ final class TranscriptionPipelineTests: XCTestCase {
         XCTAssertEqual(usageStore.snapshot.totalSessions, 1)
         XCTAssertEqual(sourceStore.allSources().first?.bundleIdentifier, SourceAppInfo.unknown.bundleIdentifier)
     }
+
+    func testRunPretranscribedSkipsSpeechServiceButKeepsSideEffects() async throws {
+        let speechService = FakeRawTranscriptionService(text: "Should not run")
+        let dataManager = MockDataManager()
+        let usageDefaults = try XCTUnwrap(UserDefaults(suiteName: usageDefaultsSuite))
+        let sourceDefaults = try XCTUnwrap(UserDefaults(suiteName: sourceDefaultsSuite))
+        let usageStore = UsageMetricsStore(defaults: usageDefaults)
+        let sourceStore = SourceUsageStore(defaults: sourceDefaults)
+        let settingsStore = FakeTranscriptionSettingsStore(
+            provider: .openai,
+            semanticCorrectionMode: .off,
+            historyEnabled: true,
+            openAIModel: "gpt-4o-transcribe"
+        )
+        let pipeline = TranscriptionPipeline(
+            speechService: speechService,
+            settingsStore: settingsStore,
+            dataManager: dataManager,
+            usageMetricsStore: usageStore,
+            sourceUsageStore: sourceStore
+        )
+
+        let result = try await pipeline.runPretranscribed(
+            TranscriptionPipelineRequest(
+                audioURL: audioURL,
+                provider: .openai,
+                whisperModel: nil,
+                duration: 1.5,
+                estimatedDuration: nil,
+                sourceAppInfo: SourceAppInfo(
+                    bundleIdentifier: "com.example.chat",
+                    displayName: "Chat",
+                    iconData: nil,
+                    fallbackSymbolName: nil
+                ),
+                modelReadyTime: nil,
+                processStart: Date()
+            ),
+            rawText: "  Streamed Typeleast text  "
+        )
+
+        XCTAssertEqual(result.text, "Streamed Typeleast text")
+        XCTAssertTrue(speechService.requests.isEmpty)
+        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Streamed Typeleast text")
+        XCTAssertEqual(usageStore.snapshot.totalSessions, 1)
+        XCTAssertEqual(sourceStore.allSources().first?.bundleIdentifier, "com.example.chat")
+
+        let records = try await dataManager.fetchAllRecords()
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records.first?.text, "Streamed Typeleast text")
+        XCTAssertEqual(records.first?.asrTime, 0)
+    }
 }
 
 private final class FakeRawTranscriptionService: RawTranscriptionServicing {
@@ -167,6 +219,7 @@ private final class FakeTranscriptionSettingsStore: TranscriptionSettingsReadabl
     var isTranscriptionHistoryEnabled: Bool
     var transcriptionRetentionPeriod: RetentionPeriod = .forever
     var isSmartPasteEnabled: Bool = false
+    var isStreamingTranscriptionEnabled: Bool = true
     var maxModelStorageGB: Double = 5.0
 
     init(

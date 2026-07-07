@@ -210,6 +210,8 @@ cat >Typeleast.app/Contents/Info.plist <<EOF
     <string>14.0</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Typeleast needs access to your microphone to record audio for transcription.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Typeleast uses speech recognition to prepare streaming transcripts while you record.</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSAppTransportSecurity</key>
