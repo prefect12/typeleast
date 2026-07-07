@@ -14,9 +14,9 @@ unset GITHUB_TOKEN
 
 # Path to the homebrew-tap repository (sibling directory)
 TAP_REPO="${TAP_REPO:-../homebrew-tap}"
-CASK_FILE="$TAP_REPO/Casks/audiowhisper.rb"
+CASK_FILE="$TAP_REPO/Casks/typeleast.rb"
 
-echo "🍺 Updating AudioWhisper Homebrew Cask Formula..."
+echo "🍺 Updating Typeleast Homebrew Cask Formula..."
 
 # Check if gh CLI is available
 if ! command -v gh &> /dev/null; then
@@ -28,7 +28,7 @@ fi
 # Check if tap repo exists
 if [ ! -d "$TAP_REPO" ]; then
     echo "❌ Error: homebrew-tap repository not found at $TAP_REPO"
-    echo "Clone it first: git clone https://github.com/mazdak/homebrew-tap.git $TAP_REPO"
+    echo "Clone it first: git clone https://github.com/prefect12/homebrew-tap.git $TAP_REPO"
     exit 1
 fi
 
@@ -45,11 +45,11 @@ RELEASE_INFO=$(gh release view --json tagName,url,assets)
 VERSION=$(echo "$RELEASE_INFO" | jq -r '.tagName' | sed 's/^v//')
 echo "✅ Latest version: $VERSION"
 
-# Find the AudioWhisper.zip asset
-DOWNLOAD_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name == "AudioWhisper.zip") | .url')
+# Find the Typeleast.zip asset
+DOWNLOAD_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name == "Typeleast.zip") | .url')
 
 if [ -z "$DOWNLOAD_URL" ]; then
-    echo "❌ Error: AudioWhisper.zip not found in latest release"
+    echo "❌ Error: Typeleast.zip not found in latest release"
     exit 1
 fi
 
@@ -57,7 +57,7 @@ echo "📦 Download URL: $DOWNLOAD_URL"
 
 # Download the zip file to calculate SHA256
 TEMP_DIR=$(mktemp -d)
-ZIP_FILE="$TEMP_DIR/AudioWhisper.zip"
+ZIP_FILE="$TEMP_DIR/Typeleast.zip"
 
 echo "⬇️  Downloading release to calculate SHA256..."
 curl -L -o "$ZIP_FILE" "$DOWNLOAD_URL"
@@ -84,12 +84,12 @@ echo "   Version: $VERSION"
 echo "   SHA256:  $SHA256"
 echo ""
 echo "Next steps:"
-echo "1. Review the changes: cd $TAP_REPO && git diff Casks/audiowhisper.rb"
-echo "2. Commit: cd $TAP_REPO && git add Casks/audiowhisper.rb && git commit -m 'Update AudioWhisper to v$VERSION'"
+echo "1. Review the changes: cd $TAP_REPO && git diff Casks/typeleast.rb"
+echo "2. Commit: cd $TAP_REPO && git add Casks/typeleast.rb && git commit -m 'Update Typeleast to v$VERSION'"
 echo "3. Push: cd $TAP_REPO && git push"
 echo ""
 echo "Or run: make publish-brew-cask"
 echo ""
 echo "Users can install/update with:"
-echo "   brew install mazdak/tap/audiowhisper"
-echo "   brew upgrade audiowhisper"
+echo "   brew install prefect12/tap/typeleast"
+echo "   brew upgrade typeleast"

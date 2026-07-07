@@ -1,6 +1,6 @@
 import AppKit
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class AppDelegateMenuTests: XCTestCase {
     override func tearDown() {

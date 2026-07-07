@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class PasteManagerTests: XCTestCase {
@@ -11,10 +11,10 @@ final class PasteManagerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        defaultsSuiteName = "com.audiowhisper.tests.paste.\(UUID().uuidString)"
+        defaultsSuiteName = "com.typeleast.tests.paste.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: defaultsSuiteName)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
-        pasteboardName = NSPasteboard.Name("com.audiowhisper.tests.paste.\(UUID().uuidString)")
+        pasteboardName = NSPasteboard.Name("com.typeleast.tests.paste.\(UUID().uuidString)")
         pasteboard = NSPasteboard(name: pasteboardName)
         pasteboard.clearContents()
     }

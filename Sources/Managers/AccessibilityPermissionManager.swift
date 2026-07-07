@@ -2,14 +2,86 @@ import Foundation
 import AppKit
 import ApplicationServices
 
+internal enum AccessibilityPermissionRequestDecision: Equatable {
+    case alreadyGranted
+    case startRequest
+    case waitingForActiveRequest
+    case skippedRecentlyPrompted
+}
+
+internal final class AccessibilityPermissionRequestCoordinator {
+    static let shared = AccessibilityPermissionRequestCoordinator()
+
+    private let lock = NSLock()
+    private var isRequestInProgress = false
+    private var hasPromptedWhileDenied = false
+    private var completions: [(Bool) -> Void] = []
+
+    func register(permissionGranted: Bool, completion: @escaping (Bool) -> Void) -> AccessibilityPermissionRequestDecision {
+        lock.lock()
+
+        if permissionGranted {
+            isRequestInProgress = false
+            hasPromptedWhileDenied = false
+            lock.unlock()
+            completion(true)
+            return .alreadyGranted
+        }
+
+        if isRequestInProgress {
+            completions.append(completion)
+            lock.unlock()
+            return .waitingForActiveRequest
+        }
+
+        if hasPromptedWhileDenied {
+            lock.unlock()
+            completion(false)
+            return .skippedRecentlyPrompted
+        }
+
+        isRequestInProgress = true
+        hasPromptedWhileDenied = true
+        completions.append(completion)
+        lock.unlock()
+        return .startRequest
+    }
+
+    func complete(_ granted: Bool) {
+        lock.lock()
+        isRequestInProgress = false
+        if granted {
+            hasPromptedWhileDenied = false
+        }
+        let callbacks = completions
+        completions.removeAll()
+        lock.unlock()
+
+        callbacks.forEach { $0(granted) }
+    }
+
+    func resetForTesting() {
+        lock.lock()
+        isRequestInProgress = false
+        hasPromptedWhileDenied = false
+        completions.removeAll()
+        lock.unlock()
+    }
+}
+
 /// Dedicated manager for handling Accessibility permissions with proper explanations and error handling
 internal class AccessibilityPermissionManager {
     private let isTestEnvironment: Bool
     private let permissionCheck: () -> Bool
+    private let requestCoordinator: AccessibilityPermissionRequestCoordinator
     
-    init(permissionCheck: @escaping () -> Bool = { AXIsProcessTrusted() }) {
+    init(
+        permissionCheck: @escaping () -> Bool = { AXIsProcessTrusted() },
+        requestCoordinator: AccessibilityPermissionRequestCoordinator = .shared
+    ) {
         isTestEnvironment = NSClassFromString("XCTestCase") != nil
         self.permissionCheck = permissionCheck
+        self.requestCoordinator = requestCoordinator
     }
     
     /// Checks if the app has Accessibility permission without prompting the user
@@ -22,28 +94,42 @@ internal class AccessibilityPermissionManager {
     /// Requests Accessibility permission with a proper explanation dialog
     /// - Parameter completion: Called with the result of the permission request
     func requestPermissionWithExplanation(completion: @escaping (Bool) -> Void) {
-        // First check if already granted
-        if checkPermission() {
-            completion(true)
+        let decision = requestCoordinator.register(
+            permissionGranted: checkPermission(),
+            completion: completion
+        )
+
+        switch decision {
+        case .alreadyGranted, .waitingForActiveRequest, .skippedRecentlyPrompted:
             return
+        case .startRequest:
+            break
         }
         
-        // In tests, do not show any dialogs
         if isTestEnvironment {
-            completion(false)
+            requestCoordinator.complete(false)
             return
         }
-        
+
+        let coordinator = requestCoordinator
+
         // Show explanation alert before requesting permission (runtime only)
-        showPermissionExplanationAlert { [weak self] userWantsToGrant in
+        showPermissionExplanationAlert { [weak self, coordinator] userWantsToGrant in
+            guard let self else {
+                coordinator.complete(false)
+                return
+            }
+
             guard userWantsToGrant else {
-                self?.showPermissionDeniedMessage()
-                completion(false)
+                self.showPermissionDeniedMessage()
+                coordinator.complete(false)
                 return
             }
             
             // Request permission with system prompt
-            self?.requestPermissionFromSystem(completion: completion)
+            self.requestPermissionFromSystem { granted in
+                coordinator.complete(granted)
+            }
         }
     }
     

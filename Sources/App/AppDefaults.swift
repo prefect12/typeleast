@@ -7,14 +7,15 @@ import Foundation
 ///   accidentally clobber user preferences or treat a first-run as "already configured".
 /// - AppStorage initial values across the app should match these constants.
 internal enum AppDefaults {
-    private static let productionBundleIdentifier = "com.audiowhisper.app"
-    private static let developmentBundleIdentifier = "com.audiowhisper-dev.app"
+    private static let productionBundleIdentifier = AppIdentity.bundleIdentifier
+    private static let developmentBundleIdentifier = AppIdentity.developmentBundleIdentifier
 
     internal enum Keys {
         static let transcriptionProvider = "transcriptionProvider"
         static let selectedWhisperModel = "selectedWhisperModel"
         static let selectedParakeetModel = "selectedParakeetModel"
         static let openAITranscriptionModel = "openAITranscriptionModel"
+        static let miMoASRModel = "miMoASRModel"
         static let transcriptionLanguage = "transcriptionLanguage"
 
         static let semanticCorrectionMode = "semanticCorrectionMode"
@@ -48,6 +49,7 @@ internal enum AppDefaults {
     internal static let defaultWhisperModel: WhisperModel = .base
     internal static let defaultParakeetModel: ParakeetModel = .v3Multilingual
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-transcribe"
+    internal static let defaultMiMoASRModel = "mimo-v2.5-asr"
     internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
     internal static let defaultSemanticCorrectionMode: SemanticCorrectionMode = .off
     internal static let defaultSemanticCorrectionModelRepo: String = "mlx-community/Qwen3-1.7B-4bit"
@@ -58,6 +60,7 @@ internal enum AppDefaults {
             Keys.selectedWhisperModel: defaultWhisperModel.rawValue,
             Keys.selectedParakeetModel: defaultParakeetModel.rawValue,
             Keys.openAITranscriptionModel: defaultOpenAITranscriptionModel,
+            Keys.miMoASRModel: defaultMiMoASRModel,
             Keys.transcriptionLanguage: defaultTranscriptionLanguage.rawValue,
 
             Keys.semanticCorrectionMode: defaultSemanticCorrectionMode.rawValue,

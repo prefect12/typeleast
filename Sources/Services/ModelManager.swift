@@ -27,10 +27,6 @@ internal class ModelManager {
         
         // Only refresh manually when user requests it
         // startPeriodicRefresh()
-        
-        Task {
-            await refreshDownloadedModels()
-        }
     }
     
     deinit {

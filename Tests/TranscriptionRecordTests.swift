@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class TranscriptionRecordTests: XCTestCase {
     

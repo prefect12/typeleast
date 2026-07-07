@@ -1,7 +1,7 @@
 import Foundation
 import AppKit
 
-/// Manages window display and focus restoration for AudioWhisper
+/// Manages window display and focus restoration for Typeleast
 /// 
 /// This class handles showing/hiding the recording window and restoring focus
 /// to the previous application. All window operations now support optional
@@ -11,7 +11,7 @@ internal class WindowController {
     private let isTestEnvironment: Bool
     
     // Thread-safe static property to share target app with ContentView
-    private static let storedTargetAppQueue = DispatchQueue(label: "com.audiowhisper.storedTargetApp", attributes: .concurrent)
+    private static let storedTargetAppQueue = DispatchQueue(label: "com.typeleast.storedTargetApp", attributes: .concurrent)
     private static var _storedTargetApp: NSRunningApplication?
     
     static var storedTargetApp: NSRunningApplication? {
@@ -47,7 +47,7 @@ internal class WindowController {
         
         // Use provided window or find the recording window by title
         let recordWindow = window ?? NSApp.windows.first { window in
-            window.title == "AudioWhisper Recording"
+            window.title == AppIdentity.recordingWindowTitle
         }
         
         if let window = recordWindow {
@@ -173,7 +173,7 @@ internal class WindowController {
         }
 
         // Hide recording window if open to avoid overlap
-        if let recordWindow = NSApp.windows.first(where: { $0.title == "AudioWhisper Recording" }), recordWindow.isVisible {
+        if let recordWindow = NSApp.windows.first(where: { $0.title == AppIdentity.recordingWindowTitle }), recordWindow.isVisible {
             recordWindow.orderOut(nil)
         }
 

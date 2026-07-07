@@ -118,6 +118,8 @@ Temporary Items
 # App specific
 AudioWhisper.app/
 AudioWhisper.zip
+Typeleast.app/
+Typeleast.zip
 notarization.log
 *.xcodeproj/
 __pycache__
@@ -126,5 +128,6 @@ __pycache__
 .env
 .env.local
 AudioWhisper.iconset/
+Typeleast.iconset/
 .build-uv/
 .beads/

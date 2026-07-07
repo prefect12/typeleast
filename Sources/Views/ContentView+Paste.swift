@@ -70,7 +70,7 @@ internal extension ContentView {
 
     func hideRecordingWindow() {
         let recordWindow = NSApp.windows.first { window in
-            window.title == "AudioWhisper Recording"
+            window.title == AppIdentity.recordingWindowTitle
         }
         if let window = recordWindow {
             window.orderOut(nil)
@@ -131,7 +131,7 @@ internal extension ContentView {
                     }
                 }
             } else {
-                throw NSError(domain: "AudioWhisper", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to activate target application"])
+                throw NSError(domain: AppIdentity.displayName, code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to activate target application"])
             }
         }
         

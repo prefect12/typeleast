@@ -1,6 +1,6 @@
 import XCTest
 import AppKit
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class KeyboardEventHandlerTests: XCTestCase {
@@ -16,7 +16,7 @@ final class KeyboardEventHandlerTests: XCTestCase {
             backing: .buffered,
             defer: true
         )
-        window.title = "AudioWhisper Recording"
+        window.title = "Typeleast Recording"
     }
 
     override func tearDown() {

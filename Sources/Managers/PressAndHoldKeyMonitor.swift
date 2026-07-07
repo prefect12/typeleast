@@ -179,7 +179,7 @@ internal final class PressAndHoldKeyMonitor {
     private var flagsMonitors: [Any] = []
     private var keyDownMonitors: [Any] = []
     private var keyUpMonitors: [Any] = []
-    private let monitorQueue = DispatchQueue(label: "com.audiowhisper.pressAndHoldMonitor")
+    private let monitorQueue = DispatchQueue(label: "com.typeleast.pressAndHoldMonitor")
 
     private var isPressed = false
 

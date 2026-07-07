@@ -1,6 +1,6 @@
-# Contributing to AudioWhisper
+# Contributing to Typeleast
 
-Thank you for your interest in contributing to AudioWhisper! This guide will help you get started with development, testing, and distribution.
+Thank you for your interest in contributing to Typeleast! This guide will help you get started with development, testing, and distribution.
 
 ## Table of Contents
 - [Development Setup](#development-setup)
@@ -25,8 +25,8 @@ Thank you for your interest in contributing to AudioWhisper! This guide will hel
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/AudioWhisper.git
-cd AudioWhisper
+git clone https://github.com/prefect12/typeleast.git
+cd typeleast
 ```
 
 2. Build the project to verify setup:
@@ -129,7 +129,7 @@ make build
 This creates:
 - Universal binary (Apple Silicon + Intel)
 - Proper app bundle structure
-- App icon from AudioWhisperIcon.png
+- App icon from TypeleastIcon.png
 - Info.plist with required permissions
 
 ### Signed Release Build
@@ -148,9 +148,9 @@ make build
 ```bash
 # Set required environment variables
 export CODE_SIGN_IDENTITY="Developer ID Application: Your Name"
-export AUDIO_WHISPER_APPLE_ID='your-apple-id@example.com'
-export AUDIO_WHISPER_APPLE_PASSWORD='app-specific-password'
-export AUDIO_WHISPER_TEAM_ID='your-team-id'
+export TYPELEAST_APPLE_ID='your-apple-id@example.com'
+export TYPELEAST_APPLE_PASSWORD='app-specific-password'
+export TYPELEAST_TEAM_ID='your-team-id'
 
 # Build with notarization
 make build-notarize
@@ -164,7 +164,7 @@ For personal use without a developer account:
 
 ```bash
 # Ad-hoc sign after building
-codesign --force --deep --sign - AudioWhisper.app
+codesign --force --deep --sign - --identifier "com.typeleast.app" Typeleast.app
 ```
 
 **Limitations:**
@@ -208,13 +208,13 @@ The build script handles signing automatically if identity is available.
 
 ```bash
 # Check if app is properly signed
-codesign --verify --verbose AudioWhisper.app
+codesign --verify --verbose Typeleast.app
 
 # Check signature details
-codesign -dvv AudioWhisper.app
+codesign -dvv Typeleast.app
 
 # Check Gatekeeper approval
-spctl -a -v AudioWhisper.app
+spctl -a -v Typeleast.app
 ```
 
 ### Notarization
@@ -224,23 +224,23 @@ Notarization is required for distribution outside the Mac App Store:
 1. **Create App-Specific Password:**
    - Go to [appleid.apple.com](https://appleid.apple.com)
    - Sign in → Security → App-Specific Passwords
-   - Generate password for "AudioWhisper Notarization"
+   - Generate password for "Typeleast Notarization"
 
 2. **Submit for Notarization:**
    Use `make build-notarize` or manually:
    ```bash
    # Create zip
-   ditto -c -k --keepParent AudioWhisper.app AudioWhisper.zip
+   ditto -c -k --keepParent Typeleast.app Typeleast.zip
    
    # Submit
-   xcrun notarytool submit AudioWhisper.zip \
+   xcrun notarytool submit Typeleast.zip \
      --apple-id "your@email.com" \
      --team-id "TEAMID" \
      --password "app-specific-password" \
      --wait
    
    # Staple ticket
-   xcrun stapler staple AudioWhisper.app
+   xcrun stapler staple Typeleast.app
    ```
 
 ### Distribution Options
@@ -269,7 +269,7 @@ Notarization is required for distribution outside the Mac App Store:
 
 ### Project Structure
 ```
-AudioWhisper/
+Typeleast/
 ├── Sources/                        # Swift source files
 ├── Tests/                          # Unit tests
 ├── scripts/                        # Build and automation scripts
@@ -340,4 +340,4 @@ These warnings from Apple's frameworks can be safely ignored:
 
 ## License
 
-By contributing to AudioWhisper, you agree that your contributions will be licensed under the same license as the project.
+By contributing to Typeleast, you agree that your contributions will be licensed under the same license as the project.

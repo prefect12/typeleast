@@ -3,8 +3,9 @@ import SwiftUI
 internal extension DashboardProvidersView {
     // MARK: - Cloud Access Helpers
     func loadAPIKeys() {
-        openAIKey = keychainService.getQuietly(service: "AudioWhisper", account: "OpenAI") ?? ""
-        geminiKey = keychainService.getQuietly(service: "AudioWhisper", account: "Gemini") ?? ""
+        openAIKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") ?? ""
+        miMoKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "MiMo") ?? ""
+        geminiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "Gemini") ?? ""
     }
 
     func saveAPIKey(_ key: String, service: String, account: String) {

@@ -38,7 +38,7 @@ internal struct ParakeetResponse: Codable {
 }
 
 internal class ParakeetService {
-    private let logger = Logger(subsystem: "com.audiowhisper.app", category: "ParakeetService")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "ParakeetService")
     private let daemon = MLDaemonManager.shared
 
     func transcribe(audioFileURL: URL, pythonPath _: String? = nil) async throws -> String {

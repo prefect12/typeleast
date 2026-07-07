@@ -49,7 +49,7 @@ internal struct WaveformRecordingView: View {
         HStack(spacing: 8) {
             Image(systemName: "waveform")
                 .font(.system(size: 15, weight: .medium))
-            Text("AudioWhisper")
+            Text("Typeleast")
                 .font(.system(size: 15, weight: .semibold))
         }
         .foregroundStyle(Color(nsColor: .labelColor))
@@ -106,7 +106,7 @@ internal struct WaveformRecordingView: View {
         case .downloadingModel(let message):
             return message
         case .success:
-            return "Copied to clipboard"
+            return AppStatus.successMessage(smartPasteEnabled: smartPasteEnabled)
         case .ready:
             return "Ready to record"
         case .permissionRequired:
@@ -125,7 +125,7 @@ internal struct WaveformRecordingView: View {
         case .downloadingModel:
             return "Start Recording"
         case .success:
-            return "Paste"
+            return AppStatus.successButtonHelp(smartPasteEnabled: smartPasteEnabled)
         case .permissionRequired:
             return "Grant Permission"
         case .error:
@@ -144,7 +144,7 @@ internal struct WaveformRecordingView: View {
         case .downloadingModel:
             return "record.circle.fill"
         case .success:
-            return "doc.on.clipboard"
+            return AppStatus.successIcon(smartPasteEnabled: smartPasteEnabled)
         case .permissionRequired:
             return "mic.badge.plus"
         case .error:
@@ -196,7 +196,7 @@ internal struct WaveformRecordingView: View {
         case .downloadingModel:
             return "Start recording"
         case .success:
-            return "Paste"
+            return AppStatus.successButtonHelp(smartPasteEnabled: smartPasteEnabled)
         case .permissionRequired:
             return "Grant microphone permission"
         case .error:
@@ -204,6 +204,10 @@ internal struct WaveformRecordingView: View {
         case .ready:
             return "Start recording"
         }
+    }
+
+    private var smartPasteEnabled: Bool {
+        UserDefaults.standard.bool(forKey: AppDefaults.Keys.enableSmartPaste)
     }
 }
 

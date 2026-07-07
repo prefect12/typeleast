@@ -6,6 +6,8 @@ import AppKit
 internal struct TranscriptionHistoryView: View {
     @Query(sort: \TranscriptionRecord.date, order: .reverse) private var allRecords: [TranscriptionRecord]
 
+    @ObservedObject private var languageManager = LanguageManager.shared
+    @State private var metricsStore = UsageMetricsStore.shared
     @State private var searchText = ""
     @State private var showError = false
     @State private var errorMessage = ""
@@ -48,21 +50,21 @@ internal struct TranscriptionHistoryView: View {
                 Button {
                     copySelectedToClipboard()
                 } label: {
-                    Label("Copy", systemImage: "doc.on.doc")
+                    Label(L10n.History.copy, systemImage: "doc.on.doc")
                 }
                 .disabled(selectedRecords.isEmpty)
 
                 Button(role: .destructive) {
                     showDeleteSelectedConfirmation = true
                 } label: {
-                    Label("Delete", systemImage: "trash")
+                    Label(L10n.History.delete, systemImage: "trash")
                 }
                 .disabled(selectedRecords.isEmpty || isBusy)
 
                 Button(role: .destructive) {
                     showClearAllConfirmation = true
                 } label: {
-                    Text("Clear All")
+                    Text(L10n.History.clearAll)
                 }
                 .disabled(allRecords.isEmpty || isBusy)
             }
@@ -72,34 +74,35 @@ internal struct TranscriptionHistoryView: View {
             showDeleteSelectedConfirmation = true
         }
         .confirmationDialog(
-            "Delete Transcriptions",
+            L10n.History.deleteTranscriptions,
             isPresented: $showDeleteSelectedConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Cancel", role: .cancel) {}
+            Button(L10n.Common.cancel, role: .cancel) {}
             Button(deleteSelectedButtonTitle, role: .destructive) {
                 deleteSelectedRecords()
             }
         } message: {
-            Text("This action cannot be undone.")
+            Text(L10n.History.irreversible)
         }
         .confirmationDialog(
-            "Clear All Transcription History",
+            L10n.History.clearAllTranscriptionHistory,
             isPresented: $showClearAllConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clear All", role: .destructive) {
+            Button(L10n.Common.cancel, role: .cancel) {}
+            Button(L10n.History.clearAll, role: .destructive) {
                 clearAllRecords()
             }
         } message: {
-            Text("This will permanently delete all transcriptions.")
+            Text(L10n.History.clearAllWarning)
         }
-        .alert("Error", isPresented: $showError) {
-            Button("OK") { }
+        .alert(L10n.History.error, isPresented: $showError) {
+            Button(L10n.Common.done) { }
         } message: {
             Text(errorMessage)
         }
+        .id(languageManager.current)
         .frame(
             minWidth: LayoutMetrics.TranscriptionHistory.minimumSize.width,
             minHeight: LayoutMetrics.TranscriptionHistory.minimumSize.height
@@ -109,26 +112,29 @@ internal struct TranscriptionHistoryView: View {
     private var listPane: some View {
         VStack(spacing: 0) {
             if filteredRecords.isEmpty {
-                TranscriptionHistoryEmptyContent(searchText: searchText)
+                TranscriptionHistoryEmptyContent(
+                    searchText: searchText,
+                    usageSnapshot: metricsStore.snapshot
+                )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(filteredRecords, selection: $selection) {
-                    TableColumn("Date") { record in
+                    TableColumn(L10n.History.date) { record in
                         Text(record.formattedDate)
                             .lineLimit(1)
                     }
 
-                    TableColumn("Provider") { record in
-                        Text(record.transcriptionProvider?.displayName ?? record.provider)
+                    TableColumn(L10n.History.provider) { record in
+                        Text(L10n.Provider.displayName(for: record.provider))
                             .lineLimit(1)
                     }
 
-                    TableColumn("Duration") { record in
-                        Text(record.formattedDuration ?? "—")
+                    TableColumn(L10n.History.duration) { record in
+                        Text(record.formattedDuration ?? "-")
                             .lineLimit(1)
                     }
 
-                    TableColumn("Text") { record in
+                    TableColumn(L10n.History.text) { record in
                         Text(record.preview)
                             .lineLimit(1)
                             .foregroundStyle(.secondary)
@@ -144,9 +150,9 @@ internal struct TranscriptionHistoryView: View {
                 TranscriptionDetailView(record: record)
             } else {
                 ContentUnavailableView(
-                    "Select a Transcript",
+                    L10n.History.selectTranscript,
                     systemImage: "doc.text",
-                    description: Text("Choose a transcription on the left to view details.")
+                    description: Text(L10n.History.selectTranscriptHint)
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -156,8 +162,8 @@ internal struct TranscriptionHistoryView: View {
 
     private var deleteSelectedButtonTitle: String {
         let count = selectedRecords.count
-        if count <= 1 { return "Delete" }
-        return "Delete \(count) Items"
+        if count <= 1 { return L10n.History.delete }
+        return L10n.isChinese ? "删除 \(count) 项" : "Delete \(count) Items"
     }
 
     private func copyToClipboard(_ text: String) {
@@ -189,7 +195,7 @@ internal struct TranscriptionHistoryView: View {
                 }
             } catch {
                 await MainActor.run {
-                    errorMessage = "Failed to delete records: \(error.localizedDescription)"
+                    errorMessage = "\(L10n.History.failedToDelete): \(error.localizedDescription)"
                     showError = true
                     isBusy = false
                 }
@@ -204,7 +210,7 @@ internal struct TranscriptionHistoryView: View {
                 try await DataManager.shared.deleteAllRecords()
             } catch {
                 await MainActor.run {
-                    errorMessage = "Failed to clear all records: \(error.localizedDescription)"
+                    errorMessage = "\(L10n.History.failedToClear): \(error.localizedDescription)"
                     showError = true
                 }
             }
@@ -218,21 +224,36 @@ internal struct TranscriptionHistoryView: View {
 
 private struct TranscriptionHistoryEmptyContent: View {
     let searchText: String
+    let usageSnapshot: UsageSnapshot
+
+    private var hasAggregateOnlyUsage: Bool {
+        searchText.isEmpty && usageSnapshot.hasUsageData
+    }
 
     var body: some View {
         if searchText.isEmpty {
             ContentUnavailableView(
-                "No Transcripts Yet",
+                hasAggregateOnlyUsage ? L10n.History.noSavedTranscripts : L10n.History.noTranscriptsYet,
                 systemImage: "doc.text",
-                description: Text("Your transcription history will appear here.")
+                description: Text(emptyDescription)
             )
         } else {
             ContentUnavailableView(
-                "No Results",
+                L10n.History.noResults,
                 systemImage: "magnifyingglass",
-                description: Text("Try a different search term.")
+                description: Text(L10n.History.noResultsHint)
             )
         }
+    }
+
+    private var emptyDescription: String {
+        if hasAggregateOnlyUsage {
+            return L10n.History.aggregateOnlyHistoryHint(
+                sessions: usageSnapshot.totalSessions,
+                words: usageSnapshot.totalWords
+            )
+        }
+        return L10n.History.historyWillAppear
     }
 }
 
@@ -258,22 +279,22 @@ private struct TranscriptionDetailView: View {
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 10) {
-            LabeledContent("Date") {
+            LabeledContent(L10n.History.date) {
                 Text(record.formattedDate)
             }
 
-            LabeledContent("Provider") {
-                Text(record.transcriptionProvider?.displayName ?? record.provider)
+            LabeledContent(L10n.History.provider) {
+                Text(L10n.Provider.displayName(for: record.provider))
             }
 
             if let duration = record.formattedDuration {
-                LabeledContent("Duration") {
+                LabeledContent(L10n.History.duration) {
                     Text(duration)
                 }
             }
 
             if let modelUsed = record.modelUsed, !modelUsed.isEmpty {
-                LabeledContent("Model") {
+                LabeledContent(L10n.History.model) {
                     Text(modelUsed)
                 }
             }

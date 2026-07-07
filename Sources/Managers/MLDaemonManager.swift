@@ -34,7 +34,7 @@ internal actor MLDaemonManager {
         let completion: (Result<Data, Error>) -> Void
     }
 
-    private let logger = Logger(subsystem: "com.audiowhisper.app", category: "MLDaemon")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "MLDaemon")
     private let maxRestartAttempts = 3
 
     private var process: Process?

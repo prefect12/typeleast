@@ -121,8 +121,8 @@ internal struct TranscriptionRecordRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Transcription from \(record.formattedDate), using \(record.provider)")
-        .accessibilityHint("Tap to expand or collapse. Use action buttons to copy or delete.")
+        .accessibilityLabel(L10n.RecordRow.accessibilityLabel(date: record.formattedDate, provider: providerDisplayName))
+        .accessibilityHint(L10n.RecordRow.accessibilityHint)
     }
     
     @ViewBuilder
@@ -137,7 +137,7 @@ internal struct TranscriptionRecordRow: View {
                 .background(providerColor(for: provider))
                 .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         } else {
-            Text(record.provider)
+            Text(providerDisplayName)
                 .font(.caption2)
                 .fontWeight(.medium)
                 .foregroundStyle(.white)
@@ -151,11 +151,17 @@ internal struct TranscriptionRecordRow: View {
     private var backgroundFill: Color {
         isHovered ? Color(NSColor.controlBackgroundColor) : Color.clear
     }
+
+    private var providerDisplayName: String {
+        L10n.Provider.displayName(for: record.provider)
+    }
     
     private func providerColor(for provider: TranscriptionProvider) -> Color {
         switch provider {
         case .openai:
             return .green
+        case .mimo:
+            return .cyan
         case .gemini:
             return .blue
         case .local:

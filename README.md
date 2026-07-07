@@ -1,9 +1,9 @@
-# AudioWhisper 🎙️
+# Typeleast
 
-A lightweight macOS menu bar app for quick audio transcription using OpenAI Whisper, Google Gemini, Local WhisperKit, or Parakeet‑MLX. Press a hotkey, record your thoughts, and get instant text that's automatically copied to your clipboard.
+A lightweight macOS menu bar app that lets you speak once and type less. Press a hotkey, record your thought, and get instant text from OpenAI Whisper, Google Gemini, Local WhisperKit, or Parakeet‑MLX.
 
 <p align="center">
-  <img src="https://github.com/mazdak/AudioWhisper/blob/master/AudioWhisperIcon.png" width="128" height="128" alt="AudioWhisper Icon">
+  <img src="https://github.com/prefect12/typeleast/blob/master/TypeleastIcon.png" width="128" height="128" alt="Typeleast Icon">
 </p>
 
 ## Features ✨
@@ -39,38 +39,36 @@ A lightweight macOS menu bar app for quick audio transcription using OpenAI Whis
 ### Option 1: Homebrew (Recommended)
 ```bash
 # Tap the repository (one-time setup)
-brew tap mazdak/tap
+brew tap prefect12/tap
 
-# Install AudioWhisper
-brew install audiowhisper
+# Install Typeleast
+brew install typeleast
 
 # Launch the app
-open -a AudioWhisper
+open -a Typeleast
 ```
 
 To update:
 ```bash
-brew upgrade audiowhisper
+brew upgrade typeleast
 ```
 
-> **Note**: The `mazdak/tap` repository also includes other tools like [LazyRedis](https://github.com/mazdak/lazyredis)
-
 ### Option 2: Download Pre-built App
-1. Download the latest release from [Releases](https://github.com/mazdak/AudioWhisper/releases)
-2. Drag AudioWhisper.app to your Applications folder
+1. Download the latest release from [Releases](https://github.com/prefect12/typeleast/releases)
+2. Drag Typeleast.app to your Applications folder
 3. Launch and configure your API key through the Dashboard
 
 ### Option 3: Build from Source
 ```bash
 # Clone the repository
-git clone https://github.com/mazdak/AudioWhisper.git
-cd AudioWhisper
+git clone https://github.com/prefect12/typeleast.git
+cd typeleast
 
 # Build the app
 make build
 
 # Copy to Applications
-cp -r AudioWhisper.app /Applications/
+cp -r Typeleast.app /Applications/
 ```
 
 ## Setup 🔧
@@ -101,7 +99,7 @@ cp -r AudioWhisper.app /Applications/
 - Modes: Off, Local MLX, or Cloud (uses the active provider)
 - Local MLX runs fully offline on Apple Silicon; choose a correction model in the Dashboard (models cache under `~/.cache/huggingface/hub`)
 - App-aware categories (Terminal/Coding/Chat/Writing/Email/General) can be edited in Dashboard → Categories
-- You can override prompts by placing `*_prompt.txt` files in `~/Library/Application Support/AudioWhisper/prompts/` (e.g. `terminal_prompt.txt`)
+- You can override prompts by placing `*_prompt.txt` files in `~/Library/Application Support/Typeleast/prompts/` (e.g. `terminal_prompt.txt`)
 
 **History & Usage Stats (Optional)**
 - Enable “Save Transcription History” in Dashboard → Preferences; pick retention: 1 week / 1 month / 3 months / forever
@@ -116,7 +114,7 @@ cp -r AudioWhisper.app /Applications/
 
 ### First Run
 
-1. Launch AudioWhisper from Applications
+1. Launch Typeleast from Applications
 2. The app will detect no API keys and show a welcome dialog
 3. Click OK to open the Dashboard
 4. Choose your provider:
@@ -160,8 +158,8 @@ The recording window shows helpful instructions at the bottom:
 ### Development Build
 ```bash
 # Clone the repository
-git clone https://github.com/mazdak/AudioWhisper.git
-cd AudioWhisper
+git clone https://github.com/prefect12/typeleast.git
+cd typeleast
 
 # Run in development mode
 swift run
@@ -203,7 +201,7 @@ make build
 - Grant permissions in System Settings → Privacy & Security → Input Monitoring (Smart Paste) and Accessibility (Press & Hold)
 
 **Microphone not detected**
-- System Settings → Privacy & Security → Microphone → enable AudioWhisper
+- System Settings → Privacy & Security → Microphone → enable Typeleast
 
 **API key problems**
 - Re‑enter the key in the Dashboard; check quota; verify any custom base URL/endpoint is correct

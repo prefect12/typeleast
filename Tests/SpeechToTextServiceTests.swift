@@ -1,6 +1,7 @@
 import XCTest
 import Foundation
-@testable import AudioWhisper
+import AVFoundation
+@testable import Typeleast
 
 class SpeechToTextServiceTests: XCTestCase {
     var service: SpeechToTextService!
@@ -11,7 +12,7 @@ class SpeechToTextServiceTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        defaultsSuiteName = "com.audiowhisper.tests.speech.\(UUID().uuidString)"
+        defaultsSuiteName = "com.typeleast.tests.speech.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: defaultsSuiteName)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         mockKeychain = MockKeychainService()
@@ -65,6 +66,24 @@ class SpeechToTextServiceTests: XCTestCase {
         defaults.set("   ", forKey: AppDefaults.Keys.openAITranscriptionModel)
 
         XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
+    }
+
+    func testMiMoASRModelDefaultsToV25ASR() {
+        defaults.removeObject(forKey: AppDefaults.Keys.miMoASRModel)
+
+        XCTAssertEqual(service.resolvedMiMoASRModel, "mimo-v2.5-asr")
+    }
+
+    func testMiMoASRModelUsesConfiguredValue() {
+        defaults.set("mimo-v2.5-asr-custom", forKey: AppDefaults.Keys.miMoASRModel)
+
+        XCTAssertEqual(service.resolvedMiMoASRModel, "mimo-v2.5-asr-custom")
+    }
+
+    func testMiMoASRModelFallsBackWhenBlank() {
+        defaults.set("   ", forKey: AppDefaults.Keys.miMoASRModel)
+
+        XCTAssertEqual(service.resolvedMiMoASRModel, "mimo-v2.5-asr")
     }
 
     func testTranscriptionLanguageDefaultsToAuto() {
@@ -238,6 +257,60 @@ class SpeechToTextServiceTests: XCTestCase {
             XCTFail("Failed to decode GeminiResponse: \(error)")
         }
     }
+
+    func testMiMoResponseDecoding() throws {
+        let jsonString = """
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": "Good morning.",
+                        "role": "assistant"
+                    }
+                }
+            ]
+        }
+        """
+
+        let data = jsonString.data(using: .utf8)!
+        let response = try JSONDecoder().decode(MiMoChatCompletionResponse.self, from: data)
+
+        XCTAssertEqual(response.choices.first?.message.content, "Good morning.")
+    }
+
+    func testMiMoRequestEncodingUsesOpenAICompatibleAudioShape() throws {
+        let request = MiMoChatCompletionRequest.make(
+            model: "mimo-v2.5-asr",
+            dataURI: "data:audio/mp4;base64,AAAA",
+            language: .chinese
+        )
+        let data = try JSONEncoder().encode(request)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let messages = object?["messages"] as? [[String: Any]]
+        let firstMessage = messages?.first
+        let content = firstMessage?["content"] as? [[String: Any]]
+        let inputAudio = content?.first?["input_audio"] as? [String: Any]
+        let asrOptions = object?["asr_options"] as? [String: Any]
+
+        XCTAssertEqual(object?["model"] as? String, "mimo-v2.5-asr")
+        XCTAssertEqual(firstMessage?["role"] as? String, "user")
+        XCTAssertEqual(content?.first?["type"] as? String, "input_audio")
+        XCTAssertEqual(inputAudio?["data"] as? String, "data:audio/mp4;base64,AAAA")
+        XCTAssertEqual(asrOptions?["language"] as? String, "zh")
+    }
+
+    func testMiMoAudioDataURI() {
+        let data = Data([0x01, 0x02, 0x03])
+
+        XCTAssertEqual(SpeechToTextService.miMoAudioDataURI(data: data, mimeType: "audio/mp4"), "data:audio/mp4;base64,AQID")
+    }
+
+    func testMiMoMimeTypeDetection() {
+        XCTAssertEqual(SpeechToTextService.mimeType(forAudioURL: URL(fileURLWithPath: "/tmp/test.m4a")), "audio/mp4")
+        XCTAssertEqual(SpeechToTextService.mimeType(forAudioURL: URL(fileURLWithPath: "/tmp/test.wav")), "audio/wav")
+        XCTAssertEqual(SpeechToTextService.mimeType(forAudioURL: URL(fileURLWithPath: "/tmp/test.mp3")), "audio/mpeg")
+        XCTAssertEqual(SpeechToTextService.mimeType(forAudioURL: URL(fileURLWithPath: "/tmp/test.unknown")), "audio/mp4")
+    }
     
     // MARK: - File Handling Tests
     
@@ -246,7 +319,7 @@ class SpeechToTextServiceTests: XCTestCase {
         
         do {
             // Set up mock keychain to have an API key so we get to the file reading part
-            mockKeychain.saveQuietly("test-key", service: "AudioWhisper", account: "OpenAI")
+            mockKeychain.saveQuietly("test-key", service: "Typeleast", account: "OpenAI")
             
             _ = try await service.transcribe(audioURL: invalidURL)
             XCTFail("Expected error due to invalid file URL")
@@ -263,12 +336,12 @@ class SpeechToTextServiceTests: XCTestCase {
         let mockKeychain = MockKeychainService()
         
         // Test that it returns nil when no key is found
-        let apiKey = mockKeychain.getQuietly(service: "AudioWhisper", account: "OpenAI")
+        let apiKey = mockKeychain.getQuietly(service: "Typeleast", account: "OpenAI")
         XCTAssertNil(apiKey)
         
         // Test saving and retrieving a key
-        mockKeychain.saveQuietly("test-api-key", service: "AudioWhisper", account: "OpenAI")
-        let retrievedKey = mockKeychain.getQuietly(service: "AudioWhisper", account: "OpenAI")
+        mockKeychain.saveQuietly("test-api-key", service: "Typeleast", account: "OpenAI")
+        let retrievedKey = mockKeychain.getQuietly(service: "Typeleast", account: "OpenAI")
         XCTAssertEqual(retrievedKey, "test-api-key")
     }
     
@@ -278,13 +351,27 @@ class SpeechToTextServiceTests: XCTestCase {
         let _ = SpeechToTextService(keychainService: mockKeychain, userDefaults: defaults)
         
         // Test that it returns nil when no key is found
-        let apiKey = mockKeychain.getQuietly(service: "AudioWhisper", account: "OpenAI")
+        let apiKey = mockKeychain.getQuietly(service: "Typeleast", account: "OpenAI")
         XCTAssertNil(apiKey)
         
         // Test saving and retrieving a key
-        mockKeychain.saveQuietly("test-api-key", service: "AudioWhisper", account: "OpenAI")
-        let retrievedKey = mockKeychain.getQuietly(service: "AudioWhisper", account: "OpenAI")
+        mockKeychain.saveQuietly("test-api-key", service: "Typeleast", account: "OpenAI")
+        let retrievedKey = mockKeychain.getQuietly(service: "Typeleast", account: "OpenAI")
         XCTAssertEqual(retrievedKey, "test-api-key")
+    }
+
+    func testMiMoProviderMissingAPIKey() async throws {
+        let validAudioURL = try makeValidAudioFile()
+        defer { try? FileManager.default.removeItem(at: validAudioURL) }
+
+        do {
+            _ = try await service.transcribe(audioURL: validAudioURL, provider: .mimo)
+            XCTFail("Expected error due to missing MiMo API key")
+        } catch let error as SpeechToTextError {
+            XCTAssertEqual(error, SpeechToTextError.apiKeyMissing("MiMo"))
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
     }
     
     // MARK: - Concurrent Access Tests
@@ -365,6 +452,24 @@ extension SpeechToTextServiceTests {
         
         return audioURL
     }
+
+    private func makeValidAudioFile() throws -> URL {
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1) else {
+            throw NSError(domain: "SpeechToTextServiceTests", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to create audio format"])
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SpeechToTextServiceTests-valid-\(UUID().uuidString).wav")
+
+        let frameCount: AVAudioFrameCount = 1_024
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
+            throw NSError(domain: "SpeechToTextServiceTests", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to create buffer"])
+        }
+        buffer.frameLength = frameCount
+
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
+        return url
+    }
     
     // MARK: - Parakeet Provider Tests
     
@@ -418,9 +523,9 @@ extension SpeechToTextServiceTests {
     
     func testParakeetProviderInAllCases() {
         // Ensure Parakeet is included in all provider tests
-        let allProviders: [TranscriptionProvider] = [.openai, .gemini, .local, .parakeet]
+        let allProviders: [TranscriptionProvider] = [.openai, .mimo, .gemini, .local, .parakeet]
         XCTAssertTrue(allProviders.contains(.parakeet))
-        XCTAssertEqual(allProviders.count, 4)
+        XCTAssertEqual(allProviders.count, 5)
     }
 
     // MARK: - Custom OpenAI Endpoint Tests

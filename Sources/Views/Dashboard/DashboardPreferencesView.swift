@@ -72,7 +72,7 @@ internal struct DashboardPreferencesView: View {
                     Spacer(minLength: 12)
 
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text(globalHotkey)
+                        Text(GlobalShortcutDisplay.text(for: globalHotkey))
                             .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.secondary)
 

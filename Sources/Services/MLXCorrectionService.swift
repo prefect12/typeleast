@@ -44,7 +44,7 @@ internal protocol MLDaemonManaging {
 extension MLDaemonManager: MLDaemonManaging {}
 
 internal final class MLXCorrectionService {
-    private let logger = Logger(subsystem: "com.audiowhisper.app", category: "MLXCorrectionService")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "MLXCorrectionService")
     private let daemon: MLDaemonManaging
     private let promptLoader: () -> String?
 
@@ -109,12 +109,8 @@ internal final class MLXCorrectionService {
     // MARK: - Private Helpers
     
     private static func loadSystemPrompt() -> String? {
-        guard let promptsDir = try? FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: false
-        ).appendingPathComponent("AudioWhisper/prompts", isDirectory: true) else {
+        guard let promptsDir = try? AppIdentity.applicationSupportDirectory(create: false)
+            .appendingPathComponent("prompts", isDirectory: true) else {
             return nil
         }
         

@@ -75,6 +75,7 @@ internal protocol DataManagerProtocol {
     func deleteRecord(_ record: TranscriptionRecord) async throws
     func deleteAllRecords() async throws
     func updateTiming(for recordID: UUID, pasteTime: TimeInterval?, endToEndTime: TimeInterval?) async throws
+    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int
     func cleanupExpiredRecords() async throws
     
     // Backward compatibility methods that don't throw
@@ -117,10 +118,11 @@ internal final class DataManager: DataManagerProtocol {
             let schema = Schema([
                 TranscriptionRecord.self
             ])
+            let storeURL = try AppIdentity.swiftDataStoreURL()
             
             let modelConfiguration = ModelConfiguration(
                 schema: schema,
-                isStoredInMemoryOnly: false,
+                url: storeURL,
                 allowsSave: true
             )
             
@@ -333,6 +335,36 @@ internal final class DataManager: DataManagerProtocol {
             throw DataManagerError.saveFailed(error)
         }
     }
+
+    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int {
+        guard isHistoryEnabled else { return 0 }
+        guard snapshot.hasUsageData else { return 0 }
+        guard let container = modelContainer else {
+            throw DataManagerError.modelContainerUnavailable
+        }
+
+        do {
+            let context = ModelContext(container)
+            let existingRecords = try context.fetch(FetchDescriptor<TranscriptionRecord>())
+            let records = LegacyUsageBackfill.recordsToBackfill(
+                snapshot: snapshot,
+                existingRecords: existingRecords
+            )
+            guard !records.isEmpty else { return 0 }
+
+            for record in records {
+                context.insert(record)
+            }
+            try context.save()
+
+            Logger.dataManager.info("Backfilled \(records.count) legacy usage summary records")
+            TimingAnalysisStore.shared.invalidate()
+            return records.count
+        } catch {
+            Logger.dataManager.error("Failed to backfill legacy usage summaries: \(error.localizedDescription)")
+            throw DataManagerError.saveFailed(error)
+        }
+    }
     
     func cleanupExpiredRecords() async throws {
         guard let timeInterval = retentionPeriod.timeInterval else {
@@ -364,6 +396,9 @@ internal final class DataManager: DataManagerProtocol {
             
             if !expiredRecords.isEmpty {
                 Logger.dataManager.info("Cleaned up \(expiredRecords.count) expired transcription records")
+                let remainingRecords = try context.fetch(FetchDescriptor<TranscriptionRecord>())
+                UsageMetricsStore.shared.rebuild(using: remainingRecords)
+                SourceUsageStore.shared.rebuild(using: remainingRecords)
                 TimingAnalysisStore.shared.invalidate()
             }
             
@@ -480,6 +515,17 @@ internal final class MockDataManager: DataManagerProtocol {
         }
         TimingAnalysisStore.shared.invalidate()
     }
+
+    func backfillLegacyUsageSummaries(snapshot: UsageSnapshot) async throws -> Int {
+        guard isHistoryEnabled else { return 0 }
+        let backfilledRecords = LegacyUsageBackfill.recordsToBackfill(
+            snapshot: snapshot,
+            existingRecords: records
+        )
+        records.append(contentsOf: backfilledRecords)
+        TimingAnalysisStore.shared.invalidate()
+        return backfilledRecords.count
+    }
     
     func cleanupExpiredRecords() async throws {
         guard let timeInterval = retentionPeriod.timeInterval else { return }
@@ -491,6 +537,8 @@ internal final class MockDataManager: DataManagerProtocol {
         
         if removedCount > 0 {
             Logger.dataManager.info("Mock cleaned up \(removedCount) expired transcription records")
+            UsageMetricsStore.shared.rebuild(using: records)
+            SourceUsageStore.shared.rebuild(using: records)
             TimingAnalysisStore.shared.invalidate()
         }
     }

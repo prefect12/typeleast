@@ -1,7 +1,7 @@
 [project]
-name = "audio-whisper-runtime"
+name = "typeleast-runtime"
 version = "0.0.0"
-description = "Runtime dependencies for AudioWhisper"
+description = "Runtime dependencies for Typeleast"
 requires-python = ">=3.11,<3.12"
 dependencies = [
   # MLX correction

@@ -6,7 +6,7 @@ import os.log
 internal final class SemanticCorrectionService {
     private let mlxService = MLXCorrectionService()
     private let keychainService: KeychainServiceProtocol
-    private let logger = Logger(subsystem: "com.audiowhisper.app", category: "SemanticCorrection")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "SemanticCorrection")
     
     // Chunking configuration for 32k context window
     // 32k tokens ≈ 24k words (0.75 ratio) ≈ 120k chars
@@ -53,8 +53,8 @@ internal final class SemanticCorrectionService {
             case .gemini:
                 logger.info("Running cloud correction: Gemini")
                 return (await correctWithGemini(text: text, category: category), nil)
-            case .local, .parakeet:
-                // Don't send local text to cloud.
+            case .mimo, .local, .parakeet:
+                // MiMo is currently wired as ASR-only; don't send local/offline text to cloud either.
                 return (text, nil)
             }
         }
@@ -85,7 +85,7 @@ internal final class SemanticCorrectionService {
 
     // MARK: - Cloud (OpenAI)
     private func correctWithOpenAI(text: String, category: CategoryDefinition) async -> String {
-        guard let apiKey = keychainService.getQuietly(service: "AudioWhisper", account: "OpenAI") else {
+        guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") else {
             return text
         }
         let prompt = loadPrompt(for: category)
@@ -133,7 +133,7 @@ internal final class SemanticCorrectionService {
     }
 
     private func correctWithGemini(text: String, category: CategoryDefinition) async -> String {
-        guard let apiKey = keychainService.getQuietly(service: "AudioWhisper", account: "Gemini") else {
+        guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "Gemini") else {
             return text
         }
         let url = "\(geminiBaseURL)/v1beta/models/gemini-2.5-flash-lite:generateContent"
@@ -174,8 +174,8 @@ internal final class SemanticCorrectionService {
 
     // MARK: - Prompt file helpers
     private func promptsBaseDir() -> URL? {
-        return try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-            .appendingPathComponent("AudioWhisper/prompts", isDirectory: true)
+        try? AppIdentity.applicationSupportDirectory()
+            .appendingPathComponent("prompts", isDirectory: true)
     }
     
     private func loadPrompt(for category: CategoryDefinition) -> String {

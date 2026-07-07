@@ -1,9 +1,9 @@
 import Foundation
 import os.log
 
-// Centralized logging for AudioWhisper
+// Centralized logging for Typeleast
 internal extension Logger {
-    private static var subsystem = Bundle.main.bundleIdentifier ?? "com.audiowhisper.app"
+    private static var subsystem = Bundle.main.bundleIdentifier ?? AppIdentity.bundleIdentifier
     
     static let modelManager = Logger(subsystem: subsystem, category: "ModelManager")
     static let audioRecorder = Logger(subsystem: subsystem, category: "AudioRecorder")

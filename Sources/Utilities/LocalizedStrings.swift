@@ -1,6 +1,6 @@
 import Foundation
 
-/// Centralized localized strings for AudioWhisper
+/// Centralized localized strings for Typeleast
 internal enum LocalizedStrings {
     
     // MARK: - UI States
@@ -40,8 +40,8 @@ internal enum LocalizedStrings {
             value: "Microphone Access Required", 
             comment: "Title for microphone permission alert")
         
-        static let microphoneAccessMessage = NSLocalizedString("alerts.microphone_access_message", 
-            value: "AudioWhisper needs microphone access to record audio. Please enable microphone access in System Settings > Privacy & Security > Microphone.", 
+        static let microphoneAccessMessage = NSLocalizedString("alerts.microphone_access_message",
+            value: "Typeleast needs microphone access to record audio. Please enable microphone access in System Settings > Privacy & Security > Microphone.",
             comment: "Message explaining why microphone access is needed")
         
         static let openSystemSettings = NSLocalizedString("alerts.open_system_settings", 
@@ -144,15 +144,15 @@ internal enum LocalizedStrings {
     
     // MARK: - Settings
     enum Settings {
-        static let title = NSLocalizedString("settings.title", 
-            value: "AudioWhisper Settings", 
+        static let title = NSLocalizedString("settings.title",
+            value: "Typeleast Settings",
             comment: "Settings window title")
     }
     
     // MARK: - Accessibility
     enum Accessibility {
-        static let microphoneIcon = NSLocalizedString("accessibility.microphone_icon", 
-            value: "AudioWhisper", 
+        static let microphoneIcon = NSLocalizedString("accessibility.microphone_icon",
+            value: "Typeleast",
             comment: "Accessibility description for microphone icon")
         
         static let recordingButton = NSLocalizedString("accessibility.recording_button", 

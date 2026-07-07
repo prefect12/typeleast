@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class SourceUsageStoreTests: XCTestCase {
@@ -146,6 +146,17 @@ final class SourceUsageStoreTests: XCTestCase {
         store = SourceUsageStore(defaults: defaults)
         XCTAssertEqual(store.allSources().first?.bundleIdentifier, "com.test.icon")
         XCTAssertNil(store.allSources().first?.iconData)
+    }
+
+    func testRebuildWithNoRecordsKeepsExistingAggregateStats() {
+        let info = makeInfo(bundleId: "com.test.keep", name: "Keep App")
+        store.recordUsage(for: info, words: 25, characters: 100)
+
+        store.rebuild(using: [])
+
+        XCTAssertEqual(store.allSources().count, 1)
+        XCTAssertEqual(store.allSources().first?.bundleIdentifier, "com.test.keep")
+        XCTAssertEqual(store.allSources().first?.totalWords, 25)
     }
 
     private func makeInfo(bundleId: String, name: String, iconByte: UInt8? = nil, fallbackSymbol: String? = nil) -> SourceAppInfo {

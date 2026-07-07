@@ -4,7 +4,7 @@ SCRIPTS := scripts
 
 # Default target
 help:
-	@echo "AudioWhisper Makefile"
+	@echo "Typeleast Makefile"
 	@echo ""
 	@echo "Available targets:"
 	@echo "  build              - Build the release app bundle"
@@ -30,8 +30,8 @@ test:
 # Clean build artifacts
 clean:
 	rm -rf .build
-	rm -rf AudioWhisper.app
-	rm -f AudioWhisper.zip
+	rm -rf Typeleast.app
+	rm -f Typeleast.zip
 	rm -f Sources/AudioProcessorCLI
 
 # Update the Homebrew cask formula with latest GitHub release
@@ -45,12 +45,12 @@ publish-brew-cask: update-brew-cask
 	@VERSION=$$(cat VERSION | tr -d '[:space:]'); \
 	if [ -d "../homebrew-tap" ]; then \
 		cd ../homebrew-tap && \
-		git add Casks/audiowhisper.rb && \
-		git diff --cached --quiet || (git commit -m "Update AudioWhisper to v$$VERSION" && git push); \
+		git add Casks/typeleast.rb && \
+		git diff --cached --quiet || (git commit -m "Update Typeleast to v$$VERSION" && git push); \
 		echo "✅ Published to homebrew-tap"; \
 	else \
 		echo "❌ Error: homebrew-tap repository not found at ../homebrew-tap"; \
-		echo "Please clone it first: git clone https://github.com/mazdak/homebrew-tap.git ../homebrew-tap"; \
+		echo "Please clone it first: git clone https://github.com/prefect12/homebrew-tap.git ../homebrew-tap"; \
 		exit 1; \
 	fi
 
@@ -60,8 +60,8 @@ release:
 	echo "Creating release v$$VERSION..."; \
 	if git diff --quiet && git diff --cached --quiet; then \
 		$(SCRIPTS)/build.sh && \
-		zip -r AudioWhisper.zip AudioWhisper.app && \
-		gh release create "v$$VERSION" AudioWhisper.zip --title "v$$VERSION" --generate-notes && \
+		zip -r Typeleast.zip Typeleast.app && \
+		gh release create "v$$VERSION" Typeleast.zip --title "v$$VERSION" --generate-notes && \
 		echo "✅ Release v$$VERSION created"; \
 	else \
 		echo "❌ Error: Working directory is not clean. Commit or stash changes first."; \

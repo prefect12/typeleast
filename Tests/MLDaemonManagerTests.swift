@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class MLDaemonManagerTests: XCTestCase {
     private let manager = MLDaemonManager.shared

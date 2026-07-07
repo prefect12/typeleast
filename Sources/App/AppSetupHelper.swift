@@ -165,12 +165,8 @@ internal class AppSetupHelper {
     /// Ensure default prompt files exist for advanced customization
     static func ensurePromptFiles() {
         do {
-            let base = try FileManager.default.url(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask,
-                appropriateFor: nil,
-                create: true
-            ).appendingPathComponent("AudioWhisper/prompts", isDirectory: true)
+            let base = try AppIdentity.applicationSupportDirectory()
+                .appendingPathComponent("prompts", isDirectory: true)
             if !FileManager.default.fileExists(atPath: base.path) {
                 try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
             }

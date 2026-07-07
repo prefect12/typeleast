@@ -1,23 +1,30 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class SoundManagerTests: XCTestCase {
     
     private var soundProvider: MockSoundProvider!
     private var soundManager: SoundManager!
+    private var defaults: UserDefaults!
+    private var defaultsSuiteName: String!
     
     override func setUp() {
         super.setUp()
+        defaultsSuiteName = "com.typeleast.tests.sound.\(UUID().uuidString)"
+        defaults = UserDefaults(suiteName: defaultsSuiteName)
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
         soundProvider = MockSoundProvider()
-        soundManager = SoundManager(soundProvider: soundProvider)
-        UserDefaults.standard.removeObject(forKey: "playCompletionSound")
+        soundManager = SoundManager(soundProvider: soundProvider, userDefaults: defaults)
+        defaults.removeObject(forKey: "playCompletionSound")
     }
     
     override func tearDown() {
-        UserDefaults.standard.removeObject(forKey: "playCompletionSound")
+        defaults.removePersistentDomain(forName: defaultsSuiteName)
         soundManager = nil
         soundProvider = nil
+        defaults = nil
+        defaultsSuiteName = nil
         super.tearDown()
     }
     
@@ -29,7 +36,7 @@ final class SoundManagerTests: XCTestCase {
     }
     
     func testPlayCompletionSound_WhenDisabledDoesNotPlay() {
-        UserDefaults.standard.set(false, forKey: "playCompletionSound")
+        defaults.set(false, forKey: "playCompletionSound")
         
         soundManager.playCompletionSound()
         
@@ -38,7 +45,7 @@ final class SoundManagerTests: XCTestCase {
     }
     
     func testPlayCompletionSound_WhenEnabledPlaysOnce() {
-        UserDefaults.standard.set(true, forKey: "playCompletionSound")
+        defaults.set(true, forKey: "playCompletionSound")
         
         soundManager.playCompletionSound()
         
@@ -54,7 +61,7 @@ final class SoundManagerTests: XCTestCase {
     }
     
     func testPlayRecordingStartSound_WhenDisabledDoesNotPlay() {
-        UserDefaults.standard.set(false, forKey: "playCompletionSound")
+        defaults.set(false, forKey: "playCompletionSound")
         
         soundManager.playRecordingStartSound()
         

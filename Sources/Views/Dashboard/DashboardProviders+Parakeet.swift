@@ -158,9 +158,8 @@ internal extension DashboardProvidersView {
     }
 
     private func venvPythonPath() -> String {
-        let appSupport = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
-        let base = appSupport?.appendingPathComponent("AudioWhisper/python_project/.venv/bin/python3").path
-        return base ?? ""
+        guard let appSupport = try? AppIdentity.applicationSupportDirectory() else { return "" }
+        return appSupport.appendingPathComponent("python_project/.venv/bin/python3").path
     }
 
     func verifyParakeetModel() {

@@ -113,7 +113,7 @@ internal final class SourceUsageStore {
     private let defaults: UserDefaults
     private let storageKey = "sourceUsage.stats"
     private let importDevelopmentKey = "sourceUsage.didImportDevelopmentUsage"
-    private let developmentBundleIdentifier = "com.audiowhisper-dev.app"
+    private let developmentBundleIdentifier = AppIdentity.developmentBundleIdentifier
     private static let maxSources = 50
     private static let maxPersistedPayloadBytes = 512 * 1024
     private static let legacyIconDataField = Data(#""iconData""#.utf8)
@@ -177,6 +177,48 @@ internal final class SourceUsageStore {
     
     func allSources() -> [SourceUsageStats] {
         orderedStats
+    }
+
+    func rebuild(using records: [TranscriptionRecord]) {
+        guard !records.isEmpty else { return }
+
+        statsByBundle = [:]
+
+        for record in records {
+            guard let bundleIdentifier = record.sourceAppBundleId, !bundleIdentifier.isEmpty else {
+                continue
+            }
+
+            let words = record.wordCount > 0 ? record.wordCount : UsageMetricsStore.estimatedWordCount(for: record.text)
+            guard words > 0 else { continue }
+
+            let characters = record.characterCount > 0 ? record.characterCount : record.text.count
+            let displayName = record.sourceAppName?.isEmpty == false ? record.sourceAppName! : bundleIdentifier
+            var stat = statsByBundle[bundleIdentifier] ?? SourceUsageStats(
+                bundleIdentifier: bundleIdentifier,
+                displayName: displayName,
+                totalWords: 0,
+                totalCharacters: 0,
+                sessionCount: 0,
+                lastUsed: record.date,
+                iconData: record.sourceAppIconData,
+                fallbackSymbolName: nil
+            )
+
+            stat.displayName = stat.displayName.isEmpty ? displayName : stat.displayName
+            stat.totalWords += words
+            stat.totalCharacters += characters
+            stat.sessionCount += 1
+            stat.lastUsed = max(stat.lastUsed, record.date)
+            if stat.iconData == nil {
+                stat.iconData = record.sourceAppIconData
+            }
+            statsByBundle[bundleIdentifier] = stat
+        }
+
+        trimIfNeeded()
+        refreshOrderedStats()
+        persist()
     }
     
     private func trimIfNeeded() {

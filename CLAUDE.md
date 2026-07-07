@@ -1,6 +1,6 @@
-# AudioWhisper — LLM Assistant Guidelines
+# Typeleast — LLM Assistant Guidelines
 
-This document provides instructions for AI assistants (e.g., ChatGPT, Claude) on how to work effectively with the AudioWhisper codebase. Follow these guidelines when analyzing, proposing changes, or implementing features.
+This document provides instructions for AI assistants (e.g., ChatGPT, Claude) on how to work effectively with the Typeleast codebase. Follow these guidelines when analyzing, proposing changes, or implementing features.
 
 ## 1. Purpose and Scope
 
@@ -13,7 +13,7 @@ This document provides instructions for AI assistants (e.g., ChatGPT, Claude) on
 
 ## 2. Libraries and Frameworks
 
-AudioWhisper relies on:
+Typeleast relies on:
 - **SwiftUI** + **AppKit** for UI and macOS menu bar integration
 - **AVFoundation** for audio recording
 - **Alamofire** for HTTP requests and model downloads
@@ -65,39 +65,39 @@ When extending functionality, prefer these existing dependencies over introducin
 make build
 
 # 2. If make build fails after "Build succeeded", run manually:
-cd /Users/yesh/Documents/personal/reference/AudioWhisper
+cd /Users/kadewu/Documents/github/typeleast
 swift build -c release --arch arm64 --arch x86_64
 
 # Create app bundle manually if needed:
-rm -rf AudioWhisper.app
-mkdir -p AudioWhisper.app/Contents/{MacOS,Resources,Resources/bin}
-cp .build/apple/Products/Release/AudioWhisper AudioWhisper.app/Contents/MacOS/
-chmod +x AudioWhisper.app/Contents/MacOS/AudioWhisper
+rm -rf Typeleast.app
+mkdir -p Typeleast.app/Contents/{MacOS,Resources,Resources/bin}
+cp .build/apple/Products/Release/Typeleast Typeleast.app/Contents/MacOS/
+chmod +x Typeleast.app/Contents/MacOS/Typeleast
 
 # Copy Python scripts and ml/ package
-cp Sources/*.py AudioWhisper.app/Contents/Resources/ 2>/dev/null || true
-cp -R Sources/ml AudioWhisper.app/Contents/Resources/ 2>/dev/null || true
-find AudioWhisper.app/Contents/Resources/ml -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+cp Sources/*.py Typeleast.app/Contents/Resources/ 2>/dev/null || true
+cp -R Sources/ml Typeleast.app/Contents/Resources/ 2>/dev/null || true
+find Typeleast.app/Contents/Resources/ml -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
 # Copy uv binary
-cp "$(command -v uv)" AudioWhisper.app/Contents/Resources/bin/uv 2>/dev/null || true
+cp "$(command -v uv)" Typeleast.app/Contents/Resources/bin/uv 2>/dev/null || true
 
 # Generate Info.plist (see scripts/build.sh for full template)
 # Generate icons
 ./scripts/generate-icons.sh
-iconutil -c icns AudioWhisper.iconset -o AudioWhisper.app/Contents/Resources/AppIcon.icns
+iconutil -c icns Typeleast.iconset -o Typeleast.app/Contents/Resources/AppIcon.icns
 
 # 3. Sign with stable identifier
-codesign --force --deep --sign - --identifier "com.audiowhisper.app" AudioWhisper.app
+codesign --force --deep --sign - --identifier "com.typeleast.app" Typeleast.app
 
 # 4. Deploy
-pkill -x AudioWhisper 2>/dev/null || true
+pkill -x Typeleast 2>/dev/null || true
 sleep 1
-rm -rf /Applications/AudioWhisper.app
-cp -R AudioWhisper.app /Applications/
+rm -rf /Applications/Typeleast.app
+cp -R Typeleast.app /Applications/
 
 # 5. Launch
-open /Applications/AudioWhisper.app
+open /Applications/Typeleast.app
 ```
 
 ### Accessibility Permission (SmartPaste)
@@ -106,17 +106,17 @@ open /Applications/AudioWhisper.app
 
 After deploying a new build, the user must:
 1. Open **System Settings → Privacy & Security → Accessibility**
-2. **Remove** AudioWhisper from the list (select it, click `-`)
-3. **Re-add** it (click `+`, navigate to `/Applications/AudioWhisper.app`)
+2. **Remove** Typeleast from the list (select it, click `-`)
+3. **Re-add** it (click `+`, navigate to `/Applications/Typeleast.app`)
 4. Ensure the toggle is **ON**
 
 Without this, SmartPaste will silently fail (paste won't work).
 
 ### Troubleshooting
 
-- **"Build succeeded" then "Build failed"**: The Swift build works but post-build steps fail. Check if `.build/apple/Products/Release/AudioWhisper` exists and run bundle creation manually.
+- **"Build succeeded" then "Build failed"**: The Swift build works but post-build steps fail. Check if `.build/apple/Products/Release/Typeleast` exists and run bundle creation manually.
 - **SmartPaste broken after deploy**: Re-grant Accessibility permission (see above).
-- **App won't launch**: Check `codesign -dvvv /Applications/AudioWhisper.app` for signing issues.
+- **App won't launch**: Check `codesign -dvvv /Applications/Typeleast.app` for signing issues.
 
 ---
 

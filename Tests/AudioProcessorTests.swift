@@ -1,7 +1,7 @@
 import XCTest
 import AVFoundation
 import AudioToolbox
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class AudioProcessorTests: XCTestCase {
     func testLoadAudioReadsSamplesVerbatimAtSameRate() throws {

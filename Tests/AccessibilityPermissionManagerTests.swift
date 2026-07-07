@@ -7,10 +7,12 @@ final class AccessibilityPermissionManagerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        AccessibilityPermissionRequestCoordinator.shared.resetForTesting()
         LanguageManager.shared.current = .english
     }
 
     override func tearDown() {
+        AccessibilityPermissionRequestCoordinator.shared.resetForTesting()
         LanguageManager.shared.current = .chinese
         super.tearDown()
     }
@@ -108,5 +110,49 @@ final class AccessibilityPermissionManagerTests: XCTestCase {
         }
 
         wait(for: [expectation], timeout: 0.1)
+    }
+
+    func testPermissionRequestCoordinatorCoalescesActiveRequests() {
+        let coordinator = AccessibilityPermissionRequestCoordinator()
+        var results: [Bool] = []
+
+        let first = coordinator.register(permissionGranted: false) { results.append($0) }
+        let second = coordinator.register(permissionGranted: false) { results.append($0) }
+
+        XCTAssertEqual(first, .startRequest)
+        XCTAssertEqual(second, .waitingForActiveRequest)
+        XCTAssertTrue(results.isEmpty)
+
+        coordinator.complete(false)
+
+        XCTAssertEqual(results, [false, false])
+    }
+
+    func testPermissionRequestCoordinatorSuppressesRepeatedDeniedPromptsUntilGranted() {
+        let coordinator = AccessibilityPermissionRequestCoordinator()
+        var results: [Bool] = []
+
+        XCTAssertEqual(
+            coordinator.register(permissionGranted: false) { results.append($0) },
+            .startRequest
+        )
+        coordinator.complete(false)
+
+        XCTAssertEqual(
+            coordinator.register(permissionGranted: false) { results.append($0) },
+            .skippedRecentlyPrompted
+        )
+        XCTAssertEqual(results, [false, false])
+
+        XCTAssertEqual(
+            coordinator.register(permissionGranted: true) { results.append($0) },
+            .alreadyGranted
+        )
+        XCTAssertEqual(results, [false, false, true])
+
+        XCTAssertEqual(
+            coordinator.register(permissionGranted: false) { results.append($0) },
+            .startRequest
+        )
     }
 }

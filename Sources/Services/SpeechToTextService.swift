@@ -78,6 +78,8 @@ internal class SpeechToTextService {
         switch provider {
         case .openai:
             return try await transcribeWithOpenAI(audioURL: audioURL)
+        case .mimo:
+            return try await transcribeWithMiMo(audioURL: audioURL)
         case .gemini:
             return try await transcribeWithGemini(audioURL: audioURL)
         case .local:
@@ -115,6 +117,9 @@ internal class SpeechToTextService {
         case .openai:
             let text = try await transcribeWithOpenAI(audioURL: audioURL)
             return await correctionService.correct(text: text, providerUsed: .openai)
+        case .mimo:
+            let text = try await transcribeWithMiMo(audioURL: audioURL)
+            return await correctionService.correct(text: text, providerUsed: .mimo)
         case .gemini:
             let text = try await transcribeWithGemini(audioURL: audioURL)
             return await correctionService.correct(text: text, providerUsed: .gemini)
@@ -157,12 +162,37 @@ internal class SpeechToTextService {
         return "\(base)/audio/transcriptions"
     }
 
+    /// Returns the MiMo chat-completions endpoint used by the V2.5 ASR OpenAI-compatible API.
+    /// If the custom URL contains "chat/completions", it's treated as a full endpoint.
+    /// Otherwise, "/chat/completions" is appended to the base URL.
+    private var miMoChatCompletionEndpoint: String {
+        let custom = userDefaults.string(forKey: "miMoBaseURL") ?? ""
+        if custom.isEmpty {
+            return "https://api.xiaomimimo.com/v1/chat/completions"
+        }
+        if custom.contains("chat/completions") {
+            return custom
+        }
+        let base = custom.hasSuffix("/") ? String(custom.dropLast()) : custom
+        return "\(base)/chat/completions"
+    }
+
     var resolvedOpenAITranscriptionModel: String {
         let configured = userDefaults
             .string(forKey: AppDefaults.Keys.openAITranscriptionModel)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let configured, !configured.isEmpty else {
             return AppDefaults.defaultOpenAITranscriptionModel
+        }
+        return configured
+    }
+
+    var resolvedMiMoASRModel: String {
+        let configured = userDefaults
+            .string(forKey: AppDefaults.Keys.miMoASRModel)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let configured, !configured.isEmpty else {
+            return AppDefaults.defaultMiMoASRModel
         }
         return configured
     }
@@ -180,7 +210,7 @@ internal class SpeechToTextService {
 
     private func transcribeWithOpenAI(audioURL: URL) async throws -> String {
         // Get API key from keychain
-        guard let apiKey = keychainService.getQuietly(service: "AudioWhisper", account: "OpenAI") else {
+        guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") else {
             throw SpeechToTextError.apiKeyMissing("OpenAI")
         }
 
@@ -225,10 +255,59 @@ internal class SpeechToTextService {
             }
         }
     }
+
+    private func transcribeWithMiMo(audioURL: URL) async throws -> String {
+        guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "MiMo") else {
+            throw SpeechToTextError.apiKeyMissing("MiMo")
+        }
+
+        let fileAttributes = try FileManager.default.attributesOfItem(atPath: audioURL.path)
+        let fileSize = fileAttributes[.size] as? Int64 ?? 0
+        if fileSize > 25 * 1024 * 1024 {
+            throw SpeechToTextError.fileTooLarge
+        }
+
+        let audioData = try Data(contentsOf: audioURL)
+        let dataURI = Self.miMoAudioDataURI(
+            data: audioData,
+            mimeType: Self.mimeType(forAudioURL: audioURL)
+        )
+        let body = MiMoChatCompletionRequest.make(
+            model: resolvedMiMoASRModel,
+            dataURI: dataURI,
+            language: resolvedTranscriptionLanguage
+        )
+        let headers: HTTPHeaders = [
+            "api-key": apiKey,
+            "Content-Type": "application/json"
+        ]
+
+        return try await withCheckedThrowingContinuation { continuation in
+            AF.request(
+                miMoChatCompletionEndpoint,
+                method: .post,
+                parameters: body,
+                encoder: JSONParameterEncoder.default,
+                headers: headers
+            )
+            .responseDecodable(of: MiMoChatCompletionResponse.self) { response in
+                switch response.result {
+                case .success(let miMoResponse):
+                    if let text = miMoResponse.choices.first?.message.content {
+                        continuation.resume(returning: Self.cleanTranscriptionText(text))
+                    } else {
+                        continuation.resume(throwing: SpeechToTextError.transcriptionFailed("No text in response"))
+                    }
+                case .failure(let error):
+                    continuation.resume(throwing: SpeechToTextError.transcriptionFailed(error.localizedDescription))
+                }
+            }
+        }
+    }
     
     private func transcribeWithGemini(audioURL: URL) async throws -> String {
         // Get API key from keychain
-        guard let apiKey = keychainService.getQuietly(service: "AudioWhisper", account: "Gemini") else {
+        guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "Gemini") else {
             throw SpeechToTextError.apiKeyMissing("Gemini")
         }
         
@@ -447,6 +526,31 @@ internal class SpeechToTextService {
         return normalizeTechnicalTerms(cleanedText)
     }
 
+    static func miMoAudioDataURI(data: Data, mimeType: String) -> String {
+        "data:\(mimeType);base64,\(data.base64EncodedString())"
+    }
+
+    static func mimeType(forAudioURL audioURL: URL) -> String {
+        switch audioURL.pathExtension.lowercased() {
+        case "m4a", "mp4":
+            return "audio/mp4"
+        case "mp3":
+            return "audio/mpeg"
+        case "wav":
+            return "audio/wav"
+        case "aac":
+            return "audio/aac"
+        case "caf":
+            return "audio/x-caf"
+        case "flac":
+            return "audio/flac"
+        case "ogg", "oga":
+            return "audio/ogg"
+        default:
+            return "audio/mp4"
+        }
+    }
+
     private static func normalizeTechnicalTerms(_ text: String) -> String {
         var normalizedText = text
         let replacements: [(pattern: String, replacement: String)] = [
@@ -502,4 +606,69 @@ internal struct GeminiFileResponse: Codable {
 internal struct GeminiFile: Codable {
     let uri: String
     let name: String
+}
+
+internal struct MiMoChatCompletionRequest: Codable, Equatable {
+    let model: String
+    let messages: [MiMoMessage]
+    let asrOptions: MiMoASROptions
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case asrOptions = "asr_options"
+    }
+
+    static func make(model: String, dataURI: String, language: TranscriptionLanguage) -> MiMoChatCompletionRequest {
+        MiMoChatCompletionRequest(
+            model: model,
+            messages: [
+                MiMoMessage(
+                    role: "user",
+                    content: [
+                        MiMoContent(
+                            type: "input_audio",
+                            inputAudio: MiMoInputAudio(data: dataURI)
+                        )
+                    ]
+                )
+            ],
+            asrOptions: MiMoASROptions(language: language.mimoASRLanguageCode)
+        )
+    }
+}
+
+internal struct MiMoMessage: Codable, Equatable {
+    let role: String
+    let content: [MiMoContent]
+}
+
+internal struct MiMoContent: Codable, Equatable {
+    let type: String
+    let inputAudio: MiMoInputAudio
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case inputAudio = "input_audio"
+    }
+}
+
+internal struct MiMoInputAudio: Codable, Equatable {
+    let data: String
+}
+
+internal struct MiMoASROptions: Codable, Equatable {
+    let language: String
+}
+
+internal struct MiMoChatCompletionResponse: Codable {
+    let choices: [Choice]
+
+    struct Choice: Codable {
+        let message: Message
+    }
+
+    struct Message: Codable {
+        let content: String
+    }
 }

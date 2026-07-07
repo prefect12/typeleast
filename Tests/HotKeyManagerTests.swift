@@ -1,6 +1,6 @@
 import XCTest
 import HotKey
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class HotKeyManagerTests: XCTestCase {
     

@@ -4,8 +4,8 @@
 cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 1
 
 # Generate app icons from source image
-SOURCE_IMAGE="AudioWhisperIcon.png"
-ICONSET_DIR="AudioWhisper.iconset"
+SOURCE_IMAGE="TypeleastIcon.png"
+ICONSET_DIR="Typeleast.iconset"
 
 if [ ! -f "$SOURCE_IMAGE" ]; then
   echo "Error: $SOURCE_IMAGE not found!"
@@ -40,14 +40,15 @@ sips -z 1024 1024 "$SOURCE_IMAGE" --out "$ICONSET_DIR/icon_512x512@2x.png" --set
 
 # Don't create icns file here - build.sh will handle it
 
+ASSET_ICONSET_DIR="Sources/Assets.xcassets/AppIcon.appiconset"
+
 # Copy to Assets if they exist
-if [ -d "Assets.xcassets/AppIcon.appiconset" ]; then
+if [ -d "$ASSET_ICONSET_DIR" ]; then
   echo "Copying icons to Assets..."
-  cp "$ICONSET_DIR"/*.png Assets.xcassets/AppIcon.appiconset/
+  cp "$ICONSET_DIR"/*.png "$ASSET_ICONSET_DIR/"
 fi
 
 # Don't clean up iconset - build.sh needs it
 # rm -rf "$ICONSET_DIR"
 
 echo "Done!"
-

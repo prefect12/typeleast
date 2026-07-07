@@ -333,7 +333,7 @@ internal extension ContentView {
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 let recordWindow = NSApp.windows.first { window in
-                    window.title == "AudioWhisper Recording"
+                    window.title == AppIdentity.recordingWindowTitle
                 }
                 
                 if let window = recordWindow {

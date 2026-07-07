@@ -24,7 +24,7 @@ internal final class MLXModelManager {
     var downloadProgress: [String: String] = [:]
     var totalCacheSize: Int64 = 0
     
-    private let logger = Logger(subsystem: "com.audiowhisper.app", category: "MLXModelManager")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "MLXModelManager")
     private let cacheDirectory: URL
 
     static var parakeetRepo: String {
@@ -59,9 +59,6 @@ internal final class MLXModelManager {
     private init() {
         self.cacheDirectory = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".cache/huggingface/hub")
-        Task {
-            await refreshModelList()
-        }
     }
     
     func refreshModelList() async {

@@ -1,7 +1,7 @@
 import XCTest
 import Foundation
 import WhisperKit
-@testable import AudioWhisper
+@testable import Typeleast
 
 // MARK: - Thread-Safe Helper
 actor ActorBox<T> {
@@ -96,7 +96,7 @@ class MockModelManager {
     
     var modelsDirectory: URL {
         let appSupport = mockFileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let audioWhisperDir = appSupport.appendingPathComponent("AudioWhisper")
+        let audioWhisperDir = appSupport.appendingPathComponent("Typeleast")
         let modelsDir = audioWhisperDir.appendingPathComponent("Models")
         
         try? mockFileManager.createDirectory(at: modelsDir, withIntermediateDirectories: true, attributes: nil)
@@ -105,7 +105,7 @@ class MockModelManager {
     
     nonisolated func isModelDownloaded(_ model: WhisperModel) -> Bool {
         let appSupport = mockFileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let audioWhisperDir = appSupport.appendingPathComponent("AudioWhisper")
+        let audioWhisperDir = appSupport.appendingPathComponent("Typeleast")
         let modelsDir = audioWhisperDir.appendingPathComponent("Models")
         let modelPath = modelsDir.appendingPathComponent(model.fileName)
         return mockFileManager.fileExists(atPath: modelPath.path)
@@ -113,7 +113,7 @@ class MockModelManager {
     
     nonisolated func getModelPath(_ model: WhisperModel) -> URL? {
         let appSupport = mockFileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let audioWhisperDir = appSupport.appendingPathComponent("AudioWhisper")
+        let audioWhisperDir = appSupport.appendingPathComponent("Typeleast")
         let modelsDir = audioWhisperDir.appendingPathComponent("Models")
         let modelPath = modelsDir.appendingPathComponent(model.fileName)
         return isModelDownloaded(model) ? modelPath : nil
@@ -172,7 +172,7 @@ class MockModelManager {
     
     nonisolated func deleteModel(_ model: WhisperModel) throws {
         let appSupport = mockFileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let audioWhisperDir = appSupport.appendingPathComponent("AudioWhisper")
+        let audioWhisperDir = appSupport.appendingPathComponent("Typeleast")
         let modelsDir = audioWhisperDir.appendingPathComponent("Models")
         let modelPath = modelsDir.appendingPathComponent(model.fileName)
         
@@ -190,7 +190,7 @@ class MockModelManager {
         var totalSize: Int64 = 0
         
         let appSupport = mockFileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let audioWhisperDir = appSupport.appendingPathComponent("AudioWhisper")
+        let audioWhisperDir = appSupport.appendingPathComponent("Typeleast")
         let modelsDir = audioWhisperDir.appendingPathComponent("Models")
         
         for model in downloadedModels {
@@ -236,7 +236,7 @@ class ModelManagerTests: XCTestCase {
         
         // Test that models directory is created
         XCTAssertTrue(mockFileManager.createDirectoryCalled)
-        XCTAssertTrue(mockFileManager.mockDirectories.contains("/tmp/test/ApplicationSupport/AudioWhisper/Models"))
+        XCTAssertTrue(mockFileManager.mockDirectories.contains("/tmp/test/ApplicationSupport/Typeleast/Models"))
     }
     
     // MARK: - Model Download Tests

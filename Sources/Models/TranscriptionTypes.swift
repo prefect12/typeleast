@@ -13,6 +13,7 @@ internal enum WhisperModelError: Error, LocalizedError, Sendable {
 
 internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
     case openai = "openai"
+    case mimo = "mimo"
     case gemini = "gemini" 
     case local = "local"
     case parakeet = "parakeet"
@@ -21,6 +22,8 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
         switch self {
         case .openai:
             return "OpenAI Whisper (Cloud)"
+        case .mimo:
+            return "Xiaomi MiMo V2.5 ASR (Cloud)"
         case .gemini:
             return "Google Gemini (Cloud)"
         case .local:
@@ -71,6 +74,10 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
         default:
             return rawValue
         }
+    }
+
+    var mimoASRLanguageCode: String {
+        apiLanguageCode ?? "auto"
     }
 
     var speechInstruction: String {

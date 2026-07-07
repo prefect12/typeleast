@@ -22,15 +22,17 @@ internal final class LanguageManager: ObservableObject {
 
     private static let key = "appLanguage"
     internal static let defaultLanguage: AppLanguage = .chinese
+    private let defaults: UserDefaults
 
     @Published var current: AppLanguage {
         didSet {
-            UserDefaults.standard.set(current.rawValue, forKey: Self.key)
+            defaults.set(current.rawValue, forKey: Self.key)
         }
     }
 
-    private init() {
-        self.current = Self.initialLanguage()
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        self.current = Self.initialLanguage(defaults: defaults)
     }
 
     internal static func initialLanguage(defaults: UserDefaults = .standard) -> AppLanguage {

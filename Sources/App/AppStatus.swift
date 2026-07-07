@@ -28,6 +28,18 @@ internal enum AppStatus: Equatable {
             return "Microphone access required"
         }
     }
+
+    static func successMessage(smartPasteEnabled: Bool) -> String {
+        smartPasteEnabled ? "Pasting into app..." : "Copied to clipboard"
+    }
+
+    static func successButtonHelp(smartPasteEnabled: Bool) -> String {
+        smartPasteEnabled ? "Paste now" : "Copied to clipboard"
+    }
+
+    static func successIcon(smartPasteEnabled: Bool) -> String {
+        smartPasteEnabled ? "arrow.down.doc.on.clipboard" : "doc.on.clipboard"
+    }
     
     var color: Color {
         switch self {

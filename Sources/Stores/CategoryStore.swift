@@ -17,9 +17,8 @@ internal final class CategoryStore {
         if let storageURL {
             self.storageURL = storageURL
         } else {
-            self.storageURL = try? fileManager
-                .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-                .appendingPathComponent("AudioWhisper/categories.json", isDirectory: false)
+            self.storageURL = try? AppIdentity.applicationSupportDirectory(fileManager: fileManager)
+                .appendingPathComponent("categories.json", isDirectory: false)
         }
 
         let defaults = CategoryDefinition.defaults

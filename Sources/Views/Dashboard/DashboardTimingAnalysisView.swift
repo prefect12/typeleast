@@ -158,6 +158,7 @@ private struct TimingAnalysisSnapshot {
 internal struct DashboardTimingAnalysisView: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var timingStore = TimingAnalysisStore.shared
+    @State private var metricsStore = UsageMetricsStore.shared
     @State private var includeRecording = false
     @State private var recordLimit = 50
     @State private var hoveredRunID: UUID?
@@ -397,11 +398,22 @@ internal struct DashboardTimingAnalysisView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(L10n.Timing.noTimingData)
                 .font(.headline)
-            Text(L10n.Timing.noTimingDataHint)
+            Text(emptyTimingHint)
                 .font(.subheadline)
                 .foregroundStyle(DashboardTheme.inkMuted)
         }
         .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
+    }
+
+    private var emptyTimingHint: String {
+        let snapshot = metricsStore.snapshot
+        guard snapshot.hasUsageData else {
+            return L10n.Timing.noTimingDataHint
+        }
+        return L10n.Timing.aggregateOnlyTimingHint(
+            sessions: snapshot.totalSessions,
+            words: snapshot.totalWords
+        )
     }
 
     private var stageColorScale: KeyValuePairs<String, Color> {

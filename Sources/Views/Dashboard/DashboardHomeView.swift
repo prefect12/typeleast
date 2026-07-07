@@ -1622,6 +1622,7 @@ private extension DashboardHomeView {
     func providerColor(for label: String) -> Color {
         let lowered = label.lowercased()
         if lowered.contains("openai") { return DashboardTheme.providerOpenAI }
+        if lowered.contains("mimo") { return DashboardTheme.providerMiMo }
         if lowered.contains("gemini") { return DashboardTheme.providerGemini }
         if lowered.contains("whisper") || lowered.contains("local") { return DashboardTheme.providerLocal }
         if lowered.contains("parakeet") { return DashboardTheme.providerParakeet }

@@ -6,7 +6,7 @@ internal class ErrorPresenter {
     static let shared = ErrorPresenter()
     
     // Thread-safe properties with proper synchronization
-    private let queue = DispatchQueue(label: "com.audiowhisper.errorpresenter", qos: .userInitiated)
+    private let queue = DispatchQueue(label: "com.typeleast.errorpresenter", qos: .userInitiated)
     private var _isTestEnvironment: Bool = false
     
     // Cached lowercased error patterns for efficient matching
@@ -18,7 +18,7 @@ internal class ErrorPresenter {
     ]
     
     // Logger for security and debugging
-    private let logger = Logger(subsystem: "com.audiowhisper.app", category: "ErrorPresenter")
+    private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "ErrorPresenter")
     
     var isTestEnvironment: Bool {
         get {

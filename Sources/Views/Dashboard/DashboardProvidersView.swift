@@ -8,8 +8,10 @@ internal struct DashboardProvidersView: View {
     @AppStorage(AppDefaults.Keys.hasSetupParakeet) var hasSetupParakeet = false
     @AppStorage(AppDefaults.Keys.hasSetupLocalLLM) var hasSetupLocalLLM = false
     @AppStorage(AppDefaults.Keys.openAITranscriptionModel) var openAITranscriptionModel = AppDefaults.defaultOpenAITranscriptionModel
+    @AppStorage(AppDefaults.Keys.miMoASRModel) var miMoASRModel = AppDefaults.defaultMiMoASRModel
     @AppStorage(AppDefaults.Keys.transcriptionLanguage) var transcriptionLanguage = AppDefaults.defaultTranscriptionLanguage
     @AppStorage("openAIBaseURL") var openAIBaseURL = ""
+    @AppStorage("miMoBaseURL") var miMoBaseURL = ""
     @AppStorage("geminiBaseURL") var geminiBaseURL = ""
     @AppStorage(AppDefaults.Keys.maxModelStorageGB) var maxModelStorageGB = 5.0
     
@@ -19,8 +21,10 @@ internal struct DashboardProvidersView: View {
 
     // UI state
     @State var openAIKey = ""
+    @State var miMoKey = ""
     @State var geminiKey = ""
     @State var showOpenAIKey = false
+    @State var showMiMoKey = false
     @State var showGeminiKey = false
     @State var showAdvancedAPISettings = false
     @State var downloadError: String?
@@ -68,7 +72,7 @@ internal struct DashboardProvidersView: View {
                 Text(L10n.Provider.audioLanguageFooter)
             }
 
-            if transcriptionProvider == .openai || transcriptionProvider == .gemini {
+            if transcriptionProvider == .openai || transcriptionProvider == .mimo || transcriptionProvider == .gemini {
                 Section("API Credentials") {
                     credentialsSection
                 }
@@ -245,7 +249,7 @@ internal struct DashboardProvidersView: View {
     }
     
     private var correctionCloudInfo: some View {
-        Label("Uses your selected cloud provider for post-processing.", systemImage: "cloud")
+        Label("Cloud correction runs with OpenAI or Gemini; MiMo ASR returns transcription only.", systemImage: "cloud")
             .foregroundStyle(.secondary)
             .font(.callout)
     }
@@ -318,6 +322,8 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return EngineConfig(tagline: "Industry-leading accuracy via cloud")
+        case .mimo:
+            return EngineConfig(tagline: "MiMo V2.5 speech recognition via Xiaomi Cloud")
         case .gemini:
             return EngineConfig(tagline: "Google's multimodal intelligence")
         case .local:
@@ -337,6 +343,8 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return openAIKey.isEmpty ? ("Setup", false) : ("Ready", true)
+        case .mimo:
+            return miMoKey.isEmpty ? ("Setup", false) : ("Ready", true)
         case .gemini:
             return geminiKey.isEmpty ? ("Setup", false) : ("Ready", true)
         case .local:
@@ -351,6 +359,8 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return "cloud"
+        case .mimo:
+            return "waveform"
         case .gemini:
             return "sparkles"
         case .local:
@@ -372,10 +382,24 @@ internal struct DashboardProvidersView: View {
                     isShowing: $showOpenAIKey,
                     placeholder: "sk-..."
                 ) {
-                    saveAPIKey(openAIKey, service: "AudioWhisper", account: "OpenAI")
+                    saveAPIKey(openAIKey, service: AppIdentity.keychainService, account: "OpenAI")
                 }
 
                 openAIModelField
+            }
+
+            if transcriptionProvider == .mimo {
+                apiKeyField(
+                    provider: "Xiaomi MiMo",
+                    hint: "Get your key at xiaomimimo.com",
+                    key: $miMoKey,
+                    isShowing: $showMiMoKey,
+                    placeholder: "MiMo API key"
+                ) {
+                    saveAPIKey(miMoKey, service: AppIdentity.keychainService, account: "MiMo")
+                }
+
+                miMoModelField
             }
 
             if transcriptionProvider == .gemini {
@@ -386,7 +410,7 @@ internal struct DashboardProvidersView: View {
                     isShowing: $showGeminiKey,
                     placeholder: "AIza..."
                 ) {
-                    saveAPIKey(geminiKey, service: "AudioWhisper", account: "Gemini")
+                    saveAPIKey(geminiKey, service: AppIdentity.keychainService, account: "Gemini")
                 }
             }
 
@@ -469,6 +493,13 @@ internal struct DashboardProvidersView: View {
                     .frame(maxWidth: 320)
             }
 
+            LabeledContent("MiMo") {
+                TextField("https://api.xiaomimimo.com/v1", text: $miMoBaseURL)
+                    .textFieldStyle(.roundedBorder)
+                    .font(DashboardTheme.Fonts.mono(12, weight: .regular))
+                    .frame(maxWidth: 320)
+            }
+
             LabeledContent("Gemini") {
                 TextField("https://generativelanguage.googleapis.com", text: $geminiBaseURL)
                     .textFieldStyle(.roundedBorder)
@@ -488,6 +519,18 @@ internal struct DashboardProvidersView: View {
         .padding(.horizontal, DashboardTheme.Spacing.lg)
         .padding(.bottom, DashboardTheme.Spacing.md)
         .help("Default: \(AppDefaults.defaultOpenAITranscriptionModel). Use a deployment/model name supported by your endpoint.")
+    }
+
+    private var miMoModelField: some View {
+        LabeledContent("ASR Model") {
+            TextField(AppDefaults.defaultMiMoASRModel, text: $miMoASRModel)
+                .textFieldStyle(.roundedBorder)
+                .font(DashboardTheme.Fonts.mono(12, weight: .regular))
+                .frame(maxWidth: 260)
+        }
+        .padding(.horizontal, DashboardTheme.Spacing.lg)
+        .padding(.bottom, DashboardTheme.Spacing.md)
+        .help("Default: \(AppDefaults.defaultMiMoASRModel). Use a MiMo ASR model supported by your endpoint.")
     }
     
 }

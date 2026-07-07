@@ -1,6 +1,6 @@
 import XCTest
 import SwiftUI
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class AppStatusTests: XCTestCase {
     
@@ -107,6 +107,15 @@ final class AppStatusTests: XCTestCase {
         )
         
         XCTAssertEqual(viewModel.currentStatus, .success)
+    }
+
+    func testSuccessStatusCopyAndPasteMessages() {
+        XCTAssertEqual(AppStatus.successMessage(smartPasteEnabled: false), "Copied to clipboard")
+        XCTAssertEqual(AppStatus.successMessage(smartPasteEnabled: true), "Pasting into app...")
+        XCTAssertEqual(AppStatus.successButtonHelp(smartPasteEnabled: false), "Copied to clipboard")
+        XCTAssertEqual(AppStatus.successButtonHelp(smartPasteEnabled: true), "Paste now")
+        XCTAssertEqual(AppStatus.successIcon(smartPasteEnabled: false), "doc.on.clipboard")
+        XCTAssertEqual(AppStatus.successIcon(smartPasteEnabled: true), "arrow.down.doc.on.clipboard")
     }
     
     func testStatusViewModelUpdateWithRecording() {

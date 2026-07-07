@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class PermissionManagerTests: XCTestCase {
@@ -10,7 +10,7 @@ final class PermissionManagerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        defaultsSuiteName = "com.audiowhisper.tests.permission.\(UUID().uuidString)"
+        defaultsSuiteName = "com.typeleast.tests.permission.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: defaultsSuiteName)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
         permissionManager = PermissionManager(userDefaults: defaults)

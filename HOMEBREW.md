@@ -1,6 +1,6 @@
-# AudioWhisper Homebrew Tap Setup Guide
+# Typeleast Homebrew Tap Setup Guide
 
-This guide explains how to maintain and use the AudioWhisper Homebrew tap.
+This guide explains how to maintain and use the Typeleast Homebrew tap.
 
 ## For Users
 
@@ -8,67 +8,67 @@ This guide explains how to maintain and use the AudioWhisper Homebrew tap.
 
 ```bash
 # Add the tap
-brew tap mazdak/tap
+brew tap prefect12/tap
 
-# Install AudioWhisper
-brew install audiowhisper
+# Install Typeleast
+brew install typeleast
 
 # Launch the app
-open -a AudioWhisper
+open -a Typeleast
 ```
 
 ### Updating
 
 ```bash
-# Update Homebrew and upgrade AudioWhisper
+# Update Homebrew and upgrade Typeleast
 brew update
-brew upgrade audiowhisper
+brew upgrade typeleast
 ```
 
 ### Uninstallation
 
 ```bash
 # Uninstall the app
-brew uninstall audiowhisper
+brew uninstall typeleast
 
 # Remove the tap (optional)
-brew untap mazdak/tap
+brew untap prefect12/tap
 ```
 
 ## For Maintainers
 
 ### Repository Structure
 
-The tap repository at `mazdak/homebrew-tap` is organized as:
+The tap repository at `prefect12/homebrew-tap` is organized as:
 
 ```
 homebrew-tap/
 ├── Formula/          # CLI tools (e.g., lazyredis)
 │   └── lazyredis.rb
 └── Casks/           # GUI applications
-    └── audiowhisper.rb
+    └── typeleast.rb
 ```
 
 This single tap hosts all of your Homebrew packages (both CLI formulas and GUI casks).
 
 ### Updating the Cask Formula
 
-Whenever you release a new version of AudioWhisper:
+Whenever you release a new version of Typeleast:
 
-1. **Create a GitHub Release** with `AudioWhisper.zip` as an asset
+1. **Create a GitHub Release** with `Typeleast.zip` as an asset
    - Tag the release (e.g., `v1.5.0`)
-   - Include `AudioWhisper.zip` as a release asset
+   - Include `Typeleast.zip` as a release asset
 
 2. **Run the publish command**:
    ```bash
-   cd /path/to/AudioWhisper
+   cd /path/to/typeleast
    make publish-brew-cask
    ```
 
    This will:
    - Fetch the latest release from GitHub
    - Download the zip and calculate SHA256
-   - Update the cask in `../homebrew-tap/Casks/audiowhisper.rb`
+   - Update the cask in `../homebrew-tap/Casks/typeleast.rb`
    - Commit and push to the tap repository
 
 ### Manual Update (Alternative)
@@ -77,24 +77,24 @@ If you prefer to update manually:
 
 ```bash
 # Download the latest release
-RELEASE_URL="https://github.com/mazdak/AudioWhisper/releases/download/v1.5.0/AudioWhisper.zip"
-curl -L -o AudioWhisper.zip "$RELEASE_URL"
+RELEASE_URL="https://github.com/prefect12/typeleast/releases/download/v1.5.0/Typeleast.zip"
+curl -L -o Typeleast.zip "$RELEASE_URL"
 
 # Calculate SHA256
-shasum -a 256 AudioWhisper.zip
+shasum -a 256 Typeleast.zip
 
-# Edit ../homebrew-tap/Casks/audiowhisper.rb with:
+# Edit ../homebrew-tap/Casks/typeleast.rb with:
 # - New version number
 # - New SHA256 hash
 
 # Commit and push
 cd ../homebrew-tap
-git add Casks/audiowhisper.rb
-git commit -m "Update AudioWhisper to v1.5.0"
+git add Casks/typeleast.rb
+git commit -m "Update Typeleast to v1.5.0"
 git push
 
 # Clean up
-rm AudioWhisper.zip
+rm Typeleast.zip
 ```
 
 ### Testing the Cask
@@ -103,18 +103,18 @@ Before pushing updates, test the cask locally:
 
 ```bash
 # Test installation from tap repo
-brew install --cask --force ../homebrew-tap/Casks/audiowhisper.rb
+brew install --cask --force ../homebrew-tap/Casks/typeleast.rb
 
 # Verify it works
-open -a AudioWhisper
+open -a Typeleast
 
 # Uninstall test
-brew uninstall audiowhisper
+brew uninstall typeleast
 ```
 
 ### Makefile Targets
 
-The AudioWhisper repo includes these Makefile targets:
+The Typeleast repo includes these Makefile targets:
 
 ```bash
 make update-brew-cask   # Update the cask formula (doesn't push)
@@ -138,7 +138,7 @@ make release            # Create a new GitHub release
 - **homebrew-tap repository**: Must be cloned as a sibling directory
   ```bash
   cd /path/to/Code
-  git clone https://github.com/mazdak/homebrew-tap.git
+  git clone https://github.com/prefect12/homebrew-tap.git
   ```
 
 ## Troubleshooting
@@ -155,7 +155,7 @@ If users see checksum errors:
 
 Users need to tap the repository first:
 ```bash
-brew tap mazdak/tap
+brew tap prefect12/tap
 ```
 
 ### "homebrew-tap repository not found"
@@ -163,7 +163,7 @@ brew tap mazdak/tap
 Clone the tap repository as a sibling directory:
 ```bash
 cd ..
-git clone https://github.com/mazdak/homebrew-tap.git
+git clone https://github.com/prefect12/homebrew-tap.git
 ```
 
 ## Best Practices

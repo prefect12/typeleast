@@ -160,7 +160,7 @@ internal extension AppDelegate {
 
         var isRedState = true
 
-        let queue = DispatchQueue(label: "com.audiowhisper.animation", qos: .background)
+        let queue = DispatchQueue(label: "com.typeleast.animation", qos: .background)
         let timer = DispatchSource.makeTimerSource(queue: queue)
 
         timer.schedule(deadline: .now(), repeating: 0.5)

@@ -2,7 +2,7 @@ import XCTest
 import SwiftUI
 import AppKit
 import CoreGraphics
-@testable import AudioWhisper
+@testable import Typeleast
 
 /// Lightweight snapshot helper built on XCTest + ImageRenderer.
 @MainActor

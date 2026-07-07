@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 
 @main
-internal struct AudioWhisperApp: App {
+internal struct TypeleastApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {

@@ -53,7 +53,7 @@ internal struct WelcomeView: View {
                 .foregroundStyle(Color.accentColor)
                 .symbolRenderingMode(.hierarchical)
             
-            Text("Welcome to AudioWhisper")
+            Text("Welcome to Typeleast")
                 .font(.largeTitle)
                 .fontWeight(.semibold)
             
@@ -75,7 +75,7 @@ internal struct WelcomeView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Privacy-First Local Transcription")
                         .font(.headline)
-                    Text("AudioWhisper uses Apple's Neural Engine to transcribe audio locally on your Mac. Your audio never leaves your device.")
+                    Text("Typeleast uses Apple's Neural Engine to transcribe audio locally on your Mac. Your audio never leaves your device.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -183,7 +183,7 @@ internal struct WelcomeView: View {
     private var setupOptions: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label {
-                Text("AudioWhisper will use local AI transcription by default. No API keys or internet connection required!")
+                Text("Typeleast will use local AI transcription by default. No API keys or internet connection required!")
                     .font(.callout)
             } icon: {
                 Image(systemName: "checkmark.circle.fill")
@@ -207,7 +207,7 @@ internal struct WelcomeView: View {
                 .font(.headline)
                 .foregroundStyle(.green)
             
-            Text("AudioWhisper can automatically paste transcribed text using CGEvent-based automation:")
+            Text("Typeleast can automatically paste transcribed text using CGEvent-based automation:")
                 .font(.callout)
             
             VStack(alignment: .leading, spacing: 8) {

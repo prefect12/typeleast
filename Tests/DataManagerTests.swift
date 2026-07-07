@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class DataManagerTests: XCTestCase {
@@ -214,12 +214,33 @@ final class DataManagerTests: XCTestCase {
     }
     
     func testCleanupExpiredRecordsWithTimeBasedRetention() async throws {
+        UsageMetricsStore.shared.reset()
+        SourceUsageStore.shared.resetForTesting()
+        defer {
+            UsageMetricsStore.shared.reset()
+            SourceUsageStore.shared.resetForTesting()
+        }
+
         dataManager.retentionPeriod = .oneWeek
         dataManager.isHistoryEnabled = true
         
         // Create records with different dates
-        let recentRecord = TranscriptionRecord(text: "Recent", provider: .openai)
-        let oldRecord = TranscriptionRecord(text: "Old", provider: .gemini)
+        let recentRecord = TranscriptionRecord(
+            text: "Recent record",
+            provider: .openai,
+            wordCount: 2,
+            characterCount: 13,
+            sourceAppBundleId: "com.example.editor",
+            sourceAppName: "Editor"
+        )
+        let oldRecord = TranscriptionRecord(
+            text: "Old stale record",
+            provider: .gemini,
+            wordCount: 3,
+            characterCount: 16,
+            sourceAppBundleId: "com.example.browser",
+            sourceAppName: "Browser"
+        )
         
         // Manually set an old date for testing
         let oneMonthAgo = Date().addingTimeInterval(-30 * 24 * 60 * 60)
@@ -227,6 +248,18 @@ final class DataManagerTests: XCTestCase {
         
         try await dataManager.saveTranscription(recentRecord)
         try await dataManager.saveTranscription(oldRecord)
+        UsageMetricsStore.shared.recordSession(duration: nil, wordCount: 2, characterCount: 13)
+        UsageMetricsStore.shared.recordSession(duration: nil, wordCount: 3, characterCount: 16)
+        SourceUsageStore.shared.recordUsage(
+            for: SourceAppInfo(bundleIdentifier: "com.example.editor", displayName: "Editor", iconData: nil, fallbackSymbolName: nil),
+            words: 2,
+            characters: 13
+        )
+        SourceUsageStore.shared.recordUsage(
+            for: SourceAppInfo(bundleIdentifier: "com.example.browser", displayName: "Browser", iconData: nil, fallbackSymbolName: nil),
+            words: 3,
+            characters: 16
+        )
         
         var records = try await dataManager.fetchAllRecords()
         XCTAssertEqual(records.count, 2)
@@ -236,7 +269,11 @@ final class DataManagerTests: XCTestCase {
         
         records = try await dataManager.fetchAllRecords()
         XCTAssertEqual(records.count, 1)
-        XCTAssertEqual(records.first?.text, "Recent")
+        XCTAssertEqual(records.first?.text, "Recent record")
+        XCTAssertEqual(UsageMetricsStore.shared.snapshot.totalSessions, 1)
+        XCTAssertEqual(UsageMetricsStore.shared.snapshot.totalWords, 2)
+        XCTAssertEqual(UsageMetricsStore.shared.snapshot.totalCharacters, 13)
+        XCTAssertEqual(SourceUsageStore.shared.allSources().map(\.bundleIdentifier), ["com.example.editor"])
     }
     
     func testCleanupExpiredRecordsQuietly() async {

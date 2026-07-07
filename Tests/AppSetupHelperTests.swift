@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class AppSetupHelperTests: XCTestCase {
     private var suiteName: String!
@@ -7,7 +7,7 @@ final class AppSetupHelperTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "com.audiowhisper.tests.appsetup.\(UUID().uuidString)"
+        suiteName = "com.typeleast.tests.appsetup.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         defaults.removePersistentDomain(forName: suiteName)
     }

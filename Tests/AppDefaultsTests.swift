@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class AppDefaultsTests: XCTestCase {
     private var defaultsSuiteName: String!
@@ -8,7 +8,7 @@ final class AppDefaultsTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        defaultsSuiteName = "com.audiowhisper.tests.appdefaults.\(UUID().uuidString)"
+        defaultsSuiteName = "com.typeleast.tests.appdefaults.\(UUID().uuidString)"
         productionDomainName = "\(defaultsSuiteName!).production"
         defaults = UserDefaults(suiteName: defaultsSuiteName)
         defaults.removePersistentDomain(forName: defaultsSuiteName)
@@ -29,7 +29,7 @@ final class AppDefaultsTests: XCTestCase {
         defaults.set(RetentionPeriod.threeMonths.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod, inDomain: productionDomainName)
 
         AppDefaults.migrateHistoryPreferencesIfNeeded(
-            currentBundleIdentifier: "com.audiowhisper-dev.app",
+            currentBundleIdentifier: "com.typeleast-dev.app",
             userDefaults: defaults,
             sourceBundleIdentifier: productionDomainName
         )
@@ -45,7 +45,7 @@ final class AppDefaultsTests: XCTestCase {
         defaults.set(RetentionPeriod.oneWeek.rawValue, forKey: AppDefaults.Keys.transcriptionRetentionPeriod, inDomain: productionDomainName)
 
         AppDefaults.migrateHistoryPreferencesIfNeeded(
-            currentBundleIdentifier: "com.audiowhisper-dev.app",
+            currentBundleIdentifier: "com.typeleast-dev.app",
             userDefaults: defaults,
             sourceBundleIdentifier: productionDomainName
         )

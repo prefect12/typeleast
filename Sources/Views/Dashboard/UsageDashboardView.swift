@@ -139,7 +139,7 @@ internal struct UsageDashboardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("You have saved \(formatDuration(snapshot.estimatedTimeSaved)) with AudioWhisper")
+                    Text("You have saved \(formatDuration(snapshot.estimatedTimeSaved)) with Typeleast")
                         .font(.headline)
                         .foregroundStyle(.white)
 

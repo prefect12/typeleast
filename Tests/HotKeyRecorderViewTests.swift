@@ -1,7 +1,7 @@
 import AppKit
 import HotKey
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class HotKeyRecorderViewTests: XCTestCase {
     override func tearDown() {

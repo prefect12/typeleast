@@ -1,7 +1,7 @@
 import XCTest
 import SwiftUI
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class TranscriptionHistoryViewTests: XCTestCase {
@@ -106,7 +106,7 @@ final class TranscriptionHistoryViewTests: XCTestCase {
     
     func testProviderBadgeColors() {
         // Test that different providers get different colors
-        let providers: [TranscriptionProvider] = [.openai, .gemini, .local, .parakeet]
+        let providers: [TranscriptionProvider] = [.openai, .mimo, .gemini, .local, .parakeet]
         
         for provider in providers {
             let record = createSampleRecord(provider: provider)
@@ -281,7 +281,7 @@ final class TranscriptionHistoryViewTests: XCTestCase {
     
     func testTranscriptionProviderFromRecord() {
         // Test that records correctly return their provider enum
-        let providers: [TranscriptionProvider] = [.openai, .gemini, .local, .parakeet]
+        let providers: [TranscriptionProvider] = [.openai, .mimo, .gemini, .local, .parakeet]
         
         for provider in providers {
             let record = createSampleRecord(provider: provider)

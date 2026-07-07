@@ -1,5 +1,5 @@
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class AppCategoryManagerTests: XCTestCase {
@@ -10,7 +10,7 @@ final class AppCategoryManagerTests: XCTestCase {
     private var suiteName: String!
 
     override func setUp() async throws {
-        suiteName = "com.audiowhisper.tests.categories.\(UUID().uuidString)"
+        suiteName = "com.typeleast.tests.categories.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)
         defaults.removePersistentDomain(forName: suiteName)
 

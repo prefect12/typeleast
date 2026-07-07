@@ -36,6 +36,7 @@ internal enum DashboardTheme {
 
     // Provider colors (system-leaning)
     static let providerOpenAI = Color(nsColor: .systemBlue)
+    static let providerMiMo = Color(nsColor: .systemCyan)
     static let providerGemini = Color(nsColor: .systemIndigo)
     static let providerLocal = Color(nsColor: .systemTeal)
     static let providerParakeet = Color(nsColor: .systemGreen)
@@ -177,6 +178,8 @@ internal struct DashboardView: View {
         .id(languageManager.current)
         .task {
             await metricsStore.bootstrapIfNeeded()
+            let records = await DataManager.shared.fetchAllRecordsQuietly()
+            SourceUsageStore.shared.rebuild(using: records)
         }
     }
 
@@ -251,7 +254,7 @@ private struct DashboardSidebar: View {
 
     private var brandHeader: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("AudioWhisper")
+            Text("Typeleast")
                 .font(.system(size: 28, weight: .bold, design: .serif))
                 .foregroundStyle(DashboardTheme.sidebarText)
                 .lineLimit(1)

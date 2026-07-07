@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import AudioWhisper
+@testable import Typeleast
 
 final class UvBootstrapTests: XCTestCase {
     private var originalHome: String?
@@ -14,7 +14,7 @@ final class UvBootstrapTests: XCTestCase {
         try super.setUpWithError()
         originalHome = ProcessInfo.processInfo.environment["HOME"]
         originalPath = ProcessInfo.processInfo.environment["PATH"]
-        originalAppSupportOverride = ProcessInfo.processInfo.environment["AUDIOWHISPER_APP_SUPPORT_DIR"]
+        originalAppSupportOverride = ProcessInfo.processInfo.environment["TYPELEAST_APP_SUPPORT_DIR"]
 
         let tempRoot = FileManager.default.temporaryDirectory.appendingPathComponent("UvBootstrapTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
@@ -25,7 +25,7 @@ final class UvBootstrapTests: XCTestCase {
         try FileManager.default.createDirectory(at: tempBin, withIntermediateDirectories: true)
 
         setenv("HOME", tempHome.path, 1)
-        setenv("AUDIOWHISPER_APP_SUPPORT_DIR", tempAppSupport.path, 1)
+        setenv("TYPELEAST_APP_SUPPORT_DIR", tempAppSupport.path, 1)
         // Keep /usr/bin last so tools like /usr/bin/env remain reachable while excluding any real uv in default paths.
         setenv("PATH", "\(tempBin.path):/usr/bin", 1)
     }
@@ -38,9 +38,9 @@ final class UvBootstrapTests: XCTestCase {
             setenv("PATH", originalPath, 1)
         }
         if let originalAppSupportOverride {
-            setenv("AUDIOWHISPER_APP_SUPPORT_DIR", originalAppSupportOverride, 1)
+            setenv("TYPELEAST_APP_SUPPORT_DIR", originalAppSupportOverride, 1)
         } else {
-            unsetenv("AUDIOWHISPER_APP_SUPPORT_DIR")
+            unsetenv("TYPELEAST_APP_SUPPORT_DIR")
         }
         if let tempHome {
             try? FileManager.default.removeItem(at: tempHome)
@@ -63,8 +63,8 @@ final class UvBootstrapTests: XCTestCase {
     }
 
     func testFindUvFallsBackToUserToolsDirectory() throws {
-        // No uv on PATH; add one under Application Support/AudioWhisper/bin/uv
-        let toolsDir = tempAppSupport.appendingPathComponent("AudioWhisper/bin", isDirectory: true)
+        // No uv on PATH; add one under Application Support/Typeleast/bin/uv
+        let toolsDir = tempAppSupport.appendingPathComponent("Typeleast/bin", isDirectory: true)
         try FileManager.default.createDirectory(at: toolsDir, withIntermediateDirectories: true)
 
         let uvURL = toolsDir.appendingPathComponent("uv")
@@ -72,6 +72,20 @@ final class UvBootstrapTests: XCTestCase {
 
         let found = try UvBootstrap.findUv()
         XCTAssertEqual(found, uvURL)
+    }
+
+    func testEnsureVenvReusesLegacyAudioWhisperRuntimeWhenTypeleastRuntimeIsMissing() throws {
+        let legacyBin = tempAppSupport.appendingPathComponent("AudioWhisper/python_project/.venv/bin", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacyBin, withIntermediateDirectories: true)
+        let legacyPython = legacyBin.appendingPathComponent("python3")
+        try writeExecutable("#!/bin/bash\necho legacy-python\n", to: legacyPython)
+
+        var logMessages: [String] = []
+        let pythonURL = try UvBootstrap.ensureVenv(userPython: nil) { logMessages.append($0) }
+
+        XCTAssertEqual(pythonURL, legacyPython)
+        XCTAssertEqual(logMessages, ["Using existing AudioWhisper Python runtime…"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tempAppSupport.appendingPathComponent("Typeleast/python_project/.venv").path))
     }
 
     func testEnsureVenvCreatesAndSyncsWithDefaultPython() throws {

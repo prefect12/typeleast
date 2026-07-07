@@ -1,7 +1,7 @@
 import XCTest
 import SwiftUI
 import SwiftData
-@testable import AudioWhisper
+@testable import Typeleast
 
 @MainActor
 final class UISnapshotTests: SnapshotTestCase {

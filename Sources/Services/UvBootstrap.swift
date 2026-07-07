@@ -30,8 +30,7 @@ internal struct UvBootstrap {
     // Where we keep the app-managed project (contains pyproject + .venv)
     static func projectDir() throws -> URL {
         let fm = FileManager.default
-        let appSupportBase = try applicationSupportBaseDirectory()
-        let appSupport = appSupportBase.appendingPathComponent("AudioWhisper", isDirectory: true)
+        let appSupport = try AppIdentity.applicationSupportDirectory()
         if !fm.fileExists(atPath: appSupport.path) {
             try fm.createDirectory(at: appSupport, withIntermediateDirectories: true)
         }
@@ -64,8 +63,7 @@ internal struct UvBootstrap {
             }
         }
         // Per-user tools dir
-        if let toolsURL = try? applicationSupportBaseDirectory()
-            .appendingPathComponent("AudioWhisper/bin", isDirectory: true) {
+        for toolsURL in userToolsDirectories() {
             let url = toolsURL.appendingPathComponent("uv")
             if FileManager.default.isExecutableFile(atPath: url.path) {
                 if let ver = try? uvVersion(at: url) {
@@ -81,12 +79,25 @@ internal struct UvBootstrap {
     // Ensure project exists and dependencies are synced with uv. Returns path to project .venv python.
     // If userPython is nil, we let uv provision or use its managed interpreter (via --python 3.x)
     static func ensureVenv(userPython: String? = nil, log: ((String)->Void)? = nil) throws -> URL {
-        let uv = try findUv()
         let proj = try projectDir()
-
         let fm = FileManager.default
         // Copy pyproject.toml and uv.lock from bundle to project dir (if present / newer)
         try copyProjectFilesIfNeeded(to: proj)
+
+        if let projectPython = projectPython(in: proj, fileManager: fm) {
+            let uv = try findUv()
+            log?("Syncing project dependencies via uv sync…")
+            let (out, err, status) = runInDir(uv.path, ["sync"], cwd: proj)
+            if status != 0 { throw UvError.syncFailed(err.isEmpty ? out : err) }
+            return projectPython
+        }
+
+        if let legacyPython = legacyRuntimePython(fileManager: fm) {
+            log?("Using existing AudioWhisper Python runtime…")
+            return legacyPython
+        }
+
+        let uv = try findUv()
 
         // Ensure .venv exists using specified Python (or default)
         let venvDir = proj.appendingPathComponent(".venv", isDirectory: true)
@@ -103,12 +114,9 @@ internal struct UvBootstrap {
         let (out, err, status) = runInDir(uv.path, ["sync"], cwd: proj)
         if status != 0 { throw UvError.syncFailed(err.isEmpty ? out : err) }
 
-        // Return the project venv python
-        let candidates = [
-            proj.appendingPathComponent(".venv/bin/python3").path,
-            proj.appendingPathComponent(".venv/bin/python").path
-        ]
-        for c in candidates { if fm.isExecutableFile(atPath: c) { return URL(fileURLWithPath: c) } }
+        if let projectPython = projectPython(in: proj, fileManager: fm) {
+            return projectPython
+        }
         throw UvError.pythonNotUsable("project venv python not found")
     }
 
@@ -136,15 +144,7 @@ internal struct UvBootstrap {
 
     // Allow tests to override the base Application Support directory via env var
     private static func applicationSupportBaseDirectory() throws -> URL {
-        let fm = FileManager.default
-        if let override = ProcessInfo.processInfo.environment["AUDIOWHISPER_APP_SUPPORT_DIR"], !override.isEmpty {
-            let url = URL(fileURLWithPath: override, isDirectory: true)
-            if !fm.fileExists(atPath: url.path) {
-                try fm.createDirectory(at: url, withIntermediateDirectories: true)
-            }
-            return url
-        }
-        return try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+        try AppIdentity.applicationSupportBaseDirectory()
     }
 
     private static func uvVersion(at url: URL) throws -> String {
@@ -215,5 +215,33 @@ internal struct UvBootstrap {
             try fm.removeItem(at: dst)
         }
         try fm.copyItem(at: src, to: dst)
+    }
+
+    private static func userToolsDirectories() -> [URL] {
+        guard let base = try? applicationSupportBaseDirectory() else { return [] }
+        return [
+            base.appendingPathComponent("\(AppIdentity.appSupportDirectoryName)/bin", isDirectory: true),
+            base.appendingPathComponent("\(AppIdentity.legacyAppSupportDirectoryName)/bin", isDirectory: true)
+        ]
+    }
+
+    private static func projectPython(in project: URL, fileManager: FileManager) -> URL? {
+        let candidates = [
+            project.appendingPathComponent(".venv/bin/python3"),
+            project.appendingPathComponent(".venv/bin/python")
+        ]
+        return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
+    }
+
+    private static func legacyRuntimePython(fileManager: FileManager) -> URL? {
+        guard let base = try? applicationSupportBaseDirectory() else { return nil }
+        let legacySupport = base.appendingPathComponent(AppIdentity.legacyAppSupportDirectoryName, isDirectory: true)
+        let candidates = [
+            legacySupport.appendingPathComponent("python_project/.venv/bin/python3"),
+            legacySupport.appendingPathComponent("python_project/.venv/bin/python"),
+            legacySupport.appendingPathComponent("venv/bin/python3"),
+            legacySupport.appendingPathComponent("venv/bin/python")
+        ]
+        return candidates.first { fileManager.isExecutableFile(atPath: $0.path) }
     }
 }
