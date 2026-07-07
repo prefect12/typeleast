@@ -1,5 +1,5 @@
 import XCTest
-@testable import Typeleast
+@testable import AudioWhisper
 
 final class ActivityCalendarLayoutTests: XCTestCase {
     func testCurrentWeekOmitsFutureDates() throws {
