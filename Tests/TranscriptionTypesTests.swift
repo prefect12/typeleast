@@ -82,6 +82,24 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertTrue(TranscriptionLanguage.chinese.speechInstruction.contains("Transcribe in Chinese"))
         XCTAssertTrue(TranscriptionLanguage.english.speechInstruction.contains("Transcribe in English"))
     }
+
+    func testAutomaticStreamingLocalePrefersChinesePreferredLanguage() {
+        let locale = TranscriptionLanguage.automaticStreamingRecognitionLocale(
+            preferredLanguages: ["en-CN", "zh-Hans-CN"],
+            currentLocale: Locale(identifier: "en_CN")
+        )
+
+        XCTAssertEqual(locale.identifier, "zh_CN")
+    }
+
+    func testAutomaticStreamingLocaleUsesChineseRegionWhenLanguageIsEnglish() {
+        let locale = TranscriptionLanguage.automaticStreamingRecognitionLocale(
+            preferredLanguages: ["en-CN"],
+            currentLocale: Locale(identifier: "en_CN")
+        )
+
+        XCTAssertEqual(locale.identifier, "zh_CN")
+    }
     
     // MARK: - WhisperModel Tests
     

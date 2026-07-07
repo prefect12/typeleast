@@ -141,11 +141,11 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
     }
 }
 
-private extension TranscriptionLanguage {
+extension TranscriptionLanguage {
     var streamingRecognitionLocale: Locale {
         switch self {
         case .auto:
-            return Locale.current
+            return Self.automaticStreamingRecognitionLocale()
         case .chinese:
             return Locale(identifier: "zh_CN")
         case .english:
@@ -161,5 +161,38 @@ private extension TranscriptionLanguage {
         case .german:
             return Locale(identifier: "de_DE")
         }
+    }
+
+    static func automaticStreamingRecognitionLocale(
+        preferredLanguages: [String] = Locale.preferredLanguages,
+        currentLocale: Locale = .current
+    ) -> Locale {
+        for language in preferredLanguages {
+            let normalized = language.replacingOccurrences(of: "_", with: "-").lowercased()
+            if normalized.hasPrefix("zh-hant") ||
+                normalized.hasPrefix("zh-tw") ||
+                normalized.hasPrefix("zh-hk") ||
+                normalized.hasPrefix("zh-mo") {
+                return Locale(identifier: "zh_TW")
+            }
+            if normalized.hasPrefix("zh") {
+                return Locale(identifier: "zh_CN")
+            }
+        }
+
+        if let languageCode = currentLocale.language.languageCode?.identifier,
+           languageCode == "zh" {
+            return currentLocale
+        }
+
+        let chineseRegions: Set<String> = ["CN", "HK", "MO", "SG", "TW"]
+        if let region = currentLocale.region?.identifier,
+           chineseRegions.contains(region) {
+            return region == "TW" || region == "HK" || region == "MO"
+                ? Locale(identifier: "zh_TW")
+                : Locale(identifier: "zh_CN")
+        }
+
+        return currentLocale
     }
 }
