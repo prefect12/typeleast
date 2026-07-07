@@ -120,7 +120,7 @@ internal extension ContentView {
                         text: result.text,
                         recordID: result.savedRecordID,
                         processStart: result.processStart,
-                        shouldPasteAutomatically: streamedText == nil && !didLiveInsert
+                        shouldPasteAutomatically: !didLiveInsert
                     )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
