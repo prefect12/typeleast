@@ -9,7 +9,7 @@ internal final class LiveTextInsertionManager {
     private let pasteboard: NSPasteboard
     private var insertedText = ""
     private var queuedText: String?
-    private weak var queuedTargetApp: NSRunningApplication?
+    private var queuedTargetApp: NSRunningApplication?
     private var updateTask: Task<Void, Never>?
     private var isActive = false
 

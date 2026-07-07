@@ -17,8 +17,7 @@ internal extension ContentView {
         removeNotificationObservers()
         processingTask?.cancel()
         processingTask = nil
-        streamingTranscriber.cancel()
-        liveTextInsertionManager.cancel()
+        LiveDictationCoordinator.shared.cancel()
         streamingDraftText = ""
         lastAudioURL = nil
     }
@@ -66,14 +65,12 @@ internal extension ContentView {
             Task { @MainActor in
                 if audioRecorder.isRecording {
                     audioRecorder.cancelRecording()
-                    streamingTranscriber.cancel()
-                    liveTextInsertionManager.cancel()
+                    LiveDictationCoordinator.shared.cancel()
                     streamingDraftText = ""
                     isProcessing = false
                 } else if isProcessing {
                     processingTask?.cancel()
-                    streamingTranscriber.cancel()
-                    liveTextInsertionManager.cancel()
+                    LiveDictationCoordinator.shared.cancel()
                     streamingDraftText = ""
                     isProcessing = false
                 } else {

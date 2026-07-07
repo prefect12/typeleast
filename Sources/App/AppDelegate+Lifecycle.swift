@@ -62,6 +62,7 @@ internal extension AppDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         Task { await MLDaemonManager.shared.shutdown() }
+        LiveDictationCoordinator.shared.cancel()
         recordingAnimationTimer?.cancel()
         recordingAnimationTimer = nil
 

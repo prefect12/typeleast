@@ -6,6 +6,7 @@ internal extension AppDelegate {
         pressAndHoldMonitor?.stop()
         pressAndHoldMonitor = nil
         isHoldRecordingActive = false
+        LiveDictationCoordinator.shared.cancel()
 
         let newConfiguration = PressAndHoldSettings.configuration()
         pressAndHoldConfiguration = newConfiguration
@@ -55,11 +56,14 @@ internal extension AppDelegate {
             return
         }
 
+        let targetApp = captureLiveDictationTargetApp()
         if recorder.startRecording() {
+            LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
             isHoldRecordingActive = true
             updateMenuBarIcon(isRecording: true)
             SoundManager().playRecordingStartSound()
         } else {
+            LiveDictationCoordinator.shared.cancel()
             isHoldRecordingActive = false
             showRecordingWindowForProcessing {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -114,10 +118,13 @@ internal extension AppDelegate {
                     return
                 }
 
+                let targetApp = captureLiveDictationTargetApp()
                 if recorder.startRecording() {
+                    LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
                     updateMenuBarIcon(isRecording: true)
                     SoundManager().playRecordingStartSound()
                 } else {
+                    LiveDictationCoordinator.shared.cancel()
                     toggleRecordWindow()
                     NotificationCenter.default.post(
                         name: .recordingStartFailed,
@@ -126,7 +133,15 @@ internal extension AppDelegate {
                 }
             }
         } else {
-            toggleRecordWindow()
+            if audioRecorder?.isRecording == true {
+                showRecordingWindowForProcessing {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
+                    }
+                }
+            } else {
+                toggleRecordWindow()
+            }
         }
     }
 
@@ -139,6 +154,18 @@ internal extension AppDelegate {
             stopRecordingAnimation()
             button.image = AppSetupHelper.createMenuBarIcon()
         }
+    }
+
+    private func captureLiveDictationTargetApp() -> NSRunningApplication? {
+        guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
+              frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier,
+              !frontmostApp.isTerminated else {
+            return WindowController.storedTargetApp
+        }
+
+        WindowController.storedTargetApp = frontmostApp
+        NotificationCenter.default.post(name: .targetAppStored, object: frontmostApp)
+        return frontmostApp
     }
 
     private func startRecordingAnimation() {

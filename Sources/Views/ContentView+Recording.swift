@@ -16,32 +16,28 @@ internal extension ContentView {
         
         lastAudioURL = nil
         streamingDraftText = ""
-        liveTextInsertionManager.cancel()
+        LiveDictationCoordinator.shared.cancel()
         
         let success = audioRecorder.startRecording()
         if !success {
             errorMessage = LocalizedStrings.Errors.failedToStartRecording
             showError = true
-            streamingTranscriber.cancel()
+            LiveDictationCoordinator.shared.cancel()
             return
         }
 
-        let settings = TranscriptionSettingsStore.shared
-        if settings.isStreamingTranscriptionEnabled {
-            if settings.isSmartPasteEnabled {
-                liveTextInsertionManager.begin()
+        let targetApp = findValidTargetApp()
+        let didBeginLiveDictation = LiveDictationCoordinator.shared.beginIfNeeded(
+            targetApp: targetApp,
+            updateHandler: { text, _ in
+                streamingDraftText = text
             }
+        )
 
-            streamingTranscriber.start(
-                language: settings.transcriptionLanguage,
-                updateHandler: { text, _ in
-                    streamingDraftText = text
-                    liveTextInsertionManager.scheduleUpdate(
-                        text: text,
-                        targetApp: findValidTargetApp()
-                    )
-                }
-            )
+        if didBeginLiveDictation,
+           TranscriptionSettingsStore.shared.isSmartPasteEnabled,
+           targetApp != nil {
+            hideRecordingWindow()
         }
     }
     
@@ -72,7 +68,7 @@ internal extension ContentView {
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
 
-                let streamedText = await streamingTranscriber.finish()
+                let streamedText = await LiveDictationCoordinator.shared.finishRecognition()
                 
                 var modelReadyTime: TimeInterval?
                 if streamedText == nil, transcriptionProvider == .local {
@@ -107,14 +103,14 @@ internal extension ContentView {
                     )
                 }
 
-                let didLiveInsert = liveTextInsertionManager.hasInsertedText
+                let didLiveInsert = LiveDictationCoordinator.shared.hasInsertedText
                 if didLiveInsert {
-                    await liveTextInsertionManager.finish(
+                    await LiveDictationCoordinator.shared.finishInsertion(
                         finalText: result.text,
                         targetApp: findValidTargetApp()
                     )
                 } else {
-                    liveTextInsertionManager.cancel()
+                    LiveDictationCoordinator.shared.cancel()
                 }
 
                 await MainActor.run {
@@ -130,16 +126,14 @@ internal extension ContentView {
                 }
             } catch is CancellationError {
                 await MainActor.run {
-                    streamingTranscriber.cancel()
-                    liveTextInsertionManager.cancel()
+                    LiveDictationCoordinator.shared.cancel()
                     streamingDraftText = ""
                     isProcessing = false
                     transcriptionStartTime = nil
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch {
-                streamingTranscriber.cancel()
-                liveTextInsertionManager.cancel()
+                LiveDictationCoordinator.shared.cancel()
                 streamingDraftText = ""
                 if case let SpeechToTextError.localTranscriptionFailed(inner) = error,
                    let lwError = inner as? LocalWhisperError,
