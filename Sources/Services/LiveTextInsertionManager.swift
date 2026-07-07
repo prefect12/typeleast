@@ -93,24 +93,13 @@ internal final class LiveTextInsertionManager {
         targetApp.activate(options: [])
         try? await Task.sleep(for: .milliseconds(30))
 
+        guard let insertText = Self.appendOnlyInsertion(from: insertedText, to: text) else { return }
+
         do {
-            let edit = Self.edit(from: insertedText, to: text)
-            try deleteBackward(characterCount: edit.deleteCount)
-            try paste(edit.insertText)
+            try paste(insertText)
             insertedText = text
         } catch {
             return
-        }
-    }
-
-    private func deleteBackward(characterCount: Int) throws {
-        guard characterCount > 0 else { return }
-        guard let source = CGEventSource(stateID: .combinedSessionState) else {
-            throw PasteError.eventSourceCreationFailed
-        }
-
-        for _ in 0..<characterCount {
-            try postKey(CGKeyCode(kVK_Delete), source: source)
         }
     }
 
@@ -137,16 +126,6 @@ internal final class LiveTextInsertionManager {
         keyUp.post(tap: .cgSessionEventTap)
     }
 
-    private func postKey(_ keyCode: CGKeyCode, source: CGEventSource) throws {
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
-            throw PasteError.keyboardEventCreationFailed
-        }
-
-        keyDown.post(tap: .cgSessionEventTap)
-        keyUp.post(tap: .cgSessionEventTap)
-    }
-
     private func resetState(cancelTask: Bool) {
         if cancelTask {
             updateTask?.cancel()
@@ -158,19 +137,16 @@ internal final class LiveTextInsertionManager {
         isActive = false
     }
 
-    private static func edit(from oldText: String, to newText: String) -> (deleteCount: Int, insertText: String) {
-        let oldCharacters = Array(oldText)
-        let newCharacters = Array(newText)
-        var prefixCount = 0
-
-        while prefixCount < oldCharacters.count,
-              prefixCount < newCharacters.count,
-              oldCharacters[prefixCount] == newCharacters[prefixCount] {
-            prefixCount += 1
+    nonisolated static func appendOnlyInsertion(from oldText: String, to newText: String) -> String? {
+        if oldText.isEmpty {
+            return newText.isEmpty ? nil : newText
         }
 
-        let deleteCount = oldCharacters.count - prefixCount
-        let insertText = String(newCharacters.dropFirst(prefixCount))
-        return (deleteCount, insertText)
+        guard newText.hasPrefix(oldText) else {
+            return nil
+        }
+
+        let suffix = String(newText.dropFirst(oldText.count))
+        return suffix.isEmpty ? nil : suffix
     }
 }
