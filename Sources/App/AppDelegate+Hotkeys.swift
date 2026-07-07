@@ -62,6 +62,7 @@ internal extension AppDelegate {
             isHoldRecordingActive = true
             updateMenuBarIcon(isRecording: true)
             SoundManager().playRecordingStartSound()
+            showRecordingWindowForProcessing()
         } else {
             LiveDictationCoordinator.shared.cancel()
             isHoldRecordingActive = false
@@ -123,6 +124,7 @@ internal extension AppDelegate {
                     LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
                     updateMenuBarIcon(isRecording: true)
                     SoundManager().playRecordingStartSound()
+                    showRecordingWindowForProcessing()
                 } else {
                     LiveDictationCoordinator.shared.cancel()
                     toggleRecordWindow()

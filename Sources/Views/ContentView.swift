@@ -29,6 +29,7 @@ internal struct ContentView: View {
     @State var returnKeyObserver: NSObjectProtocol?
     @State var targetAppObserver: NSObjectProtocol?
     @State var recordingFailedObserver: NSObjectProtocol?
+    @State var streamingDraftObserver: NSObjectProtocol?
     @State var targetAppForPaste: NSRunningApplication?
     @State var windowFocusObserver: NSObjectProtocol?
     @State var retryObserver: NSObjectProtocol?
@@ -56,6 +57,7 @@ internal struct ContentView: View {
         WaveformRecordingView(
             status: statusViewModel.currentStatus,
             audioLevel: audioRecorder.audioLevel,
+            streamingDraftText: streamingDraftText,
             onTap: {
                 if audioRecorder.isRecording {
                     stopAndProcess()

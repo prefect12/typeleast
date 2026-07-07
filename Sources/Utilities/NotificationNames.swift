@@ -15,6 +15,7 @@ internal extension Notification.Name {
     static let recordingStopped = Notification.Name("RecordingStopped")
     static let targetAppStored = Notification.Name("TargetAppStored")
     static let transcriptionProgress = Notification.Name("TranscriptionProgress")
+    static let streamingTranscriptUpdated = Notification.Name("StreamingTranscriptUpdated")
     
     // MARK: - Window Management
     static let restoreFocusToPreviousApp = Notification.Name("RestoreFocusToPreviousApp")

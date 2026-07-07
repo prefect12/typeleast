@@ -27,18 +27,12 @@ internal extension ContentView {
         }
 
         let targetApp = findValidTargetApp()
-        let didBeginLiveDictation = LiveDictationCoordinator.shared.beginIfNeeded(
+        LiveDictationCoordinator.shared.beginIfNeeded(
             targetApp: targetApp,
             updateHandler: { text, _ in
                 streamingDraftText = text
             }
         )
-
-        if didBeginLiveDictation,
-           TranscriptionSettingsStore.shared.isSmartPasteEnabled,
-           targetApp != nil {
-            hideRecordingWindow()
-        }
     }
     
     func stopAndProcess() {
@@ -103,15 +97,7 @@ internal extension ContentView {
                     )
                 }
 
-                let didLiveInsert = LiveDictationCoordinator.shared.hasInsertedText
-                if didLiveInsert {
-                    await LiveDictationCoordinator.shared.finishInsertion(
-                        finalText: result.text,
-                        targetApp: findValidTargetApp()
-                    )
-                } else {
-                    LiveDictationCoordinator.shared.cancel()
-                }
+                LiveDictationCoordinator.shared.cancel()
 
                 await MainActor.run {
                     transcriptionStartTime = nil
@@ -120,7 +106,7 @@ internal extension ContentView {
                         text: result.text,
                         recordID: result.savedRecordID,
                         processStart: result.processStart,
-                        shouldPasteAutomatically: !didLiveInsert
+                        shouldPasteAutomatically: true
                     )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }

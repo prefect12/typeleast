@@ -5,6 +5,7 @@ import AppKit
 internal struct WaveformRecordingView: View {
     let status: AppStatus
     let audioLevel: Float
+    let streamingDraftText: String
     let onTap: () -> Void
 
     var body: some View {
@@ -100,6 +101,10 @@ internal struct WaveformRecordingView: View {
     private var statusText: String {
         switch status {
         case .recording:
+            let draft = streamingDraftText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !draft.isEmpty {
+                return draft
+            }
             return "Recording…"
         case .processing(let message):
             return message
@@ -235,7 +240,7 @@ private struct RecordingWaveformView: View {
 }
 
 #Preview("Recording Window") {
-    WaveformRecordingView(status: .ready, audioLevel: 0.1, onTap: {})
+    WaveformRecordingView(status: .ready, audioLevel: 0.1, streamingDraftText: "", onTap: {})
         .padding(40)
         .background(Color(nsColor: .windowBackgroundColor))
 }

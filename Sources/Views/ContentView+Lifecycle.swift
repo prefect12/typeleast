@@ -128,6 +128,16 @@ internal extension ContentView {
                 showError = true
             }
         }
+
+        streamingDraftObserver = NotificationCenter.default.addObserver(
+            forName: .streamingTranscriptUpdated,
+            object: nil,
+            queue: .main
+        ) { notification in
+            Task { @MainActor in
+                streamingDraftText = (notification.object as? String) ?? ""
+            }
+        }
         
         windowFocusObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification,
@@ -175,6 +185,7 @@ internal extension ContentView {
         removeObserver(&returnKeyObserver)
         removeObserver(&targetAppObserver)
         removeObserver(&recordingFailedObserver)
+        removeObserver(&streamingDraftObserver)
         removeObserver(&windowFocusObserver)
         removeObserver(&retryObserver)
         removeObserver(&showAudioFileObserver)
