@@ -106,6 +106,59 @@ private struct ActivityDataPoint: Identifiable, Equatable {
     var id: Date { date }
 }
 
+enum ActivityCalendarLayout {
+    static func generateWeeks(
+        activeDates: some Sequence<Date>,
+        today: Date = Date(),
+        calendar: Calendar = .current,
+        minimumActivityDays: Int
+    ) -> [[Date]] {
+        let today = calendar.startOfDay(for: today)
+        let activeDates = activeDates.map { calendar.startOfDay(for: $0) }
+        let earliestDate = activeDates.min()
+        let minimumStartDate = calendar.date(
+            byAdding: .day,
+            value: -(minimumActivityDays - 1),
+            to: today
+        ) ?? today
+        let startDate = min(earliestDate ?? minimumStartDate, minimumStartDate)
+
+        guard let firstWeekStart = startOfWeek(containing: startDate, calendar: calendar),
+              let lastWeekStart = startOfWeek(containing: today, calendar: calendar) else {
+            return []
+        }
+
+        var weeks: [[Date]] = []
+        var weekStart = firstWeekStart
+        while weekStart <= lastWeekStart {
+            var week: [Date] = []
+            for dayIndex in 0..<7 {
+                guard let date = calendar.date(byAdding: .day, value: dayIndex, to: weekStart) else {
+                    continue
+                }
+                let day = calendar.startOfDay(for: date)
+                guard day <= today else {
+                    break
+                }
+                week.append(day)
+            }
+            weeks.append(week)
+
+            guard let nextWeekStart = calendar.date(byAdding: .day, value: 7, to: weekStart) else {
+                break
+            }
+            weekStart = nextWeekStart
+        }
+        return weeks
+    }
+
+    static func startOfWeek(containing date: Date, calendar: Calendar) -> Date? {
+        let day = calendar.startOfDay(for: date)
+        let daysFromSunday = calendar.component(.weekday, from: day) - 1
+        return calendar.date(byAdding: .day, value: -daysFromSunday, to: day)
+    }
+}
+
 internal struct DashboardHomeView: View {
     private static let minimumActivityDays = 53 * 7
 
@@ -1534,45 +1587,14 @@ private extension DashboardHomeView {
     }
 
     func generateActivityWeeks() -> [[Date]] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let activeDates = dailySummaries.keys
-        let earliestDate = activeDates.min()
-        let minimumStartDate = calendar.date(
-            byAdding: .day,
-            value: -(Self.minimumActivityDays - 1),
-            to: today
-        ) ?? today
-        let startDate = min(earliestDate ?? minimumStartDate, minimumStartDate)
-
-        guard let firstWeekStart = startOfWeek(containing: startDate, calendar: calendar),
-              let lastWeekStart = startOfWeek(containing: today, calendar: calendar) else {
-            return []
-        }
-
-        var weeks: [[Date]] = []
-        var weekStart = firstWeekStart
-        while weekStart <= lastWeekStart {
-            var week: [Date] = []
-            for dayIndex in 0..<7 {
-                if let date = calendar.date(byAdding: .day, value: dayIndex, to: weekStart) {
-                    week.append(calendar.startOfDay(for: date))
-                }
-            }
-            weeks.append(week)
-
-            guard let nextWeekStart = calendar.date(byAdding: .day, value: 7, to: weekStart) else {
-                break
-            }
-            weekStart = nextWeekStart
-        }
-        return weeks
+        ActivityCalendarLayout.generateWeeks(
+            activeDates: dailySummaries.keys,
+            minimumActivityDays: Self.minimumActivityDays
+        )
     }
 
     func startOfWeek(containing date: Date, calendar: Calendar) -> Date? {
-        let day = calendar.startOfDay(for: date)
-        let daysFromSunday = calendar.component(.weekday, from: day) - 1
-        return calendar.date(byAdding: .day, value: -daysFromSunday, to: day)
+        ActivityCalendarLayout.startOfWeek(containing: date, calendar: calendar)
     }
 
     func wordsInSelectedWeek() -> Int {
