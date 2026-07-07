@@ -405,26 +405,38 @@ final class TranscriptionHistoryIntegrationTests: XCTestCase {
     // MARK: - Settings Integration Tests
     
     func testHistoryEnabledSetting() async throws {
+        let suiteName = "com.typeleast.tests.history-enabled.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
         // Test enabling history
-        UserDefaults.standard.set(true, forKey: "transcriptionHistoryEnabled")
-        let isEnabled = UserDefaults.standard.bool(forKey: "transcriptionHistoryEnabled")
+        defaults.set(true, forKey: "transcriptionHistoryEnabled")
+        let isEnabled = defaults.bool(forKey: "transcriptionHistoryEnabled")
         XCTAssertTrue(isEnabled, "History should be enabled")
         
         // Test disabling history
-        UserDefaults.standard.set(false, forKey: "transcriptionHistoryEnabled")
-        let isDisabled = UserDefaults.standard.bool(forKey: "transcriptionHistoryEnabled")
+        defaults.set(false, forKey: "transcriptionHistoryEnabled")
+        let isDisabled = defaults.bool(forKey: "transcriptionHistoryEnabled")
         XCTAssertFalse(isDisabled, "History should be disabled")
     }
     
     func testRetentionPeriodSettings() async throws {
+        let suiteName = "com.typeleast.tests.retention-period.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
         // Test all retention periods
         for period in RetentionPeriod.allCases {
-            UserDefaults.standard.set(period.rawValue, forKey: "transcriptionRetentionPeriod")
+            defaults.set(period.rawValue, forKey: "transcriptionRetentionPeriod")
             
-            let storedValue = UserDefaults.standard.string(forKey: "transcriptionRetentionPeriod")
+            let storedValue = defaults.string(forKey: "transcriptionRetentionPeriod")
             XCTAssertEqual(storedValue, period.rawValue, "Retention period should be stored correctly")
             
-            let retrievedPeriod = RetentionPeriod(rawValue: storedValue!) ?? .oneMonth
+            let retrievedPeriod = RetentionPeriod(rawValue: try XCTUnwrap(storedValue)) ?? .oneMonth
             XCTAssertEqual(retrievedPeriod, period, "Retention period should be retrieved correctly")
         }
     }
