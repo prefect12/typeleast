@@ -122,6 +122,8 @@ internal enum L10n {
         static var analyzedRuns: String { isCN ? "分析记录" : "Runs" }
         static var stageDistribution: String { isCN ? "阶段占比" : "Stage Distribution" }
         static var recordDetails: String { isCN ? "记录明细" : "Record Details" }
+        static var primaryStage: String { isCN ? "主要耗时" : "Primary Stage" }
+        static var otherStages: String { isCN ? "其它阶段" : "Other Stages" }
         static var untrackedProcessing: String { isCN ? "未拆分处理" : "Untracked Processing" }
         static var modelReady: String { isCN ? "模型准备" : "Model Prep" }
         static var asr: String { isCN ? "ASR 转录" : "ASR" }

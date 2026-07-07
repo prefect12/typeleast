@@ -160,6 +160,7 @@ internal struct DashboardTimingAnalysisView: View {
     @State private var recordLimit = 50
     @State private var hoveredRunID: UUID?
     @State private var timingHoverLocation: CGPoint?
+    @State private var chartContentFrame: CGRect = .zero
 
     private var activeRecordLimit: Int? {
         recordLimit == 0 ? nil : recordLimit
@@ -309,29 +310,45 @@ internal struct DashboardTimingAnalysisView: View {
                                     }
                             }
                         }
-                        .overlay {
+                        .background(
                             GeometryReader { geometry in
-                                if let hoveredRun = snapshot.hoveredRun, let timingHoverLocation {
-                                    let x = min(
-                                        max(timingHoverLocation.x + 124, 124),
-                                        max(124, geometry.size.width - 124)
-                                    )
-                                    let y = min(
-                                        max(timingHoverLocation.y - 112, 106),
-                                        max(106, geometry.size.height - 106)
-                                    )
-
-                                    TimingRunHoverTooltip(
-                                        run: hoveredRun,
-                                        includeRecording: includeRecording,
-                                        millisecondFormatter: formatMilliseconds
-                                    )
-                                    .position(x: x, y: y)
-                                }
+                                Color.clear.preference(
+                                    key: TimingChartContentFramePreferenceKey.self,
+                                    value: geometry.frame(in: .named("timingChartViewport"))
+                                )
                             }
-                            .allowsHitTesting(false)
-                        }
+                        )
                         .frame(width: snapshot.chartWidth, height: 340)
+                    }
+                    .coordinateSpace(name: "timingChartViewport")
+                    .onPreferenceChange(TimingChartContentFramePreferenceKey.self) { frame in
+                        chartContentFrame = frame
+                    }
+                    .overlay {
+                        GeometryReader { geometry in
+                            if let hoveredRun = snapshot.hoveredRun, let timingHoverLocation {
+                                let viewportX = timingHoverLocation.x + chartContentFrame.minX
+                                let tooltipWidth: CGFloat = 236
+                                let tooltipHeight: CGFloat = 212
+                                let x = min(
+                                    max(viewportX + tooltipWidth / 2 + 12, tooltipWidth / 2 + 8),
+                                    max(tooltipWidth / 2 + 8, geometry.size.width - tooltipWidth / 2 - 8)
+                                )
+                                let y = min(
+                                    max(timingHoverLocation.y - tooltipHeight / 2 - 12, tooltipHeight / 2 + 8),
+                                    max(tooltipHeight / 2 + 8, geometry.size.height - tooltipHeight / 2 - 8)
+                                )
+
+                                TimingRunHoverTooltip(
+                                    run: hoveredRun,
+                                    includeRecording: includeRecording,
+                                    millisecondFormatter: formatMilliseconds
+                                )
+                                .frame(width: tooltipWidth)
+                                .position(x: x, y: y)
+                            }
+                        }
+                        .allowsHitTesting(false)
                     }
                     .frame(height: 370)
                 }
@@ -584,6 +601,14 @@ private struct TimingPanel<Content: View>: View {
     }
 }
 
+private struct TimingChartContentFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
 private struct TimingStatTile: View {
     let title: String
     let value: String
@@ -716,6 +741,10 @@ private struct TimingDetailRow: View {
         run.segments(includeRecording: includeRecording)
     }
 
+    private var primarySegment: TimingSegment? {
+        segments.max { $0.seconds < $1.seconds }
+    }
+
     private var transcriptPreview: String {
         run.record.preview.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -758,13 +787,13 @@ private struct TimingDetailRow: View {
                     )
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 8)], alignment: .leading, spacing: 8) {
-                ForEach(segments) { segment in
-                    TimingSegmentPill(
-                        segment: segment,
-                        durationFormatter: durationFormatter
-                    )
-                }
+            if let primarySegment {
+                TimingDetailStageSummary(
+                    primarySegment: primarySegment,
+                    segments: segments,
+                    total: run.visibleTotal(includeRecording: includeRecording),
+                    durationFormatter: durationFormatter
+                )
             }
 
             if !run.record.hasDetailedTiming, run.record.transcriptionTime != nil {
@@ -777,39 +806,75 @@ private struct TimingDetailRow: View {
     }
 }
 
-private struct TimingSegmentPill: View {
-    let segment: TimingSegment
+private struct TimingDetailStageSummary: View {
+    let primarySegment: TimingSegment
+    let segments: [TimingSegment]
+    let total: TimeInterval
     let durationFormatter: (TimeInterval) -> String
 
+    private var share: Double {
+        guard total > 0 else { return 0 }
+        return min(1, max(0, primarySegment.seconds / total))
+    }
+
+    private var secondarySummary: String {
+        segments
+            .filter { $0.id != primarySegment.id }
+            .map { "\($0.stage.title) \(durationFormatter($0.seconds))" }
+            .joined(separator: " · ")
+    }
+
+    private var percentageText: String {
+        String(format: "%.0f%%", share * 100)
+    }
+
     var body: some View {
-        HStack(spacing: 7) {
-            Circle()
-                .fill(segment.stage.color)
-                .frame(width: 7, height: 7)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(L10n.Timing.primaryStage)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(DashboardTheme.inkMuted)
 
-            Text(segment.stage.title)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(DashboardTheme.inkLight)
-                .lineLimit(1)
+                Text(primarySegment.stage.title)
+                    .font(.callout.weight(.heavy))
+                    .foregroundStyle(primarySegment.stage.color)
+                    .lineLimit(1)
 
-            Spacer(minLength: 8)
+                Spacer(minLength: 10)
 
-            Text(durationFormatter(segment.seconds))
-                .font(.caption.monospacedDigit().weight(.heavy))
-                .foregroundStyle(segment.stage.color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                Text("\(durationFormatter(primarySegment.seconds)) / \(percentageText)")
+                    .font(.callout.monospacedDigit().weight(.heavy))
+                    .foregroundStyle(DashboardTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(DashboardTheme.inkFaint.opacity(0.16))
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(primarySegment.stage.color.opacity(0.86))
+                        .frame(width: max(5, proxy.size.width * share))
+                }
+            }
+            .frame(height: 6)
+
+            if !secondarySummary.isEmpty {
+                Text("\(L10n.Timing.otherStages): \(secondarySummary)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(DashboardTheme.inkLight)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(.vertical, 7)
-        .padding(.horizontal, 9)
-        .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-        .background(
-            segment.stage.color.opacity(0.12),
-            in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-        )
+        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(DashboardTheme.pageBg.opacity(0.42), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .stroke(segment.stage.color.opacity(0.24), lineWidth: 1)
+                .stroke(DashboardTheme.rule.opacity(0.58), lineWidth: 1)
         )
     }
 }
