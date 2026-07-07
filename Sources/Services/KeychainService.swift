@@ -41,19 +41,26 @@ internal protocol KeychainServiceProtocol {
 
 internal class KeychainService: KeychainServiceProtocol {
     static var shared: KeychainServiceProtocol = KeychainService()
+
+    private let userDefaults: UserDefaults
     
-    private init() {}
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+    }
     
     func save(_ key: String, service: String, account: String) throws {
         if key.isEmpty {
             try delete(service: service, account: account)
             return
         }
+
+        saveMirror(key, service: service, account: account)
         
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip
         ]
         
         let status = SecItemCopyMatching(query as CFDictionary, nil)
@@ -71,7 +78,7 @@ internal class KeychainService: KeychainServiceProtocol {
             if updateStatus != errSecSuccess {
                 throw KeychainError.updateFailed(updateStatus)
             }
-        } else {
+        } else if status == errSecItemNotFound {
             let attributes: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
@@ -84,16 +91,25 @@ internal class KeychainService: KeychainServiceProtocol {
             if addStatus != errSecSuccess {
                 throw KeychainError.addFailed(addStatus)
             }
+        } else if status == errSecInteractionNotAllowed || status == errSecAuthFailed {
+            return
+        } else {
+            throw KeychainError.updateFailed(status)
         }
     }
     
     func get(service: String, account: String) throws -> String? {
+        if let mirrored = getMirror(service: service, account: account) {
+            return mirrored
+        }
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip
         ]
         
         var dataTypeRef: AnyObject?
@@ -106,8 +122,11 @@ internal class KeychainService: KeychainServiceProtocol {
             guard let string = String(data: data, encoding: .utf8) else {
                 throw KeychainError.invalidData
             }
+            saveMirror(string, service: service, account: account)
             return string
         } else if status == errSecItemNotFound {
+            return nil
+        } else if status == errSecInteractionNotAllowed || status == errSecAuthFailed {
             return nil
         } else {
             throw KeychainError.itemNotFound
@@ -115,16 +134,43 @@ internal class KeychainService: KeychainServiceProtocol {
     }
     
     func delete(service: String, account: String) throws {
+        deleteMirror(service: service, account: account)
+
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: account
+            kSecAttrAccount as String: account,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip
         ]
         
         let status = SecItemDelete(query as CFDictionary)
         if status != errSecSuccess && status != errSecItemNotFound {
             throw KeychainError.deleteFailed(status)
         }
+    }
+
+    private func saveMirror(_ key: String, service: String, account: String) {
+        let encoded = Data(key.utf8).base64EncodedString()
+        userDefaults.set(encoded, forKey: Self.mirroredCredentialDefaultsKey(service: service, account: account))
+    }
+
+    private func getMirror(service: String, account: String) -> String? {
+        let defaultsKey = Self.mirroredCredentialDefaultsKey(service: service, account: account)
+        guard let encoded = userDefaults.string(forKey: defaultsKey),
+              let data = Data(base64Encoded: encoded),
+              let decoded = String(data: data, encoding: .utf8),
+              !decoded.isEmpty else {
+            return nil
+        }
+        return decoded
+    }
+
+    private func deleteMirror(service: String, account: String) {
+        userDefaults.removeObject(forKey: Self.mirroredCredentialDefaultsKey(service: service, account: account))
+    }
+
+    nonisolated static func mirroredCredentialDefaultsKey(service: String, account: String) -> String {
+        "credentialMirror.\(service).\(account)"
     }
     
     // MARK: - Backward Compatibility Methods
