@@ -1,12 +1,10 @@
 import AppKit
 import ApplicationServices
-import Carbon
 import Foundation
 
 @MainActor
 internal final class LiveTextInsertionManager {
     private let accessibilityManager: AccessibilityPermissionManager
-    private let pasteboard: NSPasteboard
     private var insertedText = ""
     private var queuedText: String?
     private var queuedTargetApp: NSRunningApplication?
@@ -14,11 +12,9 @@ internal final class LiveTextInsertionManager {
     private var isActive = false
 
     init(
-        accessibilityManager: AccessibilityPermissionManager = AccessibilityPermissionManager(),
-        pasteboard: NSPasteboard = .general
+        accessibilityManager: AccessibilityPermissionManager = AccessibilityPermissionManager()
     ) {
         self.accessibilityManager = accessibilityManager
-        self.pasteboard = pasteboard
     }
 
     var hasInsertedText: Bool {
@@ -96,32 +92,42 @@ internal final class LiveTextInsertionManager {
         guard let insertText = Self.appendOnlyInsertion(from: insertedText, to: text) else { return }
 
         do {
-            try paste(insertText)
+            try typeText(insertText)
             insertedText = text
         } catch {
             return
         }
     }
 
-    private func paste(_ text: String) throws {
+    private func typeText(_ text: String) throws {
         guard !text.isEmpty else { return }
 
-        pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        let utf16Units = Array(text.utf16)
+        var offset = 0
+        while offset < utf16Units.count {
+            let end = min(offset + Self.maxUnicodeEventLength, utf16Units.count)
+            try typeUTF16(Array(utf16Units[offset..<end]))
+            offset = end
+        }
+    }
 
+    private func typeUTF16(_ utf16Units: [UInt16]) throws {
         guard let source = CGEventSource(stateID: .combinedSessionState) else {
             throw PasteError.eventSourceCreationFailed
         }
 
-        let commandV = CGKeyCode(kVK_ANSI_V)
-        let flags = CGEventFlags([.maskCommand])
-        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: commandV, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: commandV, keyDown: false) else {
+        guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) else {
             throw PasteError.keyboardEventCreationFailed
         }
 
-        keyDown.flags = flags
-        keyUp.flags = flags
+        utf16Units.withUnsafeBufferPointer { buffer in
+            guard let baseAddress = buffer.baseAddress else { return }
+            keyDown.keyboardSetUnicodeString(
+                stringLength: buffer.count,
+                unicodeString: baseAddress
+            )
+        }
         keyDown.post(tap: .cgSessionEventTap)
         keyUp.post(tap: .cgSessionEventTap)
     }
@@ -149,4 +155,6 @@ internal final class LiveTextInsertionManager {
         let suffix = String(newText.dropFirst(oldText.count))
         return suffix.isEmpty ? nil : suffix
     }
+
+    private nonisolated static let maxUnicodeEventLength = 64
 }
