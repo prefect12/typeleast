@@ -147,10 +147,10 @@ internal class PasteManager {
         // Check permission first - if denied, show proper explanation and request
         guard accessibilityManager.checkPermission() else {
             // Show permission request with explanation - this includes user education
-            accessibilityManager.requestPermissionWithExplanation { [weak self] granted in
+            accessibilityManager.requestPermissionWithExplanation { [weak self] result in
                 guard let self = self else { return }
                 
-                if granted {
+                if result.isGranted {
                     // Permission was granted - attempt paste operation
                     self.performCGEventPaste(completion: completion)
                 } else {

@@ -71,7 +71,7 @@ internal enum AppDefaults {
             Keys.transcriptionHistoryEnabled: true,
             Keys.transcriptionRetentionPeriod: RetentionPeriod.forever.rawValue,
             Keys.maxModelStorageGB: 5.0,
-            Keys.enableSmartPaste: false,
+            Keys.enableSmartPaste: true,
             Keys.immediateRecording: false,
             Keys.globalHotkey: "⌘⇧Space",
 

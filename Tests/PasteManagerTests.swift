@@ -9,6 +9,21 @@ final class PasteManagerTests: XCTestCase {
     private var pasteboardName: NSPasteboard.Name!
     private var pasteboard: NSPasteboard!
 
+    private final class StubAccessibilityPermissionManager: AccessibilityPermissionManager {
+        private let requestResult: AccessibilityPermissionRequestResult
+
+        init(permissionGranted: Bool, requestResult: AccessibilityPermissionRequestResult) {
+            self.requestResult = requestResult
+            super.init(permissionCheck: { permissionGranted })
+        }
+
+        override func requestPermissionWithExplanation(
+            completion: @escaping (AccessibilityPermissionRequestResult) -> Void
+        ) {
+            completion(requestResult)
+        }
+    }
+
     override func setUp() {
         super.setUp()
         defaultsSuiteName = "com.typeleast.tests.paste.\(UUID().uuidString)"
@@ -38,6 +53,14 @@ final class PasteManagerTests: XCTestCase {
             pasteboard: pasteboard
         )
         return manager
+    }
+
+    private func makeManager(accessibilityManager: AccessibilityPermissionManager) -> PasteManager {
+        PasteManager(
+            accessibilityManager: accessibilityManager,
+            userDefaults: defaults,
+            pasteboard: pasteboard
+        )
     }
 
     // MARK: - Tests
@@ -128,5 +151,47 @@ final class PasteManagerTests: XCTestCase {
 
         await fulfillment(of: [notificationReceived], timeout: 1.0)
         XCTAssertEqual(mockApp.mockActivationCount, 1)
+    }
+
+    func testPasteWithUserInteractionKeepsSmartPasteEnabledWhenUserDefersPermission() async throws {
+        defaults.set(true, forKey: AppDefaults.Keys.enableSmartPaste)
+        let manager = makeManager(
+            accessibilityManager: StubAccessibilityPermissionManager(
+                permissionGranted: false,
+                requestResult: .userDeclined
+            )
+        )
+
+        await withCheckedContinuation { continuation in
+            manager.pasteWithUserInteraction { result in
+                if case .success = result {
+                    XCTFail("Paste should fail when permission is declined")
+                }
+                continuation.resume()
+            }
+        }
+
+        XCTAssertTrue(defaults.bool(forKey: AppDefaults.Keys.enableSmartPaste))
+    }
+
+    func testPasteWithUserInteractionKeepsSmartPasteEnabledWhenPermissionStillPending() async throws {
+        defaults.set(true, forKey: AppDefaults.Keys.enableSmartPaste)
+        let manager = makeManager(
+            accessibilityManager: StubAccessibilityPermissionManager(
+                permissionGranted: false,
+                requestResult: .notGranted
+            )
+        )
+
+        await withCheckedContinuation { continuation in
+            manager.pasteWithUserInteraction { result in
+                if case .success = result {
+                    XCTFail("Paste should fail when permission is not granted")
+                }
+                continuation.resume()
+            }
+        }
+
+        XCTAssertTrue(defaults.bool(forKey: AppDefaults.Keys.enableSmartPaste))
     }
 }

@@ -332,6 +332,9 @@ else
   if [ -z "$DETECTED_HASH" ]; then
     DETECTED_HASH=$(find_identity_by_name "Typeleast Local Development")
   fi
+  if [ -z "$DETECTED_HASH" ]; then
+    DETECTED_HASH=$(find_identity_by_name "AudioWhisperDev")
+  fi
   if [ -n "$DETECTED_HASH" ]; then
     DETECTED_NAME=$(identity_display_name "$DETECTED_HASH")
     echo "🔍 Auto-detected signing identity: $DETECTED_NAME"

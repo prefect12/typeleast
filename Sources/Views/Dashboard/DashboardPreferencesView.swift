@@ -7,7 +7,7 @@ internal struct DashboardPreferencesView: View {
     @AppStorage("immediateRecording") private var immediateRecording = false
     @AppStorage("globalHotkey") private var globalHotkey = "⌘⇧Space"
     @AppStorage("autoBoostMicrophoneVolume") private var autoBoostMicrophoneVolume = false
-    @AppStorage("enableSmartPaste") private var enableSmartPaste = false
+    @AppStorage("enableSmartPaste") private var enableSmartPaste = true
     @AppStorage("playCompletionSound") private var playCompletionSound = true
     @AppStorage("transcriptionHistoryEnabled") private var transcriptionHistoryEnabled = true
     @AppStorage("transcriptionRetentionPeriod") private var transcriptionRetentionPeriodRaw = RetentionPeriod.forever.rawValue

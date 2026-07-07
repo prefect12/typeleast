@@ -419,7 +419,7 @@ internal enum L10n {
                 • 在“隐私与安全性 → 辅助功能”里找到 Typeleast
                 • 打开开关，然后回到 Typeleast
 
-                如果你想手动控制，可以点“暂不启用智能粘贴”，转录文本仍会复制到剪贴板。
+                如果你现在不方便打开系统设置，可以点“稍后授权”，智能粘贴会保持开启；授权前转录文本仍会复制到剪贴板。
                 """
             }
             return """
@@ -442,11 +442,11 @@ internal enum L10n {
             • Toggle the switch to enable the permission
             • Return to Typeleast to use SmartPaste
 
-            If you prefer manual control, click "Continue Without SmartPaste" and use ⌘V yourself.
+            If you cannot open System Settings now, click "Authorize Later". SmartPaste stays enabled; until permission is granted, transcribed text is still copied to your clipboard.
             """
         }
         static var grantPermission: String { isCN ? "授予权限" : "Grant Permission" }
-        static var continueWithout: String { isCN ? "暂不启用智能粘贴" : "Continue Without SmartPaste" }
+        static var continueWithout: String { isCN ? "稍后授权" : "Authorize Later" }
         static var learnMore: String { isCN ? "了解辅助功能权限" : "Learn More About Accessibility Permissions" }
 
         static var enabledTitle: String { isCN ? "智能粘贴已启用" : "SmartPaste Enabled!" }
@@ -580,7 +580,7 @@ internal enum L10n {
                 2. 进入“隐私与安全性 → 辅助功能”
                 3. 添加 Typeleast 并打开开关
 
-                或者暂不启用智能粘贴，转录文本会继续复制到剪贴板。
+                授权完成前，转录文本会继续复制到剪贴板。
                 """
             }
             return """
@@ -593,15 +593,15 @@ internal enum L10n {
             2. Go to Privacy & Security → Accessibility
             3. Add Typeleast and enable it
 
-            Or continue using Typeleast without SmartPaste - transcribed text will be copied to your clipboard for manual pasting.
+            Until permission is granted, transcribed text will be copied to your clipboard for manual pasting.
             """
         }
 
-        static var disabledTitle: String { isCN ? "智能粘贴未启用" : "SmartPaste Disabled" }
+        static var disabledTitle: String { isCN ? "稍后授权智能粘贴" : "SmartPaste Authorization Later" }
         static var disabledMessage: String {
             isCN
-                ? "Typeleast 会继续复制转录文本到剪贴板，你可以手动按 ⌘V 粘贴。\n\n之后可以在 Typeleast 设置 → 通用 → 智能粘贴中重新启用。"
-                : "Typeleast will continue to copy transcribed text to your clipboard, and you can paste it manually using ⌘V.\n\nYou can enable SmartPaste anytime in Typeleast Settings → General → Smart Paste."
+                ? "智能粘贴会保持开启。授权完成前，Typeleast 会继续复制转录文本到剪贴板，你可以手动按 ⌘V 粘贴。"
+                : "SmartPaste stays enabled. Until permission is granted, Typeleast will continue to copy transcribed text to your clipboard for manual pasting."
         }
     }
 

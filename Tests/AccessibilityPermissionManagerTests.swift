@@ -89,8 +89,8 @@ final class AccessibilityPermissionManagerTests: XCTestCase {
         let manager = makeManager(granted: true, counter: counter)
         let expectation = expectation(description: "Completion called with granted status")
 
-        manager.requestPermissionWithExplanation { isGranted in
-            XCTAssertTrue(isGranted)
+        manager.requestPermissionWithExplanation { result in
+            XCTAssertEqual(result, .granted)
             XCTAssertEqual(counter.value, 1)
             expectation.fulfill()
         }
@@ -103,8 +103,8 @@ final class AccessibilityPermissionManagerTests: XCTestCase {
         let manager = makeManager(granted: false, counter: counter)
         let expectation = expectation(description: "Completion called with denied status in test env")
 
-        manager.requestPermissionWithExplanation { isGranted in
-            XCTAssertFalse(isGranted)
+        manager.requestPermissionWithExplanation { result in
+            XCTAssertEqual(result, .notGranted)
             XCTAssertEqual(counter.value, 1)
             expectation.fulfill()
         }
@@ -114,7 +114,7 @@ final class AccessibilityPermissionManagerTests: XCTestCase {
 
     func testPermissionRequestCoordinatorCoalescesActiveRequests() {
         let coordinator = AccessibilityPermissionRequestCoordinator()
-        var results: [Bool] = []
+        var results: [AccessibilityPermissionRequestResult] = []
 
         let first = coordinator.register(permissionGranted: false) { results.append($0) }
         let second = coordinator.register(permissionGranted: false) { results.append($0) }
@@ -123,32 +123,32 @@ final class AccessibilityPermissionManagerTests: XCTestCase {
         XCTAssertEqual(second, .waitingForActiveRequest)
         XCTAssertTrue(results.isEmpty)
 
-        coordinator.complete(false)
+        coordinator.complete(.notGranted)
 
-        XCTAssertEqual(results, [false, false])
+        XCTAssertEqual(results, [.notGranted, .notGranted])
     }
 
     func testPermissionRequestCoordinatorSuppressesRepeatedDeniedPromptsUntilGranted() {
         let coordinator = AccessibilityPermissionRequestCoordinator()
-        var results: [Bool] = []
+        var results: [AccessibilityPermissionRequestResult] = []
 
         XCTAssertEqual(
             coordinator.register(permissionGranted: false) { results.append($0) },
             .startRequest
         )
-        coordinator.complete(false)
+        coordinator.complete(.notGranted)
 
         XCTAssertEqual(
             coordinator.register(permissionGranted: false) { results.append($0) },
             .skippedRecentlyPrompted
         )
-        XCTAssertEqual(results, [false, false])
+        XCTAssertEqual(results, [.notGranted, .notGranted])
 
         XCTAssertEqual(
             coordinator.register(permissionGranted: true) { results.append($0) },
             .alreadyGranted
         )
-        XCTAssertEqual(results, [false, false, true])
+        XCTAssertEqual(results, [.notGranted, .notGranted, .granted])
 
         XCTAssertEqual(
             coordinator.register(permissionGranted: false) { results.append($0) },

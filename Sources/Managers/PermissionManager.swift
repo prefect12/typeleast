@@ -149,9 +149,9 @@ internal class PermissionManager {
             accessibilityPermissionState = .requesting
             
             // Use dedicated AccessibilityPermissionManager for proper explanation and handling
-            accessibilityManager.requestPermissionWithExplanation { [weak self] granted in
+            accessibilityManager.requestPermissionWithExplanation { [weak self] result in
                 Task { @MainActor [weak self] in
-                    self?.accessibilityPermissionState = granted ? .granted : .denied
+                    self?.accessibilityPermissionState = result.isGranted ? .granted : .denied
                     self?.checkIfAllPermissionsHandled()
                 }
             }

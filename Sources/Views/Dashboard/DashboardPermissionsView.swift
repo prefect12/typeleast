@@ -6,7 +6,7 @@ import AppKit
 internal struct DashboardPermissionsView: View {
     @State private var microphoneStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
     @State private var isAccessibilityTrusted: Bool = AXIsProcessTrusted()
-    @AppStorage("enableSmartPaste") private var enableSmartPaste = false
+    @AppStorage("enableSmartPaste") private var enableSmartPaste = true
 
     var body: some View {
         Form {

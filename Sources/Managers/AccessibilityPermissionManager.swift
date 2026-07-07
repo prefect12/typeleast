@@ -9,22 +9,35 @@ internal enum AccessibilityPermissionRequestDecision: Equatable {
     case skippedRecentlyPrompted
 }
 
+internal enum AccessibilityPermissionRequestResult: Equatable {
+    case granted
+    case userDeclined
+    case notGranted
+
+    var isGranted: Bool {
+        self == .granted
+    }
+}
+
 internal final class AccessibilityPermissionRequestCoordinator {
     static let shared = AccessibilityPermissionRequestCoordinator()
 
     private let lock = NSLock()
     private var isRequestInProgress = false
     private var hasPromptedWhileDenied = false
-    private var completions: [(Bool) -> Void] = []
+    private var completions: [(AccessibilityPermissionRequestResult) -> Void] = []
 
-    func register(permissionGranted: Bool, completion: @escaping (Bool) -> Void) -> AccessibilityPermissionRequestDecision {
+    func register(
+        permissionGranted: Bool,
+        completion: @escaping (AccessibilityPermissionRequestResult) -> Void
+    ) -> AccessibilityPermissionRequestDecision {
         lock.lock()
 
         if permissionGranted {
             isRequestInProgress = false
             hasPromptedWhileDenied = false
             lock.unlock()
-            completion(true)
+            completion(.granted)
             return .alreadyGranted
         }
 
@@ -36,7 +49,7 @@ internal final class AccessibilityPermissionRequestCoordinator {
 
         if hasPromptedWhileDenied {
             lock.unlock()
-            completion(false)
+            completion(.notGranted)
             return .skippedRecentlyPrompted
         }
 
@@ -47,17 +60,17 @@ internal final class AccessibilityPermissionRequestCoordinator {
         return .startRequest
     }
 
-    func complete(_ granted: Bool) {
+    func complete(_ result: AccessibilityPermissionRequestResult) {
         lock.lock()
         isRequestInProgress = false
-        if granted {
+        if result.isGranted {
             hasPromptedWhileDenied = false
         }
         let callbacks = completions
         completions.removeAll()
         lock.unlock()
 
-        callbacks.forEach { $0(granted) }
+        callbacks.forEach { $0(result) }
     }
 
     func resetForTesting() {
@@ -93,7 +106,7 @@ internal class AccessibilityPermissionManager {
     
     /// Requests Accessibility permission with a proper explanation dialog
     /// - Parameter completion: Called with the result of the permission request
-    func requestPermissionWithExplanation(completion: @escaping (Bool) -> Void) {
+    func requestPermissionWithExplanation(completion: @escaping (AccessibilityPermissionRequestResult) -> Void) {
         let decision = requestCoordinator.register(
             permissionGranted: checkPermission(),
             completion: completion
@@ -107,7 +120,7 @@ internal class AccessibilityPermissionManager {
         }
         
         if isTestEnvironment {
-            requestCoordinator.complete(false)
+            requestCoordinator.complete(.notGranted)
             return
         }
 
@@ -116,19 +129,19 @@ internal class AccessibilityPermissionManager {
         // Show explanation alert before requesting permission (runtime only)
         showPermissionExplanationAlert { [weak self, coordinator] userWantsToGrant in
             guard let self else {
-                coordinator.complete(false)
+                coordinator.complete(.notGranted)
                 return
             }
 
             guard userWantsToGrant else {
                 self.showPermissionDeniedMessage()
-                coordinator.complete(false)
+                coordinator.complete(.userDeclined)
                 return
             }
             
             // Request permission with system prompt
             self.requestPermissionFromSystem { granted in
-                coordinator.complete(granted)
+                coordinator.complete(granted ? .granted : .notGranted)
             }
         }
     }
