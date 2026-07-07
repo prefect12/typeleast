@@ -16,6 +16,7 @@ internal extension ContentView {
         
         lastAudioURL = nil
         streamingDraftText = ""
+        liveTextInsertionManager.cancel()
         
         let success = audioRecorder.startRecording()
         if !success {
@@ -25,11 +26,20 @@ internal extension ContentView {
             return
         }
 
-        if TranscriptionSettingsStore.shared.isStreamingTranscriptionEnabled {
+        let settings = TranscriptionSettingsStore.shared
+        if settings.isStreamingTranscriptionEnabled {
+            if settings.isSmartPasteEnabled {
+                liveTextInsertionManager.begin()
+            }
+
             streamingTranscriber.start(
-                language: TranscriptionSettingsStore.shared.transcriptionLanguage,
+                language: settings.transcriptionLanguage,
                 updateHandler: { text, _ in
                     streamingDraftText = text
+                    liveTextInsertionManager.scheduleUpdate(
+                        text: text,
+                        targetApp: findValidTargetApp()
+                    )
                 }
             )
         }
@@ -97,19 +107,31 @@ internal extension ContentView {
                     )
                 }
 
+                let didLiveInsert = liveTextInsertionManager.hasInsertedText
+                if didLiveInsert {
+                    await liveTextInsertionManager.finish(
+                        finalText: result.text,
+                        targetApp: findValidTargetApp()
+                    )
+                } else {
+                    liveTextInsertionManager.cancel()
+                }
+
                 await MainActor.run {
                     transcriptionStartTime = nil
                     streamingDraftText = ""
                     showConfirmationAndPaste(
                         text: result.text,
                         recordID: result.savedRecordID,
-                        processStart: result.processStart
+                        processStart: result.processStart,
+                        shouldPasteAutomatically: !didLiveInsert
                     )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch is CancellationError {
                 await MainActor.run {
                     streamingTranscriber.cancel()
+                    liveTextInsertionManager.cancel()
                     streamingDraftText = ""
                     isProcessing = false
                     transcriptionStartTime = nil
@@ -117,6 +139,7 @@ internal extension ContentView {
                 }
             } catch {
                 streamingTranscriber.cancel()
+                liveTextInsertionManager.cancel()
                 streamingDraftText = ""
                 if case let SpeechToTextError.localTranscriptionFailed(inner) = error,
                    let lwError = inner as? LocalWhisperError,
@@ -244,12 +267,17 @@ internal extension ContentView {
         }
     }
 
-    func showConfirmationAndPaste(text: String, recordID: UUID? = nil, processStart: Date? = nil) {
+    func showConfirmationAndPaste(
+        text: String,
+        recordID: UUID? = nil,
+        processStart: Date? = nil,
+        shouldPasteAutomatically: Bool = true
+    ) {
         showSuccess = true
         isProcessing = false
         soundManager.playCompletionSound()
         
-        if TranscriptionSettingsStore.shared.isSmartPasteEnabled {
+        if TranscriptionSettingsStore.shared.isSmartPasteEnabled, shouldPasteAutomatically {
             if !awaitingSemanticPaste {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     performUserTriggeredPaste(recordID: recordID, processStart: processStart, pasteStart: Date())

@@ -12,6 +12,7 @@ internal struct ContentView: View {
     @State var pasteManager = PasteManager()
     @State var statusViewModel = StatusViewModel()
     @State var permissionManager = PermissionManager()
+    @State var liveTextInsertionManager = LiveTextInsertionManager()
     @StateObject var soundManager = SoundManager()
     @StateObject var streamingTranscriber = StreamingSpeechTranscriber()
     @State var isProcessing = false
