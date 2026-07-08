@@ -32,7 +32,7 @@ internal enum TimingStage: String, CaseIterable, Identifiable {
         case .correction: return Color(nsColor: .systemPurple)
         case .untrackedProcessing: return Color(nsColor: .systemYellow)
         case .clipboard: return DashboardTheme.accent
-        case .paste: return Color(nsColor: .systemRed)
+        case .paste: return Color(nsColor: .systemOrange)
         }
     }
 
@@ -438,7 +438,7 @@ internal struct DashboardTimingAnalysisView: View {
             L10n.Timing.correction: Color(nsColor: .systemPurple),
             L10n.Timing.untrackedProcessing: Color(nsColor: .systemYellow),
             L10n.Timing.clipboard: DashboardTheme.accent,
-            L10n.Timing.paste: Color(nsColor: .systemRed)
+            L10n.Timing.paste: Color(nsColor: .systemOrange)
         ]
     }
 

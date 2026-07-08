@@ -171,7 +171,8 @@ final class TranscriptionPipelineTests: XCTestCase {
                 modelReadyTime: nil,
                 processStart: Date()
             ),
-            rawText: "  Streamed Typeleast text  "
+            rawText: "  Streamed Typeleast text  ",
+            asrTime: 0.42
         )
 
         XCTAssertEqual(result.text, "Streamed Typeleast text")
@@ -183,7 +184,8 @@ final class TranscriptionPipelineTests: XCTestCase {
         let records = try await dataManager.fetchAllRecords()
         XCTAssertEqual(records.count, 1)
         XCTAssertEqual(records.first?.text, "Streamed Typeleast text")
-        XCTAssertEqual(records.first?.asrTime, 0)
+        XCTAssertEqual(records.first?.asrTime ?? 0, 0.42, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(records.first?.transcriptionTime ?? 0, 0.42)
     }
 }
 

@@ -121,7 +121,9 @@ internal final class TranscriptionPipeline {
             }
         }
 
-        let transcriptionElapsed = Date().timeIntervalSince(transcriptionStart)
+        let measuredTranscriptionElapsed = Date().timeIntervalSince(transcriptionStart)
+        let minimumStageElapsed = asrTime + correctionTime
+        let transcriptionElapsed = max(measuredTranscriptionElapsed, minimumStageElapsed)
         let wordCount = UsageMetricsStore.estimatedWordCount(for: finalText)
         let characterCount = finalText.count
 

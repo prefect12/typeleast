@@ -62,7 +62,11 @@ internal extension ContentView {
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
 
+                let streamingFinishStart = Date()
                 let streamedText = await LiveDictationCoordinator.shared.finishRecognition()
+                let streamingFinalizeTime = streamedText == nil
+                    ? nil
+                    : Date().timeIntervalSince(streamingFinishStart)
                 
                 var modelReadyTime: TimeInterval?
                 if streamedText == nil, transcriptionProvider == .local {
@@ -88,6 +92,7 @@ internal extension ContentView {
                     result = try await transcriptionPipeline.runPretranscribed(
                         request,
                         rawText: streamedText,
+                        asrTime: streamingFinalizeTime ?? 0,
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
