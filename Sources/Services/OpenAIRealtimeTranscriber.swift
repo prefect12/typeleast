@@ -67,7 +67,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         }
     }
 
-    func finish(timeout: TimeInterval = 1.2) async -> String? {
+    func finish(timeout: Duration = .seconds(3)) async -> String? {
         pendingStartTask?.cancel()
         pendingStartTask = nil
 
@@ -80,7 +80,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         stopAudioCapture()
 
         do {
-            try? await Task.sleep(for: .milliseconds(80))
+            try? await Task.sleep(for: .milliseconds(150))
             await waitForInFlightCommit()
             try await commitBufferedAudioIfNeeded()
 
@@ -212,7 +212,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         periodicCommitTask = Task { [weak self] in
             while !Task.isCancelled {
                 do {
-                    try await Task.sleep(for: .milliseconds(450))
+                    try await Task.sleep(for: .milliseconds(1_200))
                 } catch {
                     return
                 }
@@ -364,37 +364,33 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
             .joined(separator: " ")
     }
 
-    private func waitForCompletion(timeout: TimeInterval, targetCommitCount: Int) async throws -> String {
-        let deadline = Date().addingTimeInterval(timeout)
-        var bestText = currentBestText()
-        var lastTextChange = Date()
-
-        while Date() < deadline {
-            if let lastError {
-                throw lastError
-            }
-
-            let text = currentBestText()
-            if !text.isEmpty {
-                if text != bestText {
-                    bestText = text
-                    lastTextChange = Date()
-                }
-
-                if completedCommitCount >= targetCommitCount ||
-                    Date().timeIntervalSince(lastTextChange) >= 0.18 {
-                    return text
-                }
-            }
-
-            try await Task.sleep(for: .milliseconds(60))
+    private func waitForCompletion(timeout: Duration, targetCommitCount: Int) async throws -> String {
+        let existing = currentBestText()
+        if !existing.isEmpty, completedCommitCount >= targetCommitCount {
+            return existing
         }
 
-        if !bestText.isEmpty {
-            return bestText
+        return try await withCheckedThrowingContinuation { continuation in
+            completionTargetCommitCount = targetCommitCount
+            completionContinuation = continuation
+            Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: timeout)
+                    guard let self, self.completionContinuation != nil else { return }
+                    let text = self.currentBestText()
+                    self.completionContinuation = nil
+                    if !text.isEmpty {
+                        continuation.resume(returning: text)
+                    } else {
+                        continuation.resume(throwing: SpeechToTextError.transcriptionFailed("OpenAI realtime transcription timed out"))
+                    }
+                } catch {
+                    guard let self, self.completionContinuation != nil else { return }
+                    self.completionContinuation = nil
+                    continuation.resume(throwing: error)
+                }
+            }
         }
-
-        throw SpeechToTextError.transcriptionFailed("OpenAI realtime transcription timed out")
     }
 
     private func resumeCompletion(with text: String) {

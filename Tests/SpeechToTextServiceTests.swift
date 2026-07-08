@@ -80,16 +80,16 @@ class SpeechToTextServiceTests: XCTestCase {
         XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionModel, "custom-realtime-whisper")
     }
 
-    func testOpenAIRealtimeTranscriptionDelayDefaultsToMinimal() {
+    func testOpenAIRealtimeTranscriptionDelayDefaultsToLow() {
         defaults.removeObject(forKey: AppDefaults.Keys.openAIRealtimeTranscriptionDelay)
 
-        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .minimal)
+        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .low)
     }
 
     func testOpenAIRealtimeTranscriptionDelayFallsBackWhenInvalid() {
         defaults.set("not-a-delay", forKey: AppDefaults.Keys.openAIRealtimeTranscriptionDelay)
 
-        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .minimal)
+        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .low)
     }
 
     func testMiMoASRModelDefaultsToV25ASR() {

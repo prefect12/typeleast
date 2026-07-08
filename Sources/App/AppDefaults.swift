@@ -54,7 +54,7 @@ internal enum AppDefaults {
     internal static let defaultParakeetModel: ParakeetModel = .v3Multilingual
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-transcribe"
     internal static let defaultOpenAIRealtimeTranscriptionModel = "gpt-realtime-whisper"
-    internal static let defaultOpenAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay = .minimal
+    internal static let defaultOpenAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay = .low
     internal static let defaultMiMoASRModel = "mimo-v2.5-asr"
     internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
     internal static let defaultRecordingHUDStyle: RecordingHUDStyle = .appleGlass

@@ -64,7 +64,6 @@ internal extension ContentView {
 
                 let streamingFinishStart = Date()
                 let streamedText = await LiveDictationCoordinator.shared.finishRecognition()
-                let didInsertLiveText = LiveDictationCoordinator.shared.hasInsertedLiveText
                 let streamingFinalizeTime = streamedText == nil
                     ? nil
                     : Date().timeIntervalSince(streamingFinishStart)
@@ -123,7 +122,7 @@ internal extension ContentView {
                         text: result.text,
                         recordID: result.savedRecordID,
                         processStart: result.processStart,
-                        shouldPasteAutomatically: !didInsertLiveText
+                        shouldPasteAutomatically: true
                     )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
