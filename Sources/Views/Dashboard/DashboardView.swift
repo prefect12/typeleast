@@ -199,9 +199,7 @@ internal struct DashboardView: View {
         case .providers:
             DashboardProvidersView()
         case .preferences:
-            DashboardPreferencesView {
-                selectionModel.selectedNav = .recording
-            }
+            DashboardPreferencesView()
         case .permissions:
             DashboardPermissionsView()
         }

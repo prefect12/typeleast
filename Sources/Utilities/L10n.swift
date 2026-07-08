@@ -218,6 +218,11 @@ internal enum L10n {
         static var hudStyleCandidateBar: String { isCN ? "输入法候选栏" : "Candidate Bar" }
         static var behavior: String { isCN ? "行为" : "Behavior" }
         static var key: String { isCN ? "按键" : "Key" }
+        static var shortcutTrigger: String { isCN ? "快捷键触发方式" : "Shortcut Trigger" }
+        static var shortcutTriggerDesc: String {
+            isCN ? "持续模式：双击单独修饰键开始/结束；普通组合键按一次开始、再按一次结束。快速模式：按住快捷键录音，松开结束。" :
+                "Continuous: double-press a modifier-only shortcut to start/stop, or press a key combo once to start and again to stop. Quick: hold the shortcut to record, release to stop."
+        }
         static var holdMode: String { isCN ? "快速模式" : "Quick Mode" }
         static var toggleMode: String { isCN ? "持续模式" : "Continuous Mode" }
         static var doubleTapMode: String { toggleMode }

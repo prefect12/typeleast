@@ -1,6 +1,8 @@
 import SwiftUI
 import ServiceManagement
 import os.log
+import HotKey
+import AppKit
 
 internal struct DashboardPreferencesView: View {
     @AppStorage("startAtLogin") private var startAtLogin = true
@@ -20,8 +22,9 @@ internal struct DashboardPreferencesView: View {
 
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var loginItemError: String?
-
-    var onConfigureShortcuts: (() -> Void)?
+    @State private var isRecordingHotkey = false
+    @State private var recordedModifiers: NSEvent.ModifierFlags = []
+    @State private var recordedKey: Key?
 
     private let storageOptions: [Double] = [1, 2, 5, 10, 20]
 
@@ -84,16 +87,28 @@ internal struct DashboardPreferencesView: View {
 
                     Spacer(minLength: 12)
 
-                    VStack(alignment: .trailing, spacing: 4) {
-                        Text(GlobalShortcutDisplay.text(for: globalHotkey))
-                            .font(.system(.body, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .trailing, spacing: 6) {
+                        if isRecordingHotkey {
+                            HotKeyRecorderView(
+                                isRecording: $isRecordingHotkey,
+                                recordedModifiers: $recordedModifiers,
+                                recordedKey: $recordedKey,
+                                onComplete: { result in
+                                    applyRecordedHotkey(result)
+                                }
+                            )
+                        } else {
+                            Text(GlobalShortcutDisplay.text(for: globalHotkey))
+                                .font(.system(.body, design: .monospaced))
+                                .foregroundStyle(.secondary)
 
-                        Button(L10n.Preferences.configureShortcut) {
-                            onConfigureShortcuts?()
+                            Button(L10n.Preferences.configureShortcut) {
+                                isRecordingHotkey = true
+                                recordedModifiers = []
+                                recordedKey = nil
+                            }
+                            .buttonStyle(.link)
                         }
-                        .buttonStyle(.link)
-                        .disabled(onConfigureShortcuts == nil)
                     }
                 }
 
@@ -235,6 +250,40 @@ internal struct DashboardPreferencesView: View {
                 mode: isContinuous ? .doubleTapToggle : .hold
             )
         )
+    }
+
+    private func updateGlobalHotkey(_ newHotkey: String) {
+        NotificationCenter.default.post(
+            name: .updateGlobalHotkey,
+            object: newHotkey
+        )
+    }
+
+    private func applyRecordedHotkey(_ result: HotKeyRecordingResult) {
+        switch result {
+        case .keyCombo(let newHotkey):
+            let wasModifierOnly = GlobalShortcutDisplay.modifierOnlyKey(from: globalHotkey) != nil
+            globalHotkey = newHotkey
+            updateGlobalHotkey(newHotkey)
+
+            if wasModifierOnly {
+                pressAndHoldEnabled = false
+                NotificationCenter.default.post(
+                    name: .pressAndHoldSettingsChanged,
+                    object: PressAndHoldConfiguration(
+                        enabled: false,
+                        key: PressAndHoldKey(rawValue: pressAndHoldKeyIdentifier) ?? PressAndHoldConfiguration.defaults.key,
+                        mode: PressAndHoldMode(rawValue: pressAndHoldModeRaw) ?? PressAndHoldConfiguration.defaults.mode
+                    )
+                )
+            }
+
+        case .modifierOnly(let key):
+            let storedValue = GlobalShortcutDisplay.storedValue(for: key)
+            globalHotkey = storedValue
+            updateGlobalHotkey(storedValue)
+            syncModifierOnlyShortcutMode(isContinuous: immediateRecording)
+        }
     }
 
     private func updateLoginItem(enabled: Bool) {

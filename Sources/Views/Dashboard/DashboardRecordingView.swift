@@ -81,47 +81,30 @@ internal struct DashboardRecordingView: View {
             }
 
             Section {
-                Toggle(isOn: $pressAndHoldEnabled) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.RecordingSettings.enablePressAndHold)
-                        Text(L10n.RecordingSettings.pressAndHoldDesc)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker(L10n.RecordingSettings.shortcutTrigger, selection: recordingModeBinding) {
+                        Text(L10n.Preferences.continuousMode).tag(true)
+                        Text(L10n.Preferences.quickMode).tag(false)
                     }
-                }
-                .onChange(of: pressAndHoldEnabled) { _, _ in
-                    publishPressAndHoldConfiguration()
-                }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(maxWidth: 260)
 
-                if pressAndHoldEnabled {
-                    Picker(L10n.RecordingSettings.behavior, selection: $pressAndHoldModeRaw) {
-                        ForEach(PressAndHoldMode.allCases, id: \.rawValue) { mode in
-                            Text(mode.displayName).tag(mode.rawValue)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: pressAndHoldModeRaw) { _, _ in
-                        publishPressAndHoldConfiguration()
-                    }
-
-                    Picker(L10n.RecordingSettings.key, selection: $pressAndHoldKeyIdentifier) {
-                        ForEach(PressAndHoldKey.allCases, id: \.rawValue) { key in
-                            Text(key.displayName).tag(key.rawValue)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .onChange(of: pressAndHoldKeyIdentifier) { _, _ in
-                        publishPressAndHoldConfiguration()
-                    }
+                    Text(L10n.RecordingSettings.shortcutTriggerDesc)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             } header: {
-                Text(L10n.RecordingSettings.pressAndHold)
+                Text(L10n.RecordingSettings.shortcutTrigger)
             } footer: {
                 Text(L10n.RecordingSettings.pressAndHoldFooter)
             }
         }
         .formStyle(.grouped)
-        .onAppear(perform: loadMicrophones)
+        .onAppear {
+            loadMicrophones()
+            syncModifierOnlyShortcutMode(isContinuous: immediateRecording)
+        }
     }
 
     private func loadMicrophones() {
@@ -131,6 +114,32 @@ internal struct DashboardRecordingView: View {
             position: .unspecified
         )
         availableMicrophones = discoverySession.devices
+    }
+
+    private var recordingModeBinding: Binding<Bool> {
+        Binding(
+            get: { immediateRecording },
+            set: { isContinuous in
+                immediateRecording = isContinuous
+                syncModifierOnlyShortcutMode(isContinuous: isContinuous)
+            }
+        )
+    }
+
+    private func syncModifierOnlyShortcutMode(isContinuous: Bool) {
+        guard let key = GlobalShortcutDisplay.modifierOnlyKey(from: globalHotkey) else { return }
+
+        pressAndHoldEnabled = true
+        pressAndHoldKeyIdentifier = key.rawValue
+        pressAndHoldModeRaw = isContinuous ? PressAndHoldMode.doubleTapToggle.rawValue : PressAndHoldMode.hold.rawValue
+
+        publishPressAndHoldConfiguration(
+            PressAndHoldConfiguration(
+                enabled: true,
+                key: key,
+                mode: isContinuous ? .doubleTapToggle : .hold
+            )
+        )
     }
 
     private func publishPressAndHoldConfiguration() {
