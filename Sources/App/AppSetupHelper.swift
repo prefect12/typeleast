@@ -142,7 +142,10 @@ internal class AppSetupHelper {
         
         do {
             let files = try FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: [.creationDateKey], options: [])
-            let audioFiles = files.filter { $0.lastPathComponent.hasPrefix("recording_") && $0.pathExtension == "m4a" }
+            let audioFiles = files.filter {
+                $0.lastPathComponent.hasPrefix("recording_") &&
+                    ($0.pathExtension == "m4a" || $0.pathExtension == "wav")
+            }
             
             let cutoffDate = Date().addingTimeInterval(-24 * 60 * 60) // 24 hours ago
             
