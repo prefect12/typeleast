@@ -33,7 +33,7 @@ internal extension AppDelegate {
         switch pressAndHoldConfiguration.mode {
         case .hold:
             startRecordingFromPressAndHold()
-        case .toggle:
+        case .toggle, .doubleTapToggle:
             handleHotkey(source: .pressAndHold)
         }
     }

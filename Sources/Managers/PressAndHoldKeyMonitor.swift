@@ -4,6 +4,7 @@ import AppKit
 internal enum PressAndHoldMode: String, CaseIterable, Identifiable {
     case hold
     case toggle
+    case doubleTapToggle
 
     var id: String { rawValue }
 
@@ -13,6 +14,8 @@ internal enum PressAndHoldMode: String, CaseIterable, Identifiable {
             return L10n.RecordingSettings.holdMode
         case .toggle:
             return L10n.RecordingSettings.toggleMode
+        case .doubleTapToggle:
+            return L10n.RecordingSettings.doubleTapMode
         }
     }
 }
@@ -175,6 +178,8 @@ internal final class PressAndHoldKeyMonitor {
     private let addGlobalMonitor: EventMonitorFactory
     private let addLocalMonitor: LocalEventMonitorFactory
     private let removeMonitor: EventMonitorRemoval
+    private let now: () -> Date
+    private let doubleTapInterval: TimeInterval
 
     private var flagsMonitors: [Any] = []
     private var keyDownMonitors: [Any] = []
@@ -182,6 +187,7 @@ internal final class PressAndHoldKeyMonitor {
     private let monitorQueue = DispatchQueue(label: "com.typeleast.pressAndHoldMonitor")
 
     private var isPressed = false
+    private var lastTapTime: Date?
 
     init(
         configuration: PressAndHoldConfiguration,
@@ -189,7 +195,9 @@ internal final class PressAndHoldKeyMonitor {
         keyUpHandler: (() -> Void)? = nil,
         addGlobalMonitor: @escaping EventMonitorFactory = NSEvent.addGlobalMonitorForEvents(matching:handler:),
         addLocalMonitor: @escaping LocalEventMonitorFactory = NSEvent.addLocalMonitorForEvents(matching:handler:),
-        removeMonitor: @escaping EventMonitorRemoval = NSEvent.removeMonitor(_:)
+        removeMonitor: @escaping EventMonitorRemoval = NSEvent.removeMonitor(_:),
+        now: @escaping () -> Date = Date.init,
+        doubleTapInterval: TimeInterval = 0.35
     ) {
         self.configuration = configuration
         self.keyDownHandler = keyDownHandler
@@ -197,6 +205,8 @@ internal final class PressAndHoldKeyMonitor {
         self.addGlobalMonitor = addGlobalMonitor
         self.addLocalMonitor = addLocalMonitor
         self.removeMonitor = removeMonitor
+        self.now = now
+        self.doubleTapInterval = doubleTapInterval
     }
 
     func start() {
@@ -234,6 +244,7 @@ internal final class PressAndHoldKeyMonitor {
         keyUpMonitors.removeAll()
 
         isPressed = false
+        lastTapTime = nil
     }
 
     deinit {
@@ -265,6 +276,10 @@ internal final class PressAndHoldKeyMonitor {
         if isKeyDownEvent {
             guard !isPressed else { return }
             isPressed = true
+            if configuration.mode == .doubleTapToggle {
+                handleDoubleTapKeyDown()
+                return
+            }
             Task { @MainActor [keyDownHandler] in
                 keyDownHandler()
             }
@@ -275,6 +290,21 @@ internal final class PressAndHoldKeyMonitor {
             Task { @MainActor in
                 keyUpHandler()
             }
+        }
+    }
+
+    private func handleDoubleTapKeyDown() {
+        let currentTime = now()
+
+        guard let previousTapTime = lastTapTime,
+              currentTime.timeIntervalSince(previousTapTime) <= doubleTapInterval else {
+            lastTapTime = currentTime
+            return
+        }
+
+        lastTapTime = nil
+        Task { @MainActor [keyDownHandler] in
+            keyDownHandler()
         }
     }
 

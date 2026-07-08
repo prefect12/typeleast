@@ -19,7 +19,9 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
     private func makeMonitor(
         configuration: PressAndHoldConfiguration,
         keyDownHandler: @escaping () -> Void = {},
-        keyUpHandler: (() -> Void)? = nil
+        keyUpHandler: (() -> Void)? = nil,
+        now: @escaping () -> Date = Date.init,
+        doubleTapInterval: TimeInterval = 0.35
     ) -> PressAndHoldKeyMonitor {
         let addGlobalMonitor: PressAndHoldKeyMonitor.EventMonitorFactory = { [weak self] mask, handler in
             self?.addedGlobalEvents.append((mask, handler))
@@ -41,7 +43,9 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
             keyUpHandler: keyUpHandler,
             addGlobalMonitor: addGlobalMonitor,
             addLocalMonitor: addLocalMonitor,
-            removeMonitor: removeMonitor
+            removeMonitor: removeMonitor,
+            now: now,
+            doubleTapInterval: doubleTapInterval
         )
     }
 
@@ -108,6 +112,66 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
 
         monitor.processTransition(isKeyDownEvent: false)
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+    }
+
+    func testDoubleTapModeDoesNotInvokeHandlerOnSinglePress() {
+        let expectationDown = expectation(description: "keyDown")
+        expectationDown.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: {
+                expectationDown.fulfill()
+            }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processTransition(isKeyDownEvent: false)
+
+        wait(for: [expectationDown], timeout: 0.1)
+    }
+
+    func testDoubleTapModeInvokesHandlerOnSecondPressWithinInterval() {
+        var currentTime = Date(timeIntervalSinceReferenceDate: 100)
+        let expectationDown = expectation(description: "keyDown")
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: {
+                expectationDown.fulfill()
+            },
+            now: { currentTime },
+            doubleTapInterval: 0.35
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processTransition(isKeyDownEvent: false)
+        currentTime = currentTime.addingTimeInterval(0.2)
+        monitor.processTransition(isKeyDownEvent: true)
+
+        wait(for: [expectationDown], timeout: 1.0)
+    }
+
+    func testDoubleTapModeIgnoresSecondPressAfterInterval() {
+        var currentTime = Date(timeIntervalSinceReferenceDate: 100)
+        let expectationDown = expectation(description: "keyDown")
+        expectationDown.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: {
+                expectationDown.fulfill()
+            },
+            now: { currentTime },
+            doubleTapInterval: 0.35
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processTransition(isKeyDownEvent: false)
+        currentTime = currentTime.addingTimeInterval(0.5)
+        monitor.processTransition(isKeyDownEvent: true)
+
+        wait(for: [expectationDown], timeout: 0.1)
     }
 
     // MARK: - stop()

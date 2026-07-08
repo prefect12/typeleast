@@ -220,6 +220,7 @@ internal enum L10n {
         static var key: String { isCN ? "按键" : "Key" }
         static var holdMode: String { isCN ? "按住时录音" : "Press and Hold" }
         static var toggleMode: String { isCN ? "按一次切换" : "Press to Toggle" }
+        static var doubleTapMode: String { isCN ? "双击切换" : "Double Press to Toggle" }
         static var rightCommand: String { isCN ? "右 Command (⌘)" : "Right Command (⌘)" }
         static var leftCommand: String { isCN ? "左 Command (⌘)" : "Left Command (⌘)" }
         static var rightOption: String { isCN ? "右 Option (⌥)" : "Right Option (⌥)" }
