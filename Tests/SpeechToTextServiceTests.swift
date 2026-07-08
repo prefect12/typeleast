@@ -92,13 +92,6 @@ class SpeechToTextServiceTests: XCTestCase {
         XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .minimal)
     }
 
-    func testOpenAIRealtimeTranscriptionURLUsesTranscriptionIntent() throws {
-        let url = try OpenAIRealtimeTranscriber.transcriptionSessionURL()
-
-        XCTAssertEqual(url.absoluteString, "wss://api.openai.com/v1/realtime?intent=transcription")
-        XCTAssertFalse(url.absoluteString.contains("model="))
-    }
-
     func testMiMoASRModelDefaultsToV25ASR() {
         defaults.removeObject(forKey: AppDefaults.Keys.miMoASRModel)
 

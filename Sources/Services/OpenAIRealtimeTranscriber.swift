@@ -45,15 +45,6 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         self.urlSession = urlSession
     }
 
-    nonisolated static func transcriptionSessionURL() throws -> URL {
-        var components = URLComponents(string: "wss://api.openai.com/v1/realtime")
-        components?.queryItems = [URLQueryItem(name: "intent", value: "transcription")]
-        guard let url = components?.url else {
-            throw SpeechToTextError.invalidURL
-        }
-        return url
-    }
-
     func start(language: TranscriptionLanguage, updateHandler: UpdateHandler? = nil) {
         cancel()
         currentText = ""
@@ -77,10 +68,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     }
 
     func finish(timeout: TimeInterval = 1.2) async -> String? {
-        if let pendingStartTask {
-            self.pendingStartTask = nil
-            await pendingStartTask.value
-        }
+        pendingStartTask?.cancel()
         pendingStartTask = nil
 
         guard isStreaming, webSocketTask != nil else {
@@ -128,7 +116,12 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
             throw SpeechToTextError.apiKeyMissing("OpenAI")
         }
 
-        let url = try Self.transcriptionSessionURL()
+        let model = settingsStore.openAIRealtimeTranscriptionModel
+        var components = URLComponents(string: "wss://api.openai.com/v1/realtime")
+        components?.queryItems = [URLQueryItem(name: "model", value: model)]
+        guard let url = components?.url else {
+            throw SpeechToTextError.invalidURL
+        }
 
         var request = URLRequest(url: url)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
