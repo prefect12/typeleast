@@ -58,7 +58,7 @@ internal extension AppDelegate {
             .modelContainer(DataManager.shared.sharedModelContainer ?? createFallbackModelContainer())
 
         window.contentView = NSHostingView(rootView: contentView)
-        window.center()
+        RecordingWindowPositioner.position(window)
 
         window.standardWindowButton(.closeButton)?.isHidden = true
         window.standardWindowButton(.miniaturizeButton)?.isHidden = true

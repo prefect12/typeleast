@@ -209,6 +209,13 @@ internal enum L10n {
         static var pressAndHoldFooter: String {
             isCN ? "在其他应用中使用需要辅助功能权限。" : "Requires Accessibility permission to work in other apps."
         }
+        static var hudStyle: String { isCN ? "浮窗样式" : "Floating HUD Style" }
+        static var hudStyleFooter: String {
+            isCN ? "控制录音和处理状态小浮窗的视觉风格。" : "Controls the visual style of the recording and processing popup."
+        }
+        static var hudStyleAppleGlass: String { isCN ? "Apple 玻璃" : "Apple Glass" }
+        static var hudStyleSiriAura: String { isCN ? "Siri 光晕" : "Siri Aura" }
+        static var hudStyleCandidateBar: String { isCN ? "输入法候选栏" : "Candidate Bar" }
         static var behavior: String { isCN ? "行为" : "Behavior" }
         static var key: String { isCN ? "按键" : "Key" }
         static var holdMode: String { isCN ? "按住时录音" : "Press and Hold" }

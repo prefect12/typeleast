@@ -8,19 +8,29 @@ internal class ChromelessWindow: NSWindow {
 }
 
 internal struct VisualEffectView: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .hudWindow
+    var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
+    var appearanceName: NSAppearance.Name?
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let effectView = NSVisualEffectView()
         effectView.state = .active
-        // Keep the recording window feeling like a light, translucent HUD that adapts to Light/Dark Mode.
-        effectView.material = .popover
-        effectView.blendingMode = .behindWindow
+        effectView.material = material
+        effectView.blendingMode = blendingMode
+        if let appearanceName {
+            effectView.appearance = NSAppearance(named: appearanceName)
+        }
         effectView.wantsLayer = true
         effectView.layer?.cornerRadius = LayoutMetrics.RecordingWindow.cornerRadius
         effectView.layer?.masksToBounds = true
         return effectView
     }
 
-    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = material
+        nsView.blendingMode = blendingMode
+        nsView.appearance = appearanceName.flatMap { NSAppearance(named: $0) }
+    }
 }
 
 internal class RecordingWindowDelegate: NSObject, NSWindowDelegate {

@@ -28,6 +28,7 @@ internal enum AppDefaults {
         static let maxModelStorageGB = "maxModelStorageGB"
         static let enableSmartPaste = "enableSmartPaste"
         static let enableStreamingTranscription = "enableStreamingTranscription"
+        static let recordingHUDStyle = "recordingHUDStyle"
         static let immediateRecording = "immediateRecording"
         static let globalHotkey = "globalHotkey"
 
@@ -52,6 +53,7 @@ internal enum AppDefaults {
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-transcribe"
     internal static let defaultMiMoASRModel = "mimo-v2.5-asr"
     internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
+    internal static let defaultRecordingHUDStyle: RecordingHUDStyle = .appleGlass
     internal static let defaultSemanticCorrectionMode: SemanticCorrectionMode = .off
     internal static let defaultSemanticCorrectionModelRepo: String = "mlx-community/Qwen3-1.7B-4bit"
 
@@ -74,6 +76,7 @@ internal enum AppDefaults {
             Keys.maxModelStorageGB: 5.0,
             Keys.enableSmartPaste: true,
             Keys.enableStreamingTranscription: true,
+            Keys.recordingHUDStyle: defaultRecordingHUDStyle.rawValue,
             Keys.immediateRecording: false,
             Keys.globalHotkey: "⌘⇧Space",
 

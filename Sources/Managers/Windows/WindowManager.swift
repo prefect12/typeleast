@@ -66,22 +66,9 @@ internal class WindowManager: ObservableObject {
         // Force the window to update its appearance
         window.appearance = NSApp.appearance
         
-        centerWindow(window)
+        RecordingWindowPositioner.position(window)
         enableMouseTracking(for: window)
         preventFocusRing(for: window)
-    }
-    
-    private func centerWindow(_ window: NSWindow) {
-        window.center()
-        
-        // Reset to center of screen if position seems off
-        let screenFrame = NSScreen.main?.frame ?? NSRect.zero
-        let windowFrame = window.frame
-        let centeredOrigin = NSPoint(
-            x: (screenFrame.width - windowFrame.width) / 2,
-            y: (screenFrame.height - windowFrame.height) / 2 + 50 // Slightly above center
-        )
-        window.setFrameOrigin(centeredOrigin)
     }
     
     private func enableMouseTracking(for window: NSWindow) {
@@ -132,17 +119,7 @@ internal class WindowManager: ObservableObject {
     
     func showRecordingWindow() {
         guard let window = recordWindow else { return }
-        
-        // Force window to current Space
-        if let screen = NSScreen.main {
-            let screenFrame = screen.frame
-            let windowFrame = window.frame
-            let centeredOrigin = NSPoint(
-                x: (screenFrame.width - windowFrame.width) / 2,
-                y: (screenFrame.height - windowFrame.height) / 2 + 50
-            )
-            window.setFrameOrigin(centeredOrigin)
-        }
+        RecordingWindowPositioner.position(window)
         
         NSApp?.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
