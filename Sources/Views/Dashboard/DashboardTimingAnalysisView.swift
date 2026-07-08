@@ -53,70 +53,109 @@ private struct TimingSegment: Identifiable {
 private struct TimingRun: Identifiable {
     let record: TranscriptionRecord
     let index: Int
+    let runLabel: String
+    let chartKey: String
+    let chartLabel: String
+    let detailLine: String
+    private let segmentsIncludingRecording: [TimingSegment]
+    private let segmentsExcludingRecording: [TimingSegment]
+    private let totalIncludingRecording: TimeInterval
+    private let totalExcludingRecording: TimeInterval
 
     var id: UUID { record.id }
 
-    var runLabel: String {
-        "#\(index + 1) · \(Self.shortFormatter.string(from: record.date))"
-    }
-
-    var chartKey: String {
-        String(format: "%05d", index + 1)
-    }
-
-    var chartLabel: String {
-        "\(index + 1)"
-    }
-
-    var detailLine: String {
+    init(record: TranscriptionRecord, index: Int) {
+        self.record = record
+        self.index = index
+        self.runLabel = "#\(index + 1) · \(Self.shortFormatter.string(from: record.date))"
+        self.chartKey = String(format: "%05d", index + 1)
+        self.chartLabel = "\(index + 1)"
         let provider = L10n.Provider.displayName(for: record.provider)
         let source = record.sourceAppName?.isEmpty == false ? record.sourceAppName! : "-"
-        return "\(provider) · \(source)"
+        self.detailLine = "\(provider) · \(source)"
+
+        let segmentsExcludingRecording = Self.makeSegments(
+            for: record,
+            runLabel: self.runLabel,
+            chartKey: self.chartKey,
+            includeRecording: false
+        )
+        self.segmentsExcludingRecording = segmentsExcludingRecording
+        self.segmentsIncludingRecording = Self.makeSegments(
+            for: record,
+            runLabel: self.runLabel,
+            chartKey: self.chartKey,
+            includeRecording: true
+        )
+        self.totalExcludingRecording = segmentsExcludingRecording.reduce(0) { $0 + $1.seconds }
+        self.totalIncludingRecording = self.segmentsIncludingRecording.reduce(0) { $0 + $1.seconds }
     }
 
     func segments(includeRecording: Bool) -> [TimingSegment] {
+        includeRecording ? segmentsIncludingRecording : segmentsExcludingRecording
+    }
+
+    func visibleTotal(includeRecording: Bool) -> TimeInterval {
+        includeRecording ? totalIncludingRecording : totalExcludingRecording
+    }
+
+    func processingTotal() -> TimeInterval {
+        totalExcludingRecording
+    }
+
+    private static func makeSegments(
+        for record: TranscriptionRecord,
+        runLabel: String,
+        chartKey: String,
+        includeRecording: Bool
+    ) -> [TimingSegment] {
         var output: [TimingSegment] = []
 
         if includeRecording, let duration = record.duration, duration > 0 {
-            output.append(segment(.recording, duration))
+            output.append(Self.segment(.recording, duration, record: record, chartKey: chartKey, runLabel: runLabel))
         }
 
         if record.hasDetailedTiming {
-            appendPositive(record.modelReadyTime, stage: .modelReady, to: &output)
-            appendPositive(record.asrTime, stage: .asr, to: &output)
-            appendPositive(record.correctionTime, stage: .correction, to: &output)
+            appendPositive(record.modelReadyTime, stage: .modelReady, record: record, chartKey: chartKey, runLabel: runLabel, to: &output)
+            appendPositive(record.asrTime, stage: .asr, record: record, chartKey: chartKey, runLabel: runLabel, to: &output)
+            appendPositive(record.correctionTime, stage: .correction, record: record, chartKey: chartKey, runLabel: runLabel, to: &output)
 
             let knownProcessing = [record.modelReadyTime, record.asrTime, record.correctionTime]
                 .compactMap { $0 }
                 .reduce(0, +)
             if let total = record.transcriptionTime {
                 let remaining = max(0, total - knownProcessing)
-                appendPositive(remaining > 0.05 ? remaining : nil, stage: .untrackedProcessing, to: &output)
+                appendPositive(remaining > 0.05 ? remaining : nil, stage: .untrackedProcessing, record: record, chartKey: chartKey, runLabel: runLabel, to: &output)
             }
 
-            appendPositive(record.clipboardTime, stage: .clipboard, to: &output)
-            appendPositive(record.pasteTime, stage: .paste, to: &output)
+            appendPositive(record.clipboardTime, stage: .clipboard, record: record, chartKey: chartKey, runLabel: runLabel, to: &output)
+            appendPositive(record.pasteTime, stage: .paste, record: record, chartKey: chartKey, runLabel: runLabel, to: &output)
         } else if let total = record.transcriptionTime, total > 0 {
-            output.append(segment(.untrackedProcessing, total))
+            output.append(Self.segment(.untrackedProcessing, total, record: record, chartKey: chartKey, runLabel: runLabel))
         }
 
         return output
     }
 
-    func visibleTotal(includeRecording: Bool) -> TimeInterval {
-        segments(includeRecording: includeRecording).reduce(0) { $0 + $1.seconds }
-    }
-
-    func processingTotal() -> TimeInterval {
-        segments(includeRecording: false).reduce(0) { $0 + $1.seconds }
-    }
-
-    private func appendPositive(_ value: TimeInterval?, stage: TimingStage, to output: inout [TimingSegment]) {
+    private static func appendPositive(
+        _ value: TimeInterval?,
+        stage: TimingStage,
+        record: TranscriptionRecord,
+        chartKey: String,
+        runLabel: String,
+        to output: inout [TimingSegment]
+    ) {
         guard let value, value > 0 else { return }
-        output.append(segment(stage, value))
+        output.append(segment(stage, value, record: record, chartKey: chartKey, runLabel: runLabel))
     }
 
-    private func segment(_ stage: TimingStage, _ seconds: TimeInterval) -> TimingSegment {
+    private static func segment(
+        _ stage: TimingStage,
+        _ seconds: TimeInterval,
+        record: TranscriptionRecord,
+        chartKey: String,
+        runLabel: String
+    ) -> TimingSegment {
         TimingSegment(
             id: "\(record.id.uuidString)-\(stage.rawValue)",
             recordID: record.id,
@@ -152,10 +191,39 @@ private struct TimingAnalysisSnapshot {
     let slowestRun: TimingRun?
 }
 
+private final class TimingRunCache {
+    private struct CacheKey: Equatable {
+        let recordIDs: [UUID]
+        let reloadToken: Int
+        let languageKey: String
+    }
+
+    private var key: CacheKey?
+    private var cachedRuns: [TimingRun] = []
+
+    func runs(for records: [TranscriptionRecord], reloadToken: Int, languageKey: String) -> [TimingRun] {
+        let nextKey = CacheKey(
+            recordIDs: records.map(\.id),
+            reloadToken: reloadToken,
+            languageKey: languageKey
+        )
+        if key == nextKey {
+            return cachedRuns
+        }
+
+        let runs = records.enumerated()
+            .map { TimingRun(record: $0.element, index: $0.offset) }
+        key = nextKey
+        cachedRuns = runs
+        return runs
+    }
+}
+
 internal struct DashboardTimingAnalysisView: View {
     @ObservedObject private var languageManager = LanguageManager.shared
     @State private var timingStore = TimingAnalysisStore.shared
     @State private var metricsStore = UsageMetricsStore.shared
+    @State private var runsCache = TimingRunCache()
     @State private var includeRecording = false
     @State private var recordLimit = 50
     @State private var hoveredRunID: UUID?
@@ -322,7 +390,9 @@ internal struct DashboardTimingAnalysisView: View {
                     }
                     .coordinateSpace(name: "timingChartViewport")
                     .onPreferenceChange(TimingChartContentFramePreferenceKey.self) { frame in
-                        chartContentFrame = frame
+                        if chartContentFrame != frame {
+                            chartContentFrame = frame
+                        }
                     }
                     .overlay {
                         GeometryReader { geometry in
@@ -391,7 +461,7 @@ internal struct DashboardTimingAnalysisView: View {
                 if snapshot.visibleRuns.isEmpty {
                     emptyState
                 } else {
-                    VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
                         ForEach(Array(snapshot.visibleRuns.enumerated()), id: \.element.id) { offset, run in
                             TimingDetailRow(
                                 run: run,
@@ -444,8 +514,11 @@ internal struct DashboardTimingAnalysisView: View {
 
     private func makeSnapshot() -> TimingAnalysisSnapshot {
         let source = recordLimit == 0 ? timingStore.records : Array(timingStore.records.prefix(recordLimit))
-        let runs = source.enumerated()
-            .map { TimingRun(record: $0.element, index: $0.offset) }
+        let runs = runsCache.runs(
+            for: source,
+            reloadToken: timingStore.reloadToken,
+            languageKey: String(describing: languageManager.current)
+        )
             .filter { !$0.segments(includeRecording: true).isEmpty }
         let visibleRuns = runs.filter { !$0.segments(includeRecording: includeRecording).isEmpty }
         let chartSegments = visibleRuns.flatMap { $0.segments(includeRecording: includeRecording) }
