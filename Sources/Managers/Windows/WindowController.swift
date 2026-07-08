@@ -75,6 +75,7 @@ internal class WindowController {
         
         // Remember the currently active app before showing our window
         storePreviousApp()
+        RecordingWindowPositioner.position(window)
         
         // Configure window for proper keyboard handling and space management
         window.canHide = false
@@ -108,6 +109,7 @@ internal class WindowController {
                 
                 // Use higher window level to ensure it appears over fullscreen apps
                 window.level = .modalPanel
+                RecordingWindowPositioner.position(window)
                 
                 // Activate app to ensure we're in right space context
                 NSApp.activate(ignoringOtherApps: true)

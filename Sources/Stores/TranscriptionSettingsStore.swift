@@ -7,6 +7,7 @@ internal protocol TranscriptionSettingsReadable: AnyObject {
     var openAITranscriptionModel: String { get }
     var miMoASRModel: String { get }
     var transcriptionLanguage: TranscriptionLanguage { get }
+    var recordingHUDStyle: RecordingHUDStyle { get }
     var semanticCorrectionMode: SemanticCorrectionMode { get }
     var semanticCorrectionModelRepo: String { get }
     var isTranscriptionHistoryEnabled: Bool { get }
@@ -23,6 +24,7 @@ internal struct TranscriptionSettingsSnapshot: Equatable {
     let openAITranscriptionModel: String
     let miMoASRModel: String
     let transcriptionLanguage: TranscriptionLanguage
+    let recordingHUDStyle: RecordingHUDStyle
     let semanticCorrectionMode: SemanticCorrectionMode
     let semanticCorrectionModelRepo: String
     let isTranscriptionHistoryEnabled: Bool
@@ -79,6 +81,12 @@ internal final class TranscriptionSettingsStore: TranscriptionSettingsReadable {
         return TranscriptionLanguage(rawValue: rawValue) ?? AppDefaults.defaultTranscriptionLanguage
     }
 
+    var recordingHUDStyle: RecordingHUDStyle {
+        let rawValue = defaults.string(forKey: AppDefaults.Keys.recordingHUDStyle)
+            ?? AppDefaults.defaultRecordingHUDStyle.rawValue
+        return RecordingHUDStyle(rawValue: rawValue) ?? AppDefaults.defaultRecordingHUDStyle
+    }
+
     var semanticCorrectionMode: SemanticCorrectionMode {
         let rawValue = defaults.string(forKey: AppDefaults.Keys.semanticCorrectionMode)
             ?? AppDefaults.defaultSemanticCorrectionMode.rawValue
@@ -129,6 +137,7 @@ internal final class TranscriptionSettingsStore: TranscriptionSettingsReadable {
             openAITranscriptionModel: openAITranscriptionModel,
             miMoASRModel: miMoASRModel,
             transcriptionLanguage: transcriptionLanguage,
+            recordingHUDStyle: recordingHUDStyle,
             semanticCorrectionMode: semanticCorrectionMode,
             semanticCorrectionModelRepo: semanticCorrectionModelRepo,
             isTranscriptionHistoryEnabled: isTranscriptionHistoryEnabled,

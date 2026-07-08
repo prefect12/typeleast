@@ -9,6 +9,7 @@ internal struct DashboardRecordingView: View {
     @AppStorage("pressAndHoldEnabled") private var pressAndHoldEnabled = PressAndHoldConfiguration.defaults.enabled
     @AppStorage("pressAndHoldKeyIdentifier") private var pressAndHoldKeyIdentifier = PressAndHoldConfiguration.defaults.key.rawValue
     @AppStorage("pressAndHoldMode") private var pressAndHoldModeRaw = PressAndHoldConfiguration.defaults.mode.rawValue
+    @AppStorage(AppDefaults.Keys.recordingHUDStyle) private var recordingHUDStyle = AppDefaults.defaultRecordingHUDStyle
 
     @State private var availableMicrophones: [AVCaptureDevice] = []
     @State private var isRecordingHotkey = false
@@ -63,6 +64,19 @@ internal struct DashboardRecordingView: View {
                 Text(L10n.RecordingSettings.globalHotkey)
             } footer: {
                 Text(L10n.RecordingSettings.globalHotkeyFooter)
+            }
+
+            Section {
+                Picker(L10n.RecordingSettings.hudStyle, selection: $recordingHUDStyle) {
+                    ForEach(RecordingHUDStyle.allCases) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                .pickerStyle(.menu)
+            } header: {
+                Text(L10n.RecordingSettings.hudStyle)
+            } footer: {
+                Text(L10n.RecordingSettings.hudStyleFooter)
             }
 
             Section {

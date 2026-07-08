@@ -216,6 +216,7 @@ private final class FakeTranscriptionSettingsStore: TranscriptionSettingsReadabl
     var openAITranscriptionModel: String
     var miMoASRModel: String = AppDefaults.defaultMiMoASRModel
     var transcriptionLanguage: TranscriptionLanguage = .auto
+    var recordingHUDStyle: RecordingHUDStyle = AppDefaults.defaultRecordingHUDStyle
     var semanticCorrectionMode: SemanticCorrectionMode
     var semanticCorrectionModelRepo: String = AppDefaults.defaultSemanticCorrectionModelRepo
     var isTranscriptionHistoryEnabled: Bool

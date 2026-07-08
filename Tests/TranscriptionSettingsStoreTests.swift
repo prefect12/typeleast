@@ -28,6 +28,7 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.openAITranscriptionModel, AppDefaults.defaultOpenAITranscriptionModel)
         XCTAssertEqual(store.miMoASRModel, AppDefaults.defaultMiMoASRModel)
         XCTAssertEqual(store.transcriptionLanguage, AppDefaults.defaultTranscriptionLanguage)
+        XCTAssertEqual(store.recordingHUDStyle, AppDefaults.defaultRecordingHUDStyle)
         XCTAssertEqual(store.semanticCorrectionMode, AppDefaults.defaultSemanticCorrectionMode)
         XCTAssertEqual(store.semanticCorrectionModelRepo, AppDefaults.defaultSemanticCorrectionModelRepo)
         XCTAssertEqual(store.transcriptionRetentionPeriod, .forever)
@@ -38,6 +39,7 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         defaults.set("invalid-whisper", forKey: AppDefaults.Keys.selectedWhisperModel)
         defaults.set("invalid-parakeet", forKey: AppDefaults.Keys.selectedParakeetModel)
         defaults.set("invalid-language", forKey: AppDefaults.Keys.transcriptionLanguage)
+        defaults.set("invalid-hud-style", forKey: AppDefaults.Keys.recordingHUDStyle)
         defaults.set("invalid-correction", forKey: AppDefaults.Keys.semanticCorrectionMode)
         defaults.set("invalid-retention", forKey: AppDefaults.Keys.transcriptionRetentionPeriod)
 
@@ -47,6 +49,7 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedWhisperModel, AppDefaults.defaultWhisperModel)
         XCTAssertEqual(store.selectedParakeetModel, AppDefaults.defaultParakeetModel)
         XCTAssertEqual(store.transcriptionLanguage, AppDefaults.defaultTranscriptionLanguage)
+        XCTAssertEqual(store.recordingHUDStyle, AppDefaults.defaultRecordingHUDStyle)
         XCTAssertEqual(store.semanticCorrectionMode, AppDefaults.defaultSemanticCorrectionMode)
         XCTAssertEqual(store.transcriptionRetentionPeriod, .forever)
     }
