@@ -36,4 +36,11 @@ final class LiveTextInsertionManagerTests: XCTestCase {
             LiveTextEditPlan(deleteCount: 2, insertText: "测试语音输入")
         )
     }
+
+    func testEditPlanRestoresMissingLeadingChineseText() {
+        XCTAssertEqual(
+            LiveTextInsertionManager.editPlan(from: ",测试语音输入。", to: "你好,测试语音输入。"),
+            LiveTextEditPlan(deleteCount: 8, insertText: "你好,测试语音输入。")
+        )
+    }
 }

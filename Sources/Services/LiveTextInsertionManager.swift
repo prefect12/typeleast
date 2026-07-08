@@ -8,6 +8,11 @@ internal struct LiveTextEditPlan: Equatable {
     let insertText: String
 }
 
+private enum LiveTextApplyMode {
+    case liveUpdate
+    case finalReplacement
+}
+
 @MainActor
 internal final class LiveTextInsertionManager {
     private let accessibilityManager: AccessibilityPermissionManager
@@ -56,7 +61,7 @@ internal final class LiveTextInsertionManager {
         queuedText = nil
         queuedTargetApp = nil
 
-        await apply(text: finalText, targetApp: targetApp)
+        await apply(text: finalText, targetApp: targetApp, mode: .finalReplacement)
         isActive = false
     }
 
@@ -71,13 +76,17 @@ internal final class LiveTextInsertionManager {
             let targetApp = queuedTargetApp
             queuedText = nil
             queuedTargetApp = nil
-            await apply(text: text, targetApp: targetApp)
+            await apply(text: text, targetApp: targetApp, mode: .liveUpdate)
         }
 
         updateTask = nil
     }
 
-    private func apply(text: String, targetApp: NSRunningApplication?) async {
+    private func apply(
+        text: String,
+        targetApp: NSRunningApplication?,
+        mode: LiveTextApplyMode
+    ) async {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard text != insertedText else { return }
 
@@ -93,25 +102,39 @@ internal final class LiveTextInsertionManager {
         }
 
         targetApp.activate(options: [])
-        try? await Task.sleep(for: .milliseconds(30))
+        try? await Task.sleep(for: activationDelay(for: mode))
 
         guard let editPlan = Self.editPlan(from: insertedText, to: text) else { return }
 
         do {
-            try await apply(editPlan: editPlan)
+            try await apply(editPlan: editPlan, mode: mode)
             insertedText = text
         } catch {
             return
         }
     }
 
-    private func apply(editPlan: LiveTextEditPlan) async throws {
+    private func activationDelay(for mode: LiveTextApplyMode) -> Duration {
+        switch mode {
+        case .liveUpdate:
+            return insertedText.isEmpty ? .milliseconds(100) : .milliseconds(30)
+        case .finalReplacement:
+            return .milliseconds(150)
+        }
+    }
+
+    private func apply(editPlan: LiveTextEditPlan, mode: LiveTextApplyMode) async throws {
         if editPlan.deleteCount > 0 {
-            try deleteBackward(count: editPlan.deleteCount)
-            try? await Task.sleep(for: .milliseconds(10))
+            try await deleteBackward(count: editPlan.deleteCount)
+            try? await Task.sleep(for: .milliseconds(30))
         }
 
-        try typeText(editPlan.insertText)
+        switch mode {
+        case .liveUpdate:
+            try typeText(editPlan.insertText)
+        case .finalReplacement:
+            try await pasteText(editPlan.insertText)
+        }
     }
 
     private func typeText(_ text: String) throws {
@@ -147,7 +170,7 @@ internal final class LiveTextInsertionManager {
         keyUp.post(tap: .cgSessionEventTap)
     }
 
-    private func deleteBackward(count: Int) throws {
+    private func deleteBackward(count: Int) async throws {
         guard count > 0 else { return }
 
         guard let source = CGEventSource(stateID: .combinedSessionState) else {
@@ -163,7 +186,30 @@ internal final class LiveTextInsertionManager {
 
             keyDown.post(tap: .cgSessionEventTap)
             keyUp.post(tap: .cgSessionEventTap)
+            try? await Task.sleep(for: .milliseconds(2))
         }
+    }
+
+    private func pasteText(_ text: String) async throws {
+        guard !text.isEmpty else { return }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        try? await Task.sleep(for: .milliseconds(30))
+
+        guard let source = CGEventSource(stateID: .combinedSessionState),
+              let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false) else {
+            throw PasteError.keyboardEventCreationFailed
+        }
+
+        let commandFlag = CGEventFlags([.maskCommand])
+        keyDown.flags = commandFlag
+        keyUp.flags = commandFlag
+        keyDown.post(tap: .cgSessionEventTap)
+        keyUp.post(tap: .cgSessionEventTap)
+        try? await Task.sleep(for: .milliseconds(80))
     }
 
     private func resetState(cancelTask: Bool) {
