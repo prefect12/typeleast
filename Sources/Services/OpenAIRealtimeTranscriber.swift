@@ -83,7 +83,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
                     capturesMicrophoneAudio: capturesMicrophoneAudio
                 )
             } catch {
-                Logger.speechToText.error("Failed to start OpenAI realtime transcription: \(error.localizedDescription)")
+                Logger.speechToText.error("Failed to start OpenAI realtime transcription: \(error.localizedDescription, privacy: .public)")
                 self.lastError = error
                 self.cleanup()
             }
@@ -176,15 +176,18 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         webSocketTask = task
         task.resume()
 
-        receiveMessages()
+        Logger.speechToText.info("OpenAI realtime connecting; capturesMicrophoneAudio=\(capturesMicrophoneAudio, privacy: .public)")
+        try await receiveInitialEvent(matching: "session.created", timeout: 4)
+        try await sendSessionUpdate(language: language)
+        try await receiveInitialEvent(matching: "session.updated", timeout: 4)
+
         if capturesMicrophoneAudio {
             try startAudioCapture()
         }
         isStreaming = true
-        try await waitForSessionCreated(timeout: 4)
-        try await sendSessionUpdate(language: language)
-        try await waitForSessionUpdated(timeout: 4)
         isSessionReadyForAudio = true
+        receiveMessages()
+        Logger.speechToText.info("OpenAI realtime session ready; queuedChunks=\(self.queuedStartupAudioChunks.count, privacy: .public)")
         flushQueuedStartupAudioChunks()
         startPeriodicCommits()
         try await commitBufferedAudioIfNeeded()
@@ -364,31 +367,6 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         }
     }
 
-    private func waitForSessionCreated(timeout: TimeInterval) async throws {
-        try await waitForSessionFlag(timeout: timeout) { $0.hasSessionCreated }
-    }
-
-    private func waitForSessionUpdated(timeout: TimeInterval) async throws {
-        try await waitForSessionFlag(timeout: timeout) { $0.hasSessionUpdated }
-    }
-
-    private func waitForSessionFlag(
-        timeout: TimeInterval,
-        isReady: (OpenAIRealtimeTranscriber) -> Bool
-    ) async throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if isReady(self) {
-                return
-            }
-            if let lastError {
-                throw lastError
-            }
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        throw SpeechToTextError.transcriptionFailed("OpenAI realtime session timed out")
-    }
-
     private func sendEvent(_ event: [String: Any]) async throws {
         guard let webSocketTask else {
             throw SpeechToTextError.transcriptionFailed("OpenAI realtime session is not connected")
@@ -400,6 +378,46 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         try await webSocketTask.send(.string(text))
     }
 
+    private func receiveInitialEvent(matching expectedType: String, timeout: TimeInterval) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let remaining = max(0.1, deadline.timeIntervalSinceNow)
+            let message = try await receiveMessage(timeout: remaining)
+            let event = try decode(message)
+            Logger.speechToText.info("OpenAI realtime initial event: \(event.type, privacy: .public)")
+            handle(event)
+            if event.type == expectedType {
+                return
+            }
+            if let lastError {
+                throw lastError
+            }
+        }
+        throw SpeechToTextError.transcriptionFailed("OpenAI realtime session timed out waiting for \(expectedType)")
+    }
+
+    private func receiveMessage(timeout: TimeInterval) async throws -> URLSessionWebSocketTask.Message {
+        guard let webSocketTask else {
+            throw SpeechToTextError.transcriptionFailed("OpenAI realtime session is not connected")
+        }
+
+        return try await withThrowingTaskGroup(of: URLSessionWebSocketTask.Message.self) { group in
+            group.addTask {
+                try await webSocketTask.receive()
+            }
+            group.addTask {
+                try await Task.sleep(for: .milliseconds(Int(timeout * 1_000)))
+                throw SpeechToTextError.transcriptionFailed("OpenAI realtime receive timed out")
+            }
+
+            let result = try await group.next() ?? {
+                throw SpeechToTextError.transcriptionFailed("OpenAI realtime receive failed")
+            }()
+            group.cancelAll()
+            return result
+        }
+    }
+
     private func receiveMessages() {
         receiveTask?.cancel()
         receiveTask = Task { [weak self] in
@@ -408,7 +426,8 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
                 guard let webSocketTask = self.webSocketTask else { return }
                 do {
                     let message = try await webSocketTask.receive()
-                    self.handle(message)
+                    let event = try self.decode(message)
+                    self.handle(event)
                 } catch {
                     await MainActor.run {
                         self.lastError = error
@@ -420,7 +439,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         }
     }
 
-    private func handle(_ message: URLSessionWebSocketTask.Message) {
+    private func decode(_ message: URLSessionWebSocketTask.Message) throws -> OpenAIRealtimeServerEvent {
         let data: Data?
         switch message {
         case .string(let text):
@@ -431,13 +450,10 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
             data = nil
         }
 
-        guard let data else { return }
-        do {
-            let event = try JSONDecoder().decode(OpenAIRealtimeServerEvent.self, from: data)
-            handle(event)
-        } catch {
-            Logger.speechToText.error("Failed to decode OpenAI realtime event: \(error.localizedDescription)")
+        guard let data else {
+            throw SpeechToTextError.transcriptionFailed("OpenAI realtime event is empty")
         }
+        return try JSONDecoder().decode(OpenAIRealtimeServerEvent.self, from: data)
     }
 
     private func handle(_ event: OpenAIRealtimeServerEvent) {
@@ -459,6 +475,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         case "conversation.item.input_audio_transcription.failed", "error":
             let message = event.error?.message ?? "OpenAI realtime transcription failed"
             let error = SpeechToTextError.transcriptionFailed(message)
+            Logger.speechToText.error("OpenAI realtime server error: \(message, privacy: .public)")
             lastError = error
             resumeCompletion(with: error)
         default:
