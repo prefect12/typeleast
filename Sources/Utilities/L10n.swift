@@ -199,18 +199,6 @@ internal enum L10n {
         static var globalHotkey: String { isCN ? "全局快捷键" : "Global Hotkey" }
         static var globalHotkeyFooter: String { isCN ? "在任何位置开始或停止录音。" : "Starts and stops recording system-wide." }
         static var changeHotkey: String { isCN ? "更改…" : "Change…" }
-        static var expressMode: String { isCN ? "快捷模式" : "Express Mode" }
-        static var expressModeDesc: String { isCN ? "快捷键直接开始/停止录音" : "Hotkey immediately starts and stops recording." }
-        static var recordingExperience: String { isCN ? "录音体验" : "Recording Experience" }
-        static var autoBoost: String { isCN ? "自动增强麦克风" : "Auto-Boost Microphone" }
-        static var autoBoostDesc: String { isCN ? "录音时暂时最大化麦克风输入" : "Temporarily maximize mic input while recording." }
-        static var livePreview: String { isCN ? "实时转写预览" : "Live Transcript Preview" }
-        static var livePreviewDesc: String {
-            isCN ? "录音时启用流式转写，并在浮窗显示实时文字。" :
-                "Enable streaming transcription while recording and show live text in the popup."
-        }
-        static var completionSound: String { isCN ? "完成提示音" : "Completion Sound" }
-        static var completionSoundDesc: String { isCN ? "转录完成时播放提示音" : "Play a chime when transcription finishes." }
         static var pressKeys: String { isCN ? "按下快捷键..." : "Press keys..." }
         static var pressAnotherKey: String { isCN ? "再按一个键" : "press another key" }
         static var releaseToSave: String { isCN ? "松开保存" : "release to save" }
@@ -252,7 +240,6 @@ internal enum L10n {
         static func displayName(for provider: String) -> String {
             switch provider.lowercased() {
             case "openai": return "OpenAI"
-            case "openairealtime": return isCN ? "OpenAI 实时" : "OpenAI Realtime"
             case "mimo": return "MiMo"
             case "gemini": return "Gemini"
             case "local": return isCN ? "本地 Whisper" : "Local Whisper"
@@ -401,7 +388,6 @@ internal enum L10n {
         static var autoBoostDesc: String { isCN ? "录音时暂时最大化麦克风输入" : "Temporarily maximize mic input while recording." }
         static var smartPaste: String { isCN ? "智能粘贴" : "Smart Paste" }
         static var smartPasteDesc: String { isCN ? "自动粘贴完成的转录文本" : "Automatically paste finished transcripts." }
-        static var output: String { isCN ? "输出与粘贴" : "Output & Paste" }
         static var streamingTranscription: String { isCN ? "流式输入" : "Streaming Input" }
         static var streamingTranscriptionDesc: String {
             isCN ? "说话时把实时文本插入当前输入框；不可用时回退到停录后粘贴。" :

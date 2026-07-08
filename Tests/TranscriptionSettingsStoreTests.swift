@@ -26,8 +26,6 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedWhisperModel, AppDefaults.defaultWhisperModel)
         XCTAssertEqual(store.selectedParakeetModel, AppDefaults.defaultParakeetModel)
         XCTAssertEqual(store.openAITranscriptionModel, AppDefaults.defaultOpenAITranscriptionModel)
-        XCTAssertEqual(store.openAIRealtimeTranscriptionModel, AppDefaults.defaultOpenAIRealtimeTranscriptionModel)
-        XCTAssertEqual(store.openAIRealtimeTranscriptionDelay, AppDefaults.defaultOpenAIRealtimeTranscriptionDelay)
         XCTAssertEqual(store.miMoASRModel, AppDefaults.defaultMiMoASRModel)
         XCTAssertEqual(store.transcriptionLanguage, AppDefaults.defaultTranscriptionLanguage)
         XCTAssertEqual(store.recordingHUDStyle, AppDefaults.defaultRecordingHUDStyle)
@@ -41,7 +39,6 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         defaults.set("invalid-whisper", forKey: AppDefaults.Keys.selectedWhisperModel)
         defaults.set("invalid-parakeet", forKey: AppDefaults.Keys.selectedParakeetModel)
         defaults.set("invalid-language", forKey: AppDefaults.Keys.transcriptionLanguage)
-        defaults.set("invalid-delay", forKey: AppDefaults.Keys.openAIRealtimeTranscriptionDelay)
         defaults.set("invalid-hud-style", forKey: AppDefaults.Keys.recordingHUDStyle)
         defaults.set("invalid-correction", forKey: AppDefaults.Keys.semanticCorrectionMode)
         defaults.set("invalid-retention", forKey: AppDefaults.Keys.transcriptionRetentionPeriod)
@@ -52,7 +49,6 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedWhisperModel, AppDefaults.defaultWhisperModel)
         XCTAssertEqual(store.selectedParakeetModel, AppDefaults.defaultParakeetModel)
         XCTAssertEqual(store.transcriptionLanguage, AppDefaults.defaultTranscriptionLanguage)
-        XCTAssertEqual(store.openAIRealtimeTranscriptionDelay, AppDefaults.defaultOpenAIRealtimeTranscriptionDelay)
         XCTAssertEqual(store.recordingHUDStyle, AppDefaults.defaultRecordingHUDStyle)
         XCTAssertEqual(store.semanticCorrectionMode, AppDefaults.defaultSemanticCorrectionMode)
         XCTAssertEqual(store.transcriptionRetentionPeriod, .forever)
@@ -60,14 +56,12 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
 
     func testBlankModelStringsFallBackSafely() {
         defaults.set("   ", forKey: AppDefaults.Keys.openAITranscriptionModel)
-        defaults.set("", forKey: AppDefaults.Keys.openAIRealtimeTranscriptionModel)
         defaults.set("\n\t", forKey: AppDefaults.Keys.miMoASRModel)
         defaults.set("", forKey: AppDefaults.Keys.semanticCorrectionModelRepo)
 
         let store = TranscriptionSettingsStore(defaults: defaults)
 
         XCTAssertEqual(store.openAITranscriptionModel, AppDefaults.defaultOpenAITranscriptionModel)
-        XCTAssertEqual(store.openAIRealtimeTranscriptionModel, AppDefaults.defaultOpenAIRealtimeTranscriptionModel)
         XCTAssertEqual(store.miMoASRModel, AppDefaults.defaultMiMoASRModel)
         XCTAssertEqual(store.semanticCorrectionModelRepo, AppDefaults.defaultSemanticCorrectionModelRepo)
     }

@@ -160,8 +160,6 @@ internal struct TranscriptionRecordRow: View {
         switch provider {
         case .openai:
             return .green
-        case .openAIRealtime:
-            return .mint
         case .mimo:
             return .cyan
         case .gemini:

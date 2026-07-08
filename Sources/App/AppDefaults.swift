@@ -15,8 +15,6 @@ internal enum AppDefaults {
         static let selectedWhisperModel = "selectedWhisperModel"
         static let selectedParakeetModel = "selectedParakeetModel"
         static let openAITranscriptionModel = "openAITranscriptionModel"
-        static let openAIRealtimeTranscriptionModel = "openAIRealtimeTranscriptionModel"
-        static let openAIRealtimeTranscriptionDelay = "openAIRealtimeTranscriptionDelay"
         static let miMoASRModel = "miMoASRModel"
         static let transcriptionLanguage = "transcriptionLanguage"
 
@@ -53,8 +51,6 @@ internal enum AppDefaults {
     internal static let defaultWhisperModel: WhisperModel = .base
     internal static let defaultParakeetModel: ParakeetModel = .v3Multilingual
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-transcribe"
-    internal static let defaultOpenAIRealtimeTranscriptionModel = "gpt-realtime-whisper"
-    internal static let defaultOpenAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay = .low
     internal static let defaultMiMoASRModel = "mimo-v2.5-asr"
     internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
     internal static let defaultRecordingHUDStyle: RecordingHUDStyle = .appleGlass
@@ -67,8 +63,6 @@ internal enum AppDefaults {
             Keys.selectedWhisperModel: defaultWhisperModel.rawValue,
             Keys.selectedParakeetModel: defaultParakeetModel.rawValue,
             Keys.openAITranscriptionModel: defaultOpenAITranscriptionModel,
-            Keys.openAIRealtimeTranscriptionModel: defaultOpenAIRealtimeTranscriptionModel,
-            Keys.openAIRealtimeTranscriptionDelay: defaultOpenAIRealtimeTranscriptionDelay.rawValue,
             Keys.miMoASRModel: defaultMiMoASRModel,
             Keys.transcriptionLanguage: defaultTranscriptionLanguage.rawValue,
 

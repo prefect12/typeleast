@@ -8,8 +8,6 @@ internal struct DashboardProvidersView: View {
     @AppStorage(AppDefaults.Keys.hasSetupParakeet) var hasSetupParakeet = false
     @AppStorage(AppDefaults.Keys.hasSetupLocalLLM) var hasSetupLocalLLM = false
     @AppStorage(AppDefaults.Keys.openAITranscriptionModel) var openAITranscriptionModel = AppDefaults.defaultOpenAITranscriptionModel
-    @AppStorage(AppDefaults.Keys.openAIRealtimeTranscriptionModel) var openAIRealtimeTranscriptionModel = AppDefaults.defaultOpenAIRealtimeTranscriptionModel
-    @AppStorage(AppDefaults.Keys.openAIRealtimeTranscriptionDelay) var openAIRealtimeTranscriptionDelay = AppDefaults.defaultOpenAIRealtimeTranscriptionDelay
     @AppStorage(AppDefaults.Keys.miMoASRModel) var miMoASRModel = AppDefaults.defaultMiMoASRModel
     @AppStorage(AppDefaults.Keys.transcriptionLanguage) var transcriptionLanguage = AppDefaults.defaultTranscriptionLanguage
     @AppStorage("openAIBaseURL") var openAIBaseURL = ""
@@ -74,7 +72,7 @@ internal struct DashboardProvidersView: View {
                 Text(L10n.Provider.audioLanguageFooter)
             }
 
-            if transcriptionProvider == .openai || transcriptionProvider == .openAIRealtime || transcriptionProvider == .mimo || transcriptionProvider == .gemini {
+            if transcriptionProvider == .openai || transcriptionProvider == .mimo || transcriptionProvider == .gemini {
                 Section("API Credentials") {
                     credentialsSection
                 }
@@ -324,8 +322,6 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return EngineConfig(tagline: "Industry-leading accuracy via cloud")
-        case .openAIRealtime:
-            return EngineConfig(tagline: "Live OpenAI transcription with lower release latency")
         case .mimo:
             return EngineConfig(tagline: "MiMo V2.5 speech recognition via Xiaomi Cloud")
         case .gemini:
@@ -345,7 +341,7 @@ internal struct DashboardProvidersView: View {
 
     private func statusInfo(for provider: TranscriptionProvider) -> (String, Bool) {
         switch provider {
-        case .openai, .openAIRealtime:
+        case .openai:
             return openAIKey.isEmpty ? ("Setup", false) : ("Ready", true)
         case .mimo:
             return miMoKey.isEmpty ? ("Setup", false) : ("Ready", true)
@@ -363,8 +359,6 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return "cloud"
-        case .openAIRealtime:
-            return "dot.radiowaves.left.and.right"
         case .mimo:
             return "waveform"
         case .gemini:
@@ -380,7 +374,7 @@ internal struct DashboardProvidersView: View {
     private var credentialsSection: some View {
         VStack(alignment: .leading, spacing: DashboardTheme.Spacing.md) {
             // Show relevant key based on provider
-            if transcriptionProvider == .openai || transcriptionProvider == .openAIRealtime {
+            if transcriptionProvider == .openai {
                 apiKeyField(
                     provider: "OpenAI",
                     hint: "Get your key at platform.openai.com",
@@ -391,12 +385,7 @@ internal struct DashboardProvidersView: View {
                     saveAPIKey(openAIKey, service: AppIdentity.keychainService, account: "OpenAI")
                 }
 
-                if transcriptionProvider == .openAIRealtime {
-                    openAIRealtimeModelField
-                    openAIRealtimeDelayField
-                } else {
-                    openAIModelField
-                }
+                openAIModelField
             }
 
             if transcriptionProvider == .mimo {
@@ -530,33 +519,6 @@ internal struct DashboardProvidersView: View {
         .padding(.horizontal, DashboardTheme.Spacing.lg)
         .padding(.bottom, DashboardTheme.Spacing.md)
         .help("Default: \(AppDefaults.defaultOpenAITranscriptionModel). Use a deployment/model name supported by your endpoint.")
-    }
-
-    private var openAIRealtimeModelField: some View {
-        LabeledContent("Realtime Model") {
-            TextField(AppDefaults.defaultOpenAIRealtimeTranscriptionModel, text: $openAIRealtimeTranscriptionModel)
-                .textFieldStyle(.roundedBorder)
-                .font(DashboardTheme.Fonts.mono(12, weight: .regular))
-                .frame(maxWidth: 260)
-        }
-        .padding(.horizontal, DashboardTheme.Spacing.lg)
-        .padding(.bottom, DashboardTheme.Spacing.md)
-        .help("Default: \(AppDefaults.defaultOpenAIRealtimeTranscriptionModel). Uses OpenAI Realtime transcription over WebSocket.")
-    }
-
-    private var openAIRealtimeDelayField: some View {
-        LabeledContent("Realtime Delay") {
-            Picker("", selection: $openAIRealtimeTranscriptionDelay) {
-                ForEach(OpenAIRealtimeTranscriptionDelay.allCases) { delay in
-                    Text(delay.displayName).tag(delay)
-                }
-            }
-            .labelsHidden()
-            .frame(maxWidth: 180)
-        }
-        .padding(.horizontal, DashboardTheme.Spacing.lg)
-        .padding(.bottom, DashboardTheme.Spacing.md)
-        .help("Lower values return partial text sooner; higher values trade latency for more context.")
     }
 
     private var miMoModelField: some View {

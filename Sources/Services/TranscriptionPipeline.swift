@@ -182,8 +182,6 @@ internal final class TranscriptionPipeline {
             return settingsStore.selectedParakeetModel.rawValue
         case .openai:
             return settingsStore.openAITranscriptionModel
-        case .openAIRealtime:
-            return settingsStore.openAIRealtimeTranscriptionModel
         case .mimo:
             return settingsStore.miMoASRModel
         case .gemini:

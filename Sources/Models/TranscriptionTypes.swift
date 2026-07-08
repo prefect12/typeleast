@@ -13,7 +13,6 @@ internal enum WhisperModelError: Error, LocalizedError, Sendable {
 
 internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
     case openai = "openai"
-    case openAIRealtime = "openaiRealtime"
     case mimo = "mimo"
     case gemini = "gemini" 
     case local = "local"
@@ -23,8 +22,6 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
         switch self {
         case .openai:
             return "OpenAI Whisper (Cloud)"
-        case .openAIRealtime:
-            return "OpenAI Realtime (Streaming)"
         case .mimo:
             return "Xiaomi MiMo V2.5 ASR (Cloud)"
         case .gemini:
@@ -33,15 +30,6 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
             return "Whisper (Local)"
         case .parakeet:
             return "Parakeet (Advanced)"
-        }
-    }
-
-    var fileTranscriptionFallback: TranscriptionProvider? {
-        switch self {
-        case .openAIRealtime:
-            return .openai
-        case .openai, .mimo, .gemini, .local, .parakeet:
-            return nil
         }
     }
 }
@@ -100,17 +88,6 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
         }
     }
 
-    var openAIRealtimeLanguageHint: String? {
-        switch self {
-        case .auto, .chineseEnglish:
-            return nil
-        case .chinese:
-            return "zh"
-        default:
-            return rawValue
-        }
-    }
-
     var mimoASRLanguageCode: String {
         switch self {
         case .auto, .chinese, .chineseEnglish:
@@ -140,31 +117,6 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
             return "The spoken language is French. Transcribe in French and do not translate."
         case .german:
             return "The spoken language is German. Transcribe in German and do not translate."
-        }
-    }
-}
-
-internal enum OpenAIRealtimeTranscriptionDelay: String, CaseIterable, Codable, Identifiable, Sendable {
-    case minimal
-    case low
-    case medium
-    case high
-    case xhigh
-
-    var id: String { rawValue }
-
-    var displayName: String {
-        switch self {
-        case .minimal:
-            return "Minimal"
-        case .low:
-            return "Low"
-        case .medium:
-            return "Medium"
-        case .high:
-            return "High"
-        case .xhigh:
-            return "Extra High"
         }
     }
 }
