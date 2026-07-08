@@ -5,9 +5,11 @@ import HotKey
 internal class HotKeyManager {
     private var hotKey: HotKey?
     private let onHotKeyPressed: () -> Void
+    private let onHotKeyReleased: () -> Void
     
-    init(onHotKeyPressed: @escaping () -> Void) {
+    init(onHotKeyPressed: @escaping () -> Void, onHotKeyReleased: @escaping () -> Void = {}) {
         self.onHotKeyPressed = onHotKeyPressed
+        self.onHotKeyReleased = onHotKeyReleased
         setupObservers()
         setupInitialHotKey()
     }
@@ -43,6 +45,9 @@ internal class HotKeyManager {
             hotKey = HotKey(key: key, modifiers: modifiers)
             hotKey?.keyDownHandler = { [weak self] in
                 self?.onHotKeyPressed()
+            }
+            hotKey?.keyUpHandler = { [weak self] in
+                self?.onHotKeyReleased()
             }
         }
     }

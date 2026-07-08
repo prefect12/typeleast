@@ -6,16 +6,16 @@ internal enum PressAndHoldMode: String, CaseIterable, Identifiable {
     case toggle
     case doubleTapToggle
 
+    static let allCases: [PressAndHoldMode] = [.doubleTapToggle, .hold]
+
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
         case .hold:
             return L10n.RecordingSettings.holdMode
-        case .toggle:
+        case .toggle, .doubleTapToggle:
             return L10n.RecordingSettings.toggleMode
-        case .doubleTapToggle:
-            return L10n.RecordingSettings.doubleTapMode
         }
     }
 }

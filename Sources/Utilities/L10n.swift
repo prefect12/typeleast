@@ -218,9 +218,9 @@ internal enum L10n {
         static var hudStyleCandidateBar: String { isCN ? "输入法候选栏" : "Candidate Bar" }
         static var behavior: String { isCN ? "行为" : "Behavior" }
         static var key: String { isCN ? "按键" : "Key" }
-        static var holdMode: String { isCN ? "按住时录音" : "Press and Hold" }
-        static var toggleMode: String { isCN ? "按一次切换" : "Press to Toggle" }
-        static var doubleTapMode: String { isCN ? "双击切换" : "Double Press to Toggle" }
+        static var holdMode: String { isCN ? "快速模式" : "Quick Mode" }
+        static var toggleMode: String { isCN ? "持续模式" : "Continuous Mode" }
+        static var doubleTapMode: String { toggleMode }
         static var rightCommand: String { isCN ? "右 Command (⌘)" : "Right Command (⌘)" }
         static var leftCommand: String { isCN ? "左 Command (⌘)" : "Left Command (⌘)" }
         static var rightOption: String { isCN ? "右 Option (⌥)" : "Right Option (⌥)" }
@@ -369,8 +369,15 @@ internal enum L10n {
         static var general: String { isCN ? "通用" : "General" }
         static var startAtLogin: String { isCN ? "开机启动" : "Start at Login" }
         static var startAtLoginDesc: String { isCN ? "登录时自动启动 Typeleast" : "Launch Typeleast when you sign in." }
-        static var expressMode: String { isCN ? "快捷模式" : "Express Mode" }
-        static var expressModeDesc: String { isCN ? "快捷键直接开始/停止录音" : "Hotkey immediately starts and stops recording." }
+        static var recordingMode: String { isCN ? "录音模式" : "Recording Mode" }
+        static var recordingModeDesc: String {
+            isCN ? "持续模式：触发快捷键后持续录音，再次触发结束。快速模式：按住快捷键录音，松开结束。" :
+                "Continuous: trigger the shortcut to record until you trigger it again. Quick: hold the shortcut to record, release to stop."
+        }
+        static var continuousMode: String { isCN ? "持续模式" : "Continuous" }
+        static var quickMode: String { isCN ? "快速模式" : "Quick" }
+        static var expressMode: String { recordingMode }
+        static var expressModeDesc: String { recordingModeDesc }
         static var configureShortcut: String { isCN ? "设置快捷键..." : "Configure Shortcut..." }
         static var autoBoost: String { isCN ? "自动增强麦克风" : "Auto-Boost Microphone" }
         static var autoBoostDesc: String { isCN ? "录音时暂时最大化麦克风输入" : "Temporarily maximize mic input while recording." }

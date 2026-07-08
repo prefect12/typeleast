@@ -9,6 +9,7 @@ internal struct DashboardRecordingView: View {
     @AppStorage("pressAndHoldEnabled") private var pressAndHoldEnabled = PressAndHoldConfiguration.defaults.enabled
     @AppStorage("pressAndHoldKeyIdentifier") private var pressAndHoldKeyIdentifier = PressAndHoldConfiguration.defaults.key.rawValue
     @AppStorage("pressAndHoldMode") private var pressAndHoldModeRaw = PressAndHoldConfiguration.defaults.mode.rawValue
+    @AppStorage(AppDefaults.Keys.immediateRecording) private var immediateRecording = false
     @AppStorage(AppDefaults.Keys.recordingHUDStyle) private var recordingHUDStyle = AppDefaults.defaultRecordingHUDStyle
 
     @State private var availableMicrophones: [AVCaptureDevice] = []
@@ -170,17 +171,18 @@ internal struct DashboardRecordingView: View {
 
         case .modifierOnly(let key):
             let storedValue = GlobalShortcutDisplay.storedValue(for: key)
+            let selectedMode: PressAndHoldMode = immediateRecording ? .doubleTapToggle : .hold
             globalHotkey = storedValue
             pressAndHoldEnabled = true
             pressAndHoldKeyIdentifier = key.rawValue
-            pressAndHoldModeRaw = PressAndHoldMode.hold.rawValue
+            pressAndHoldModeRaw = selectedMode.rawValue
 
             updateGlobalHotkey(storedValue)
             publishPressAndHoldConfiguration(
                 PressAndHoldConfiguration(
                     enabled: true,
                     key: key,
-                    mode: .hold
+                    mode: selectedMode
                 )
             )
         }

@@ -6,6 +6,9 @@ internal struct DashboardPreferencesView: View {
     @AppStorage("startAtLogin") private var startAtLogin = true
     @AppStorage("immediateRecording") private var immediateRecording = false
     @AppStorage("globalHotkey") private var globalHotkey = "⌘⇧Space"
+    @AppStorage("pressAndHoldEnabled") private var pressAndHoldEnabled = PressAndHoldConfiguration.defaults.enabled
+    @AppStorage("pressAndHoldKeyIdentifier") private var pressAndHoldKeyIdentifier = PressAndHoldConfiguration.defaults.key.rawValue
+    @AppStorage("pressAndHoldMode") private var pressAndHoldModeRaw = PressAndHoldConfiguration.defaults.mode.rawValue
     @AppStorage("autoBoostMicrophoneVolume") private var autoBoostMicrophoneVolume = false
     @AppStorage("enableSmartPaste") private var enableSmartPaste = true
     @AppStorage(AppDefaults.Keys.enableStreamingTranscription) private var enableStreamingTranscription = true
@@ -61,14 +64,22 @@ internal struct DashboardPreferencesView: View {
                     updateLoginItem(enabled: newValue)
                 }
 
-                HStack(alignment: .center, spacing: 16) {
-                    Toggle(isOn: $immediateRecording) {
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(L10n.Preferences.expressMode)
-                            Text(L10n.Preferences.expressModeDesc)
+                            Text(L10n.Preferences.recordingMode)
+                            Text(L10n.Preferences.recordingModeDesc)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+
+                        Picker(L10n.Preferences.recordingMode, selection: recordingModeBinding) {
+                            Text(L10n.Preferences.continuousMode).tag(true)
+                            Text(L10n.Preferences.quickMode).tag(false)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(maxWidth: 240)
                     }
 
                     Spacer(minLength: 12)
@@ -194,6 +205,36 @@ internal struct DashboardPreferencesView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            syncModifierOnlyShortcutMode(isContinuous: immediateRecording)
+        }
+    }
+
+    private var recordingModeBinding: Binding<Bool> {
+        Binding(
+            get: { immediateRecording },
+            set: { isContinuous in
+                immediateRecording = isContinuous
+                syncModifierOnlyShortcutMode(isContinuous: isContinuous)
+            }
+        )
+    }
+
+    private func syncModifierOnlyShortcutMode(isContinuous: Bool) {
+        guard let key = GlobalShortcutDisplay.modifierOnlyKey(from: globalHotkey) else { return }
+
+        pressAndHoldEnabled = true
+        pressAndHoldKeyIdentifier = key.rawValue
+        pressAndHoldModeRaw = isContinuous ? PressAndHoldMode.doubleTapToggle.rawValue : PressAndHoldMode.hold.rawValue
+
+        NotificationCenter.default.post(
+            name: .pressAndHoldSettingsChanged,
+            object: PressAndHoldConfiguration(
+                enabled: true,
+                key: key,
+                mode: isContinuous ? .doubleTapToggle : .hold
+            )
+        )
     }
 
     private func updateLoginItem(enabled: Bool) {

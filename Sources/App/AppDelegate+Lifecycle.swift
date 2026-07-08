@@ -42,6 +42,8 @@ internal extension AppDelegate {
 
         hotKeyManager = HotKeyManager { [weak self] in
             self?.handleHotkey(source: .standardHotkey)
+        } onHotKeyReleased: { [weak self] in
+            self?.handleHotkeyRelease(source: .standardHotkey)
         }
         keyboardEventHandler = KeyboardEventHandler()
         configureShortcutMonitors()

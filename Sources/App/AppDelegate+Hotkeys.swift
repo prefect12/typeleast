@@ -95,54 +95,57 @@ internal extension AppDelegate {
     }
 
     func handleHotkey(source: HotkeyTriggerSource) {
-        let immediateRecording = UserDefaults.standard.bool(forKey: "immediateRecording")
+        let isContinuousMode = UserDefaults.standard.bool(forKey: AppDefaults.Keys.immediateRecording)
 
-        if immediateRecording {
-            guard let recorder = audioRecorder else {
-                Logger.app.error("AudioRecorder not available for immediate recording")
+        if isContinuousMode || source == .pressAndHold {
+            toggleRecordingFromShortcut()
+        } else {
+            startRecordingFromPressAndHold()
+        }
+    }
+
+    func handleHotkeyRelease(source: HotkeyTriggerSource) {
+        guard source == .standardHotkey else { return }
+        guard !UserDefaults.standard.bool(forKey: AppDefaults.Keys.immediateRecording) else { return }
+
+        stopRecordingFromPressAndHold()
+    }
+
+    private func toggleRecordingFromShortcut() {
+        guard let recorder = audioRecorder else {
+            Logger.app.error("AudioRecorder not available for shortcut recording")
+            toggleRecordWindow()
+            return
+        }
+
+        if recorder.isRecording {
+            updateMenuBarIcon(isRecording: false)
+            if recordingWindow == nil || recordingWindow?.isVisible == false {
+                toggleRecordWindow()
+            }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
+            }
+        } else {
+            if !recorder.hasPermission {
                 toggleRecordWindow()
                 return
             }
 
-            if recorder.isRecording {
-                updateMenuBarIcon(isRecording: false)
-                if recordingWindow == nil || recordingWindow?.isVisible == false {
-                    toggleRecordWindow()
-                }
-
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
-                }
+            let targetApp = captureLiveDictationTargetApp()
+            if recorder.startRecording() {
+                LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
+                updateMenuBarIcon(isRecording: true)
+                SoundManager().playRecordingStartSound()
+                showRecordingWindowForProcessing()
             } else {
-                if !recorder.hasPermission {
-                    toggleRecordWindow()
-                    return
-                }
-
-                let targetApp = captureLiveDictationTargetApp()
-                if recorder.startRecording() {
-                    LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
-                    updateMenuBarIcon(isRecording: true)
-                    SoundManager().playRecordingStartSound()
-                    showRecordingWindowForProcessing()
-                } else {
-                    LiveDictationCoordinator.shared.cancel()
-                    toggleRecordWindow()
-                    NotificationCenter.default.post(
-                        name: .recordingStartFailed,
-                        object: nil
-                    )
-                }
-            }
-        } else {
-            if audioRecorder?.isRecording == true {
-                showRecordingWindowForProcessing {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                        NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
-                    }
-                }
-            } else {
+                LiveDictationCoordinator.shared.cancel()
                 toggleRecordWindow()
+                NotificationCenter.default.post(
+                    name: .recordingStartFailed,
+                    object: nil
+                )
             }
         }
     }
