@@ -2,29 +2,38 @@ import XCTest
 @testable import Typeleast
 
 final class LiveTextInsertionManagerTests: XCTestCase {
-    func testAppendOnlyInsertionReturnsInitialText() {
+    func testEditPlanReturnsInitialText() {
         XCTAssertEqual(
-            LiveTextInsertionManager.appendOnlyInsertion(from: "", to: "你好"),
-            "你好"
+            LiveTextInsertionManager.editPlan(from: "", to: "你好"),
+            LiveTextEditPlan(deleteCount: 0, insertText: "你好")
         )
     }
 
-    func testAppendOnlyInsertionReturnsOnlyNewSuffix() {
+    func testEditPlanReturnsOnlyNewSuffix() {
         XCTAssertEqual(
-            LiveTextInsertionManager.appendOnlyInsertion(from: "你好", to: "你好世界"),
-            "世界"
+            LiveTextInsertionManager.editPlan(from: "你好", to: "你好世界"),
+            LiveTextEditPlan(deleteCount: 0, insertText: "世界")
         )
     }
 
-    func testAppendOnlyInsertionSkipsPartialRewrite() {
-        XCTAssertNil(
-            LiveTextInsertionManager.appendOnlyInsertion(from: "你好试", to: "你好是")
+    func testEditPlanReplacesPartialRewrite() {
+        XCTAssertEqual(
+            LiveTextInsertionManager.editPlan(from: "你好试", to: "你好是"),
+            LiveTextEditPlan(deleteCount: 1, insertText: "是")
         )
     }
 
-    func testAppendOnlyInsertionSkipsShorterText() {
-        XCTAssertNil(
-            LiveTextInsertionManager.appendOnlyInsertion(from: "你好世界", to: "你好")
+    func testEditPlanDeletesShorterText() {
+        XCTAssertEqual(
+            LiveTextInsertionManager.editPlan(from: "你好世界", to: "你好"),
+            LiveTextEditPlan(deleteCount: 2, insertText: "")
+        )
+    }
+
+    func testEditPlanReplacesSuffixOnlyPartialWithFullChineseText() {
+        XCTAssertEqual(
+            LiveTextInsertionManager.editPlan(from: "输入", to: "测试语音输入"),
+            LiveTextEditPlan(deleteCount: 2, insertText: "测试语音输入")
         )
     }
 }

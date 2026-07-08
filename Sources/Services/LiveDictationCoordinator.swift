@@ -44,15 +44,27 @@ internal final class LiveDictationCoordinator {
         return true
     }
 
-    func finishRecognition() async -> String? {
+    func finishRecognition(finalizeLiveText: Bool) async -> String? {
         let text = await streamingTranscriber.finish()
         let settings = TranscriptionSettingsStore.shared
 
-        if let text, settings.isSmartPasteEnabled {
+        if let text, settings.isSmartPasteEnabled, finalizeLiveText {
             await liveTextInsertionManager.finish(finalText: text, targetApp: activeTargetApp)
+            activeTargetApp = nil
         }
-        activeTargetApp = nil
         return text
+    }
+
+    func finishLiveText(with finalText: String) async {
+        let settings = TranscriptionSettingsStore.shared
+        guard settings.isSmartPasteEnabled else {
+            activeTargetApp = nil
+            liveTextInsertionManager.cancel()
+            return
+        }
+
+        await liveTextInsertionManager.finish(finalText: finalText, targetApp: activeTargetApp)
+        activeTargetApp = nil
     }
 
     func cancel() {

@@ -1,6 +1,12 @@
 import AppKit
 import ApplicationServices
+import Carbon
 import Foundation
+
+internal struct LiveTextEditPlan: Equatable {
+    let deleteCount: Int
+    let insertText: String
+}
 
 @MainActor
 internal final class LiveTextInsertionManager {
@@ -89,14 +95,23 @@ internal final class LiveTextInsertionManager {
         targetApp.activate(options: [])
         try? await Task.sleep(for: .milliseconds(30))
 
-        guard let insertText = Self.appendOnlyInsertion(from: insertedText, to: text) else { return }
+        guard let editPlan = Self.editPlan(from: insertedText, to: text) else { return }
 
         do {
-            try typeText(insertText)
+            try await apply(editPlan: editPlan)
             insertedText = text
         } catch {
             return
         }
+    }
+
+    private func apply(editPlan: LiveTextEditPlan) async throws {
+        if editPlan.deleteCount > 0 {
+            try deleteBackward(count: editPlan.deleteCount)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        try typeText(editPlan.insertText)
     }
 
     private func typeText(_ text: String) throws {
@@ -132,6 +147,25 @@ internal final class LiveTextInsertionManager {
         keyUp.post(tap: .cgSessionEventTap)
     }
 
+    private func deleteBackward(count: Int) throws {
+        guard count > 0 else { return }
+
+        guard let source = CGEventSource(stateID: .combinedSessionState) else {
+            throw PasteError.eventSourceCreationFailed
+        }
+
+        let deleteKey = CGKeyCode(kVK_Delete)
+        for _ in 0..<count {
+            guard let keyDown = CGEvent(keyboardEventSource: source, virtualKey: deleteKey, keyDown: true),
+                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: deleteKey, keyDown: false) else {
+                throw PasteError.keyboardEventCreationFailed
+            }
+
+            keyDown.post(tap: .cgSessionEventTap)
+            keyUp.post(tap: .cgSessionEventTap)
+        }
+    }
+
     private func resetState(cancelTask: Bool) {
         if cancelTask {
             updateTask?.cancel()
@@ -143,17 +177,22 @@ internal final class LiveTextInsertionManager {
         isActive = false
     }
 
-    nonisolated static func appendOnlyInsertion(from oldText: String, to newText: String) -> String? {
-        if oldText.isEmpty {
-            return newText.isEmpty ? nil : newText
+    nonisolated static func editPlan(from oldText: String, to newText: String) -> LiveTextEditPlan? {
+        let oldCharacters = Array(oldText)
+        let newCharacters = Array(newText)
+        var sharedPrefixCount = 0
+
+        while sharedPrefixCount < oldCharacters.count,
+              sharedPrefixCount < newCharacters.count,
+              oldCharacters[sharedPrefixCount] == newCharacters[sharedPrefixCount] {
+            sharedPrefixCount += 1
         }
 
-        guard newText.hasPrefix(oldText) else {
-            return nil
-        }
+        let deleteCount = oldCharacters.count - sharedPrefixCount
+        let insertText = String(newCharacters.dropFirst(sharedPrefixCount))
+        guard deleteCount > 0 || !insertText.isEmpty else { return nil }
 
-        let suffix = String(newText.dropFirst(oldText.count))
-        return suffix.isEmpty ? nil : suffix
+        return LiveTextEditPlan(deleteCount: deleteCount, insertText: insertText)
     }
 
     private nonisolated static let maxUnicodeEventLength = 64

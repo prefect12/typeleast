@@ -63,7 +63,7 @@ internal extension ContentView {
                 try Task.checkCancellation()
 
                 let streamingFinishStart = Date()
-                let streamedText = await LiveDictationCoordinator.shared.finishRecognition()
+                let streamedText = await LiveDictationCoordinator.shared.finishRecognition(finalizeLiveText: false)
                 let didInsertLiveText = LiveDictationCoordinator.shared.hasInsertedLiveText
                 let streamingFinalizeTime = streamedText == nil
                     ? nil
@@ -104,6 +104,10 @@ internal extension ContentView {
                         request,
                         progressHandler: { progressMessage = $0 }
                     )
+                }
+
+                if didInsertLiveText {
+                    await LiveDictationCoordinator.shared.finishLiveText(with: result.text)
                 }
 
                 LiveDictationCoordinator.shared.cancel()
