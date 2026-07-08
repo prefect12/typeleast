@@ -108,9 +108,6 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
-                    progressMessage = selectedProvider == .openAIRealtime
-                        ? L10n.Recording.realtimeFallback
-                        : L10n.Recording.transcribingAudio
                     result = try await transcriptionPipeline.run(
                         request,
                         progressHandler: { progressMessage = $0 }
