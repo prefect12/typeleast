@@ -146,6 +146,8 @@ extension TranscriptionLanguage {
         switch self {
         case .auto:
             return Self.automaticStreamingRecognitionLocale()
+        case .chineseEnglish:
+            return Locale(identifier: "zh_CN")
         case .chinese:
             return Locale(identifier: "zh_CN")
         case .english:
@@ -194,5 +196,17 @@ extension TranscriptionLanguage {
         }
 
         return currentLocale
+    }
+
+    var canUseAppleStreamingAsFinalText: Bool {
+        switch self {
+        case .chinese, .chineseEnglish:
+            return false
+        case .auto:
+            let locale = Self.automaticStreamingRecognitionLocale()
+            return locale.language.languageCode?.identifier != "zh"
+        case .english, .japanese, .korean, .spanish, .french, .german:
+            return true
+        }
     }
 }

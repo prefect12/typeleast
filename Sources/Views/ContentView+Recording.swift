@@ -69,7 +69,10 @@ internal extension ContentView {
                     : Date().timeIntervalSince(streamingFinishStart)
                 
                 var modelReadyTime: TimeInterval?
-                if streamedText == nil, transcriptionProvider == .local {
+                let shouldUseStreamedFinalText = streamedText != nil
+                    && TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
+
+                if !shouldUseStreamedFinalText, transcriptionProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
@@ -87,7 +90,7 @@ internal extension ContentView {
                 )
 
                 let result: TranscriptionPipelineResult
-                if let streamedText {
+                if shouldUseStreamedFinalText, let streamedText {
                     progressMessage = L10n.Recording.finalizingStreaming
                     result = try await transcriptionPipeline.runPretranscribed(
                         request,

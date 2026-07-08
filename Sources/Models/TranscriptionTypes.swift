@@ -36,6 +36,7 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
 
 internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Identifiable {
     case auto
+    case chineseEnglish = "zh-en"
     case chinese = "zh"
     case english = "en"
     case japanese = "ja"
@@ -50,6 +51,8 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
         switch self {
         case .auto:
             return L10n.isChinese ? "自动识别" : "Auto-detect"
+        case .chineseEnglish:
+            return L10n.isChinese ? "中英混输" : "Chinese + English"
         case .chinese:
             return L10n.isChinese ? "中文" : "Chinese"
         case .english:
@@ -69,7 +72,16 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
 
     var apiLanguageCode: String? {
         switch self {
-        case .auto:
+        case .auto, .chineseEnglish:
+            return nil
+        default:
+            return rawValue
+        }
+    }
+
+    var openAITranscriptionLanguageCode: String? {
+        switch self {
+        case .auto, .chinese, .chineseEnglish:
             return nil
         default:
             return rawValue
@@ -77,15 +89,22 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
     }
 
     var mimoASRLanguageCode: String {
-        apiLanguageCode ?? "auto"
+        switch self {
+        case .auto, .chinese, .chineseEnglish:
+            return "auto"
+        default:
+            return rawValue
+        }
     }
 
     var speechInstruction: String {
         switch self {
         case .auto:
-            return "Detect the spoken language automatically. Preserve the original spoken language and mixed-language wording; do not translate."
+            return "Detect the spoken language automatically. Preserve the original spoken language and mixed-language wording, especially English words inside Chinese speech; do not translate."
+        case .chineseEnglish:
+            return "The speech intentionally mixes Mandarin Chinese and English. Transcribe each word in the language spoken, preserve English words, acronyms, product names, commands, code identifiers, and technical terms exactly, and do not translate."
         case .chinese:
-            return "The spoken language is Chinese. Transcribe in Chinese, preserve mixed English technical terms, and do not translate."
+            return "The speech is primarily Chinese and may include English words, acronyms, product names, commands, code identifiers, and technical terms. Transcribe Chinese as Chinese, preserve spoken English exactly, and do not translate or convert English into Chinese phonetic approximations."
         case .english:
             return "The spoken language is English. Transcribe in English and do not translate."
         case .japanese:

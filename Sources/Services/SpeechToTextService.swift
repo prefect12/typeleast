@@ -204,7 +204,7 @@ internal class SpeechToTextService {
                     // Azure deployments already specify the model, but OpenAI-compatible APIs still expect the field.
                     multipartFormData.append(modelData, withName: "model")
                     multipartFormData.append(promptData, withName: "prompt")
-                    if let languageCode = language.apiLanguageCode,
+                    if let languageCode = language.openAITranscriptionLanguageCode,
                        let languageData = languageCode.data(using: .utf8) {
                         multipartFormData.append(languageData, withName: "language")
                     }

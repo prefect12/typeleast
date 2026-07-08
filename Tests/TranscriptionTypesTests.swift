@@ -68,19 +68,34 @@ class TranscriptionTypesTests: XCTestCase {
 
     func testTranscriptionLanguageCases() {
         XCTAssertEqual(TranscriptionLanguage.auto.apiLanguageCode, nil)
+        XCTAssertEqual(TranscriptionLanguage.chineseEnglish.apiLanguageCode, nil)
         XCTAssertEqual(TranscriptionLanguage.chinese.apiLanguageCode, "zh")
         XCTAssertEqual(TranscriptionLanguage.english.apiLanguageCode, "en")
+        XCTAssertEqual(TranscriptionLanguage.auto.openAITranscriptionLanguageCode, nil)
+        XCTAssertEqual(TranscriptionLanguage.chineseEnglish.openAITranscriptionLanguageCode, nil)
+        XCTAssertEqual(TranscriptionLanguage.chinese.openAITranscriptionLanguageCode, nil)
+        XCTAssertEqual(TranscriptionLanguage.english.openAITranscriptionLanguageCode, "en")
         XCTAssertEqual(TranscriptionLanguage.auto.mimoASRLanguageCode, "auto")
-        XCTAssertEqual(TranscriptionLanguage.chinese.mimoASRLanguageCode, "zh")
+        XCTAssertEqual(TranscriptionLanguage.chineseEnglish.mimoASRLanguageCode, "auto")
+        XCTAssertEqual(TranscriptionLanguage.chinese.mimoASRLanguageCode, "auto")
+        XCTAssertEqual(TranscriptionLanguage.english.mimoASRLanguageCode, "en")
         XCTAssertTrue(TranscriptionLanguage.allCases.contains(.auto))
+        XCTAssertTrue(TranscriptionLanguage.allCases.contains(.chineseEnglish))
         XCTAssertTrue(TranscriptionLanguage.allCases.contains(.chinese))
         XCTAssertTrue(TranscriptionLanguage.allCases.contains(.english))
     }
 
     func testTranscriptionLanguageInstructionsPreventTranslation() {
         XCTAssertTrue(TranscriptionLanguage.auto.speechInstruction.contains("do not translate"))
-        XCTAssertTrue(TranscriptionLanguage.chinese.speechInstruction.contains("Transcribe in Chinese"))
+        XCTAssertTrue(TranscriptionLanguage.chineseEnglish.speechInstruction.contains("mixes Mandarin Chinese and English"))
+        XCTAssertTrue(TranscriptionLanguage.chinese.speechInstruction.contains("preserve spoken English exactly"))
         XCTAssertTrue(TranscriptionLanguage.english.speechInstruction.contains("Transcribe in English"))
+    }
+
+    func testChineseAndMixedLanguageAvoidAppleStreamingFinalText() {
+        XCTAssertFalse(TranscriptionLanguage.chinese.canUseAppleStreamingAsFinalText)
+        XCTAssertFalse(TranscriptionLanguage.chineseEnglish.canUseAppleStreamingAsFinalText)
+        XCTAssertTrue(TranscriptionLanguage.english.canUseAppleStreamingAsFinalText)
     }
 
     func testAutomaticStreamingLocalePrefersChinesePreferredLanguage() {

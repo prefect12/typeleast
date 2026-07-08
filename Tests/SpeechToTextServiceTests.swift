@@ -296,7 +296,7 @@ class SpeechToTextServiceTests: XCTestCase {
         XCTAssertEqual(firstMessage?["role"] as? String, "user")
         XCTAssertEqual(content?.first?["type"] as? String, "input_audio")
         XCTAssertEqual(inputAudio?["data"] as? String, "data:audio/mp4;base64,AAAA")
-        XCTAssertEqual(asrOptions?["language"] as? String, "zh")
+        XCTAssertEqual(asrOptions?["language"] as? String, "auto")
     }
 
     func testMiMoAudioDataURI() {
