@@ -5,6 +5,8 @@ internal protocol TranscriptionSettingsReadable: AnyObject {
     var selectedWhisperModel: WhisperModel { get }
     var selectedParakeetModel: ParakeetModel { get }
     var openAITranscriptionModel: String { get }
+    var openAIRealtimeTranscriptionModel: String { get }
+    var openAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay { get }
     var miMoASRModel: String { get }
     var transcriptionLanguage: TranscriptionLanguage { get }
     var recordingHUDStyle: RecordingHUDStyle { get }
@@ -22,6 +24,8 @@ internal struct TranscriptionSettingsSnapshot: Equatable {
     let selectedWhisperModel: WhisperModel
     let selectedParakeetModel: ParakeetModel
     let openAITranscriptionModel: String
+    let openAIRealtimeTranscriptionModel: String
+    let openAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay
     let miMoASRModel: String
     let transcriptionLanguage: TranscriptionLanguage
     let recordingHUDStyle: RecordingHUDStyle
@@ -66,6 +70,20 @@ internal final class TranscriptionSettingsStore: TranscriptionSettingsReadable {
             forKey: AppDefaults.Keys.openAITranscriptionModel,
             fallback: AppDefaults.defaultOpenAITranscriptionModel
         )
+    }
+
+    var openAIRealtimeTranscriptionModel: String {
+        nonEmptyString(
+            forKey: AppDefaults.Keys.openAIRealtimeTranscriptionModel,
+            fallback: AppDefaults.defaultOpenAIRealtimeTranscriptionModel
+        )
+    }
+
+    var openAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay {
+        let rawValue = defaults.string(forKey: AppDefaults.Keys.openAIRealtimeTranscriptionDelay)
+            ?? AppDefaults.defaultOpenAIRealtimeTranscriptionDelay.rawValue
+        return OpenAIRealtimeTranscriptionDelay(rawValue: rawValue)
+            ?? AppDefaults.defaultOpenAIRealtimeTranscriptionDelay
     }
 
     var miMoASRModel: String {
@@ -135,6 +153,8 @@ internal final class TranscriptionSettingsStore: TranscriptionSettingsReadable {
             selectedWhisperModel: selectedWhisperModel,
             selectedParakeetModel: selectedParakeetModel,
             openAITranscriptionModel: openAITranscriptionModel,
+            openAIRealtimeTranscriptionModel: openAIRealtimeTranscriptionModel,
+            openAIRealtimeTranscriptionDelay: openAIRealtimeTranscriptionDelay,
             miMoASRModel: miMoASRModel,
             transcriptionLanguage: transcriptionLanguage,
             recordingHUDStyle: recordingHUDStyle,

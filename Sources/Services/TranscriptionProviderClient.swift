@@ -44,6 +44,16 @@ internal final class OpenAITranscriptionProviderClient: TranscriptionProviderCli
     }
 }
 
+internal final class OpenAIRealtimeTranscriptionProviderClient: TranscriptionProviderClient, @unchecked Sendable {
+    let provider: TranscriptionProvider = .openAIRealtime
+
+    func transcribe(_ request: TranscriptionProviderRequest) async throws -> String {
+        throw SpeechToTextError.transcriptionFailed(
+            "OpenAI Realtime requires a live microphone session. Transcribe audio files with OpenAI Whisper instead."
+        )
+    }
+}
+
 internal final class MiMoTranscriptionProviderClient: TranscriptionProviderClient, @unchecked Sendable {
     let provider: TranscriptionProvider = .mimo
     private let service: SpeechToTextService

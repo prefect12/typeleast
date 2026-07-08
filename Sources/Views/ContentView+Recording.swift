@@ -68,11 +68,19 @@ internal extension ContentView {
                     ? nil
                     : Date().timeIntervalSince(streamingFinishStart)
                 
-                var modelReadyTime: TimeInterval?
-                let shouldUseStreamedFinalText = streamedText != nil
+                let selectedProvider = transcriptionProvider
+                let shouldUseOpenAIRealtimeText = streamedText != nil
+                    && selectedProvider == .openAIRealtime
+                let shouldUseAppleStreamedFinalText = streamedText != nil
+                    && selectedProvider != .openAIRealtime
                     && TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
+                let shouldUseStreamedFinalText = shouldUseOpenAIRealtimeText || shouldUseAppleStreamedFinalText
+                let pipelineProvider = shouldUseStreamedFinalText
+                    ? selectedProvider
+                    : (selectedProvider.fileTranscriptionFallback ?? selectedProvider)
 
-                if !shouldUseStreamedFinalText, transcriptionProvider == .local {
+                var modelReadyTime: TimeInterval?
+                if !shouldUseStreamedFinalText, pipelineProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
@@ -80,8 +88,8 @@ internal extension ContentView {
 
                 let request = TranscriptionPipelineRequest(
                     audioURL: audioURL,
-                    provider: transcriptionProvider,
-                    whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                    provider: pipelineProvider,
+                    whisperModel: pipelineProvider == .local ? selectedWhisperModel : nil,
                     duration: sessionDuration,
                     estimatedDuration: nil,
                     sourceAppInfo: currentSourceAppInfo(),
@@ -180,7 +188,8 @@ internal extension ContentView {
                 try Task.checkCancellation()
 
                 var modelReadyTime: TimeInterval?
-                if transcriptionProvider == .local {
+                let pipelineProvider = transcriptionProvider.fileTranscriptionFallback ?? transcriptionProvider
+                if pipelineProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
@@ -195,8 +204,8 @@ internal extension ContentView {
                 let result = try await transcriptionPipeline.run(
                     TranscriptionPipelineRequest(
                         audioURL: audioURL,
-                        provider: transcriptionProvider,
-                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                        provider: pipelineProvider,
+                        whisperModel: pipelineProvider == .local ? selectedWhisperModel : nil,
                         duration: nil,
                         estimatedDuration: estimatedDuration,
                         sourceAppInfo: currentSourceAppInfo(),
@@ -319,15 +328,16 @@ internal extension ContentView {
             do {
                 try Task.checkCancellation()
 
-                if transcriptionProvider == .local {
+                let pipelineProvider = transcriptionProvider.fileTranscriptionFallback ?? transcriptionProvider
+                if pipelineProvider == .local {
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                 }
 
                 let result = try await transcriptionPipeline.run(
                     TranscriptionPipelineRequest(
                         audioURL: audioURL,
-                        provider: transcriptionProvider,
-                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                        provider: pipelineProvider,
+                        whisperModel: pipelineProvider == .local ? selectedWhisperModel : nil,
                         duration: nil,
                         estimatedDuration: nil,
                         sourceAppInfo: currentSourceAppInfo(),

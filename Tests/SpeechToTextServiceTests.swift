@@ -68,6 +68,30 @@ class SpeechToTextServiceTests: XCTestCase {
         XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
     }
 
+    func testOpenAIRealtimeTranscriptionModelDefaultsToRealtimeWhisper() {
+        defaults.removeObject(forKey: AppDefaults.Keys.openAIRealtimeTranscriptionModel)
+
+        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionModel, "gpt-realtime-whisper")
+    }
+
+    func testOpenAIRealtimeTranscriptionModelUsesConfiguredValue() {
+        defaults.set("custom-realtime-whisper", forKey: AppDefaults.Keys.openAIRealtimeTranscriptionModel)
+
+        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionModel, "custom-realtime-whisper")
+    }
+
+    func testOpenAIRealtimeTranscriptionDelayDefaultsToLow() {
+        defaults.removeObject(forKey: AppDefaults.Keys.openAIRealtimeTranscriptionDelay)
+
+        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .low)
+    }
+
+    func testOpenAIRealtimeTranscriptionDelayFallsBackWhenInvalid() {
+        defaults.set("not-a-delay", forKey: AppDefaults.Keys.openAIRealtimeTranscriptionDelay)
+
+        XCTAssertEqual(service.resolvedOpenAIRealtimeTranscriptionDelay, .low)
+    }
+
     func testMiMoASRModelDefaultsToV25ASR() {
         defaults.removeObject(forKey: AppDefaults.Keys.miMoASRModel)
 
@@ -114,8 +138,8 @@ class SpeechToTextServiceTests: XCTestCase {
     func testASRPromptCanForceChinese() {
         let prompt = SpeechToTextService.technicalASRPrompt(language: .chinese)
 
-        XCTAssertTrue(prompt.contains("spoken language is Chinese"))
-        XCTAssertTrue(prompt.contains("preserve mixed English technical terms"))
+        XCTAssertTrue(prompt.contains("primarily Chinese"))
+        XCTAssertTrue(prompt.contains("preserve spoken English exactly"))
     }
     
     func testProviderSelectionDefaultsToOpenAI() async {
@@ -523,9 +547,22 @@ extension SpeechToTextServiceTests {
     
     func testParakeetProviderInAllCases() {
         // Ensure Parakeet is included in all provider tests
-        let allProviders: [TranscriptionProvider] = [.openai, .mimo, .gemini, .local, .parakeet]
+        let allProviders: [TranscriptionProvider] = [.openai, .openAIRealtime, .mimo, .gemini, .local, .parakeet]
+        XCTAssertTrue(allProviders.contains(.openAIRealtime))
         XCTAssertTrue(allProviders.contains(.parakeet))
-        XCTAssertEqual(allProviders.count, 5)
+        XCTAssertEqual(allProviders.count, 6)
+    }
+
+    func testOpenAIRealtimeServerEventDecoding() throws {
+        let deltaJSON = #"{"type":"conversation.item.input_audio_transcription.delta","delta":"Hello"}"#.data(using: .utf8)!
+        let completedJSON = #"{"type":"conversation.item.input_audio_transcription.completed","transcript":"Hello world"}"#.data(using: .utf8)!
+
+        let delta = try JSONDecoder().decode(OpenAIRealtimeServerEvent.self, from: deltaJSON)
+        let completed = try JSONDecoder().decode(OpenAIRealtimeServerEvent.self, from: completedJSON)
+
+        XCTAssertEqual(delta.type, "conversation.item.input_audio_transcription.delta")
+        XCTAssertEqual(delta.delta, "Hello")
+        XCTAssertEqual(completed.transcript, "Hello world")
     }
 
     // MARK: - Custom OpenAI Endpoint Tests

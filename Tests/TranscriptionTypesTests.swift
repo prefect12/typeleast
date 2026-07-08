@@ -8,8 +8,9 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderCases() {
         let allCases = TranscriptionProvider.allCases
-        XCTAssertEqual(allCases.count, 5)
+        XCTAssertEqual(allCases.count, 6)
         XCTAssertTrue(allCases.contains(.openai))
+        XCTAssertTrue(allCases.contains(.openAIRealtime))
         XCTAssertTrue(allCases.contains(.mimo))
         XCTAssertTrue(allCases.contains(.gemini))
         XCTAssertTrue(allCases.contains(.local))
@@ -18,6 +19,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderDisplayNames() {
         XCTAssertEqual(TranscriptionProvider.openai.displayName, "OpenAI Whisper (Cloud)")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.displayName, "OpenAI Realtime (Streaming)")
         XCTAssertEqual(TranscriptionProvider.mimo.displayName, "Xiaomi MiMo V2.5 ASR (Cloud)")
         XCTAssertEqual(TranscriptionProvider.gemini.displayName, "Google Gemini (Cloud)")
         XCTAssertEqual(TranscriptionProvider.local.displayName, "Whisper (Local)")
@@ -26,6 +28,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderRawValues() {
         XCTAssertEqual(TranscriptionProvider.openai.rawValue, "openai")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.rawValue, "openaiRealtime")
         XCTAssertEqual(TranscriptionProvider.mimo.rawValue, "mimo")
         XCTAssertEqual(TranscriptionProvider.gemini.rawValue, "gemini")
         XCTAssertEqual(TranscriptionProvider.local.rawValue, "local")
@@ -34,6 +37,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderFromRawValue() {
         XCTAssertEqual(TranscriptionProvider(rawValue: "openai"), .openai)
+        XCTAssertEqual(TranscriptionProvider(rawValue: "openaiRealtime"), .openAIRealtime)
         XCTAssertEqual(TranscriptionProvider(rawValue: "mimo"), .mimo)
         XCTAssertEqual(TranscriptionProvider(rawValue: "gemini"), .gemini)
         XCTAssertEqual(TranscriptionProvider(rawValue: "local"), .local)
@@ -47,6 +51,7 @@ class TranscriptionTypesTests: XCTestCase {
         
         // Test encoding
         let openaiData = try encoder.encode(TranscriptionProvider.openai)
+        let openAIRealtimeData = try encoder.encode(TranscriptionProvider.openAIRealtime)
         let miMoData = try encoder.encode(TranscriptionProvider.mimo)
         let geminiData = try encoder.encode(TranscriptionProvider.gemini)
         let localData = try encoder.encode(TranscriptionProvider.local)
@@ -54,12 +59,14 @@ class TranscriptionTypesTests: XCTestCase {
         
         // Test decoding
         let decodedOpenai = try decoder.decode(TranscriptionProvider.self, from: openaiData)
+        let decodedOpenAIRealtime = try decoder.decode(TranscriptionProvider.self, from: openAIRealtimeData)
         let decodedMiMo = try decoder.decode(TranscriptionProvider.self, from: miMoData)
         let decodedGemini = try decoder.decode(TranscriptionProvider.self, from: geminiData)
         let decodedLocal = try decoder.decode(TranscriptionProvider.self, from: localData)
         let decodedParakeet = try decoder.decode(TranscriptionProvider.self, from: parakeetData)
         
         XCTAssertEqual(decodedOpenai, .openai)
+        XCTAssertEqual(decodedOpenAIRealtime, .openAIRealtime)
         XCTAssertEqual(decodedMiMo, .mimo)
         XCTAssertEqual(decodedGemini, .gemini)
         XCTAssertEqual(decodedLocal, .local)
@@ -75,6 +82,10 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertEqual(TranscriptionLanguage.chineseEnglish.openAITranscriptionLanguageCode, nil)
         XCTAssertEqual(TranscriptionLanguage.chinese.openAITranscriptionLanguageCode, nil)
         XCTAssertEqual(TranscriptionLanguage.english.openAITranscriptionLanguageCode, "en")
+        XCTAssertEqual(TranscriptionLanguage.auto.openAIRealtimeLanguageHint, nil)
+        XCTAssertEqual(TranscriptionLanguage.chineseEnglish.openAIRealtimeLanguageHint, nil)
+        XCTAssertEqual(TranscriptionLanguage.chinese.openAIRealtimeLanguageHint, "zh")
+        XCTAssertEqual(TranscriptionLanguage.english.openAIRealtimeLanguageHint, "en")
         XCTAssertEqual(TranscriptionLanguage.auto.mimoASRLanguageCode, "auto")
         XCTAssertEqual(TranscriptionLanguage.chineseEnglish.mimoASRLanguageCode, "auto")
         XCTAssertEqual(TranscriptionLanguage.chinese.mimoASRLanguageCode, "auto")
@@ -96,6 +107,16 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertFalse(TranscriptionLanguage.chinese.canUseAppleStreamingAsFinalText)
         XCTAssertFalse(TranscriptionLanguage.chineseEnglish.canUseAppleStreamingAsFinalText)
         XCTAssertTrue(TranscriptionLanguage.english.canUseAppleStreamingAsFinalText)
+    }
+
+    func testOpenAIRealtimeProviderFallsBackForFileTranscription() {
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.fileTranscriptionFallback, .openai)
+        XCTAssertNil(TranscriptionProvider.openai.fileTranscriptionFallback)
+    }
+
+    func testOpenAIRealtimeDelayCases() {
+        XCTAssertEqual(OpenAIRealtimeTranscriptionDelay.allCases.map(\.rawValue), ["minimal", "low", "medium", "high", "xhigh"])
+        XCTAssertEqual(OpenAIRealtimeTranscriptionDelay.low.displayName, "Low")
     }
 
     func testAutomaticStreamingLocalePrefersChinesePreferredLanguage() {

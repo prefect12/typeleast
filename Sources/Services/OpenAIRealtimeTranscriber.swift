@@ -1,0 +1,504 @@
+@preconcurrency import AVFoundation
+import Foundation
+import os.log
+
+@MainActor
+internal final class OpenAIRealtimeTranscriber: ObservableObject {
+    typealias UpdateHandler = @MainActor (_ text: String, _ isFinal: Bool) -> Void
+
+    @Published private(set) var currentText = ""
+    @Published private(set) var isStreaming = false
+
+    private let keychainService: KeychainServiceProtocol
+    private let settingsStore: TranscriptionSettingsReadable
+    private let urlSession: URLSession
+    private var webSocketTask: URLSessionWebSocketTask?
+    private var receiveTask: Task<Void, Never>?
+    private var pendingStartTask: Task<Void, Never>?
+    private var audioEngine: AVAudioEngine?
+    private var periodicCommitTask: Task<Void, Never>?
+    private var completionContinuation: CheckedContinuation<String, Error>?
+    private var completionTargetCommitCount = 0
+    private var finalTranscript = ""
+    private var hasUncommittedAudio = false
+    private var isCommitInFlight = false
+    private var sentCommitCount = 0
+    private var completedCommitCount = 0
+    private var transcriptSegments: [String: TranscriptSegment] = [:]
+    private var transcriptSegmentOrder: [String] = []
+    private var lastError: Error?
+    private var updateHandler: UpdateHandler?
+    private let fallbackSegmentID = "fallback"
+
+    private struct TranscriptSegment {
+        var text: String
+        var isFinal: Bool
+    }
+
+    init(
+        keychainService: KeychainServiceProtocol = KeychainService.shared,
+        settingsStore: TranscriptionSettingsReadable = TranscriptionSettingsStore.shared,
+        urlSession: URLSession = .shared
+    ) {
+        self.keychainService = keychainService
+        self.settingsStore = settingsStore
+        self.urlSession = urlSession
+    }
+
+    func start(language: TranscriptionLanguage, updateHandler: UpdateHandler? = nil) {
+        cancel()
+        currentText = ""
+        finalTranscript = ""
+        resetTranscriptState()
+        lastError = nil
+        self.updateHandler = updateHandler
+
+        guard !AppEnvironment.isRunningTests else { return }
+
+        pendingStartTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await self.startStreaming(language: language)
+            } catch {
+                Logger.speechToText.error("Failed to start OpenAI realtime transcription: \(error.localizedDescription)")
+                self.lastError = error
+                self.cleanup()
+            }
+        }
+    }
+
+    func finish(timeout: Duration = .seconds(3)) async -> String? {
+        pendingStartTask?.cancel()
+        pendingStartTask = nil
+
+        guard isStreaming, webSocketTask != nil else {
+            let text = currentBestText()
+            cleanup()
+            return text.isEmpty ? nil : text
+        }
+
+        stopAudioCapture()
+
+        do {
+            try? await Task.sleep(for: .milliseconds(150))
+            await waitForInFlightCommit()
+            try await commitBufferedAudioIfNeeded()
+
+            guard sentCommitCount > 0 else {
+                let text = currentBestText()
+                cleanup()
+                return text.isEmpty ? nil : text
+            }
+
+            let text = try await waitForCompletion(
+                timeout: timeout,
+                targetCommitCount: sentCommitCount
+            )
+            cleanup()
+            return text.isEmpty ? nil : text
+        } catch {
+            Logger.speechToText.error("OpenAI realtime transcription did not complete: \(error.localizedDescription)")
+            let text = currentBestText()
+            cleanup()
+            return text.isEmpty ? nil : text
+        }
+    }
+
+    func cancel() {
+        pendingStartTask?.cancel()
+        pendingStartTask = nil
+        resumeCompletion(with: SpeechToTextError.transcriptionFailed("Realtime transcription cancelled"))
+        cleanup()
+    }
+
+    private func startStreaming(language: TranscriptionLanguage) async throws {
+        guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") else {
+            throw SpeechToTextError.apiKeyMissing("OpenAI")
+        }
+
+        let model = settingsStore.openAIRealtimeTranscriptionModel
+        var components = URLComponents(string: "wss://api.openai.com/v1/realtime")
+        components?.queryItems = [URLQueryItem(name: "model", value: model)]
+        guard let url = components?.url else {
+            throw SpeechToTextError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let task = urlSession.webSocketTask(with: request)
+        webSocketTask = task
+        task.resume()
+
+        receiveMessages()
+        try await sendSessionUpdate(language: language)
+        try startAudioCapture()
+        isStreaming = true
+        startPeriodicCommits()
+    }
+
+    private func sendSessionUpdate(language: TranscriptionLanguage) async throws {
+        var transcription: [String: Any] = [
+            "model": settingsStore.openAIRealtimeTranscriptionModel,
+            "delay": settingsStore.openAIRealtimeTranscriptionDelay.rawValue
+        ]
+
+        if let languageHint = language.openAIRealtimeLanguageHint {
+            transcription["language"] = languageHint
+        }
+
+        try await sendEvent([
+            "type": "session.update",
+            "session": [
+                "type": "transcription",
+                "audio": [
+                    "input": [
+                        "format": [
+                            "type": "audio/pcm",
+                            "rate": 24_000
+                        ],
+                        "transcription": transcription,
+                        "turn_detection": NSNull()
+                    ]
+                ]
+            ]
+        ])
+    }
+
+    private func startAudioCapture() throws {
+        let engine = AVAudioEngine()
+        let inputNode = engine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw SpeechToTextError.transcriptionFailed("Microphone input format is unavailable")
+        }
+
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
+            guard let audioData = Self.pcm16Mono24kData(from: buffer), !audioData.isEmpty else { return }
+            let encoded = audioData.base64EncodedString()
+            Task { @MainActor [weak self] in
+                await self?.sendAudioChunk(encoded)
+            }
+        }
+
+        engine.prepare()
+        try engine.start()
+        audioEngine = engine
+    }
+
+    private func stopAudioCapture() {
+        if audioEngine?.isRunning == true {
+            audioEngine?.inputNode.removeTap(onBus: 0)
+            audioEngine?.stop()
+        }
+    }
+
+    private func sendAudioChunk(_ base64Audio: String) async {
+        guard webSocketTask != nil else { return }
+        do {
+            try await sendEvent([
+                "type": "input_audio_buffer.append",
+                "audio": base64Audio
+            ])
+            hasUncommittedAudio = true
+        } catch {
+            Logger.speechToText.error("Failed to send OpenAI realtime audio chunk: \(error.localizedDescription)")
+            lastError = error
+        }
+    }
+
+    private func startPeriodicCommits() {
+        periodicCommitTask?.cancel()
+        periodicCommitTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .milliseconds(1_200))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                await self?.commitLivePreviewBuffer()
+            }
+        }
+    }
+
+    private func commitLivePreviewBuffer() async {
+        do {
+            try await commitBufferedAudioIfNeeded()
+        } catch {
+            Logger.speechToText.error("Failed to commit OpenAI realtime preview buffer: \(error.localizedDescription)")
+            lastError = error
+        }
+    }
+
+    @discardableResult
+    private func commitBufferedAudioIfNeeded() async throws -> Bool {
+        guard webSocketTask != nil, hasUncommittedAudio, !isCommitInFlight else {
+            return false
+        }
+
+        isCommitInFlight = true
+        hasUncommittedAudio = false
+        do {
+            try await sendEvent(["type": "input_audio_buffer.commit"])
+            sentCommitCount += 1
+            isCommitInFlight = false
+            return true
+        } catch {
+            hasUncommittedAudio = true
+            isCommitInFlight = false
+            throw error
+        }
+    }
+
+    private func waitForInFlightCommit() async {
+        while isCommitInFlight {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    private func sendEvent(_ event: [String: Any]) async throws {
+        guard let webSocketTask else {
+            throw SpeechToTextError.transcriptionFailed("OpenAI realtime session is not connected")
+        }
+        let data = try JSONSerialization.data(withJSONObject: event)
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw SpeechToTextError.transcriptionFailed("Failed to encode realtime event")
+        }
+        try await webSocketTask.send(.string(text))
+    }
+
+    private func receiveMessages() {
+        receiveTask?.cancel()
+        receiveTask = Task { [weak self] in
+            guard let self else { return }
+            while !Task.isCancelled {
+                guard let webSocketTask = self.webSocketTask else { return }
+                do {
+                    let message = try await webSocketTask.receive()
+                    self.handle(message)
+                } catch {
+                    await MainActor.run {
+                        self.lastError = error
+                        self.resumeCompletion(with: error)
+                    }
+                    return
+                }
+            }
+        }
+    }
+
+    private func handle(_ message: URLSessionWebSocketTask.Message) {
+        let data: Data?
+        switch message {
+        case .string(let text):
+            data = text.data(using: .utf8)
+        case .data(let messageData):
+            data = messageData
+        @unknown default:
+            data = nil
+        }
+
+        guard let data else { return }
+        do {
+            let event = try JSONDecoder().decode(OpenAIRealtimeServerEvent.self, from: data)
+            handle(event)
+        } catch {
+            Logger.speechToText.error("Failed to decode OpenAI realtime event: \(error.localizedDescription)")
+        }
+    }
+
+    private func handle(_ event: OpenAIRealtimeServerEvent) {
+        switch event.type {
+        case "conversation.item.input_audio_transcription.delta":
+            guard let delta = event.delta, !delta.isEmpty else { return }
+            updateSegment(for: event, text: delta, isFinal: false, appending: true)
+            publishTranscriptUpdate(isFinal: false)
+        case "conversation.item.input_audio_transcription.completed":
+            let transcript = event.transcript?.trimmingCharacters(in: .whitespacesAndNewlines) ?? currentText
+            updateSegment(for: event, text: transcript, isFinal: true, appending: false)
+            completedCommitCount += 1
+            publishTranscriptUpdate(isFinal: true)
+            resumeCompletionIfReady()
+        case "conversation.item.input_audio_transcription.failed", "error":
+            let message = event.error?.message ?? "OpenAI realtime transcription failed"
+            let error = SpeechToTextError.transcriptionFailed(message)
+            lastError = error
+            resumeCompletion(with: error)
+        default:
+            break
+        }
+    }
+
+    private func updateSegment(
+        for event: OpenAIRealtimeServerEvent,
+        text: String,
+        isFinal: Bool,
+        appending: Bool
+    ) {
+        let segmentID = event.itemID ?? fallbackSegmentID
+        if transcriptSegments[segmentID] == nil {
+            transcriptSegmentOrder.append(segmentID)
+            transcriptSegments[segmentID] = TranscriptSegment(text: "", isFinal: false)
+        }
+
+        var segment = transcriptSegments[segmentID] ?? TranscriptSegment(text: "", isFinal: false)
+        segment.text = appending ? segment.text + text : text
+        segment.isFinal = isFinal
+        transcriptSegments[segmentID] = segment
+    }
+
+    private func publishTranscriptUpdate(isFinal: Bool) {
+        let transcript = joinedTranscript()
+        currentText = transcript
+        if isFinal {
+            finalTranscript = transcript
+        }
+        updateHandler?(transcript, isFinal)
+    }
+
+    private func joinedTranscript() -> String {
+        transcriptSegmentOrder
+            .compactMap { transcriptSegments[$0]?.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private func waitForCompletion(timeout: Duration, targetCommitCount: Int) async throws -> String {
+        let existing = currentBestText()
+        if !existing.isEmpty, completedCommitCount >= targetCommitCount {
+            return existing
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            completionTargetCommitCount = targetCommitCount
+            completionContinuation = continuation
+            Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(for: timeout)
+                    guard let self, self.completionContinuation != nil else { return }
+                    let text = self.currentBestText()
+                    self.completionContinuation = nil
+                    if !text.isEmpty {
+                        continuation.resume(returning: text)
+                    } else {
+                        continuation.resume(throwing: SpeechToTextError.transcriptionFailed("OpenAI realtime transcription timed out"))
+                    }
+                } catch {
+                    guard let self, self.completionContinuation != nil else { return }
+                    self.completionContinuation = nil
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func resumeCompletion(with text: String) {
+        guard let completionContinuation else { return }
+        self.completionContinuation = nil
+        completionContinuation.resume(returning: text)
+    }
+
+    private func resumeCompletion(with error: Error) {
+        guard let completionContinuation else { return }
+        self.completionContinuation = nil
+        completionContinuation.resume(throwing: error)
+    }
+
+    private func resumeCompletionIfReady() {
+        guard let completionContinuation,
+              completedCommitCount >= completionTargetCommitCount else {
+            return
+        }
+        self.completionContinuation = nil
+        completionContinuation.resume(returning: currentBestText())
+    }
+
+    private func currentBestText() -> String {
+        let text = finalTranscript.isEmpty ? currentText : finalTranscript
+        return SpeechToTextService.cleanTranscriptionText(text)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func cleanup() {
+        stopAudioCapture()
+        periodicCommitTask?.cancel()
+        periodicCommitTask = nil
+        audioEngine = nil
+        receiveTask?.cancel()
+        receiveTask = nil
+        webSocketTask?.cancel(with: .normalClosure, reason: nil)
+        webSocketTask = nil
+        updateHandler = nil
+        isStreaming = false
+        hasUncommittedAudio = false
+        isCommitInFlight = false
+    }
+
+    private func resetTranscriptState() {
+        completionTargetCommitCount = 0
+        sentCommitCount = 0
+        completedCommitCount = 0
+        hasUncommittedAudio = false
+        isCommitInFlight = false
+        transcriptSegments.removeAll()
+        transcriptSegmentOrder.removeAll()
+    }
+
+    nonisolated private static func pcm16Mono24kData(from buffer: AVAudioPCMBuffer) -> Data? {
+        guard let targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatInt16,
+            sampleRate: 24_000,
+            channels: 1,
+            interleaved: true
+        ), let converter = AVAudioConverter(from: buffer.format, to: targetFormat) else {
+            return nil
+        }
+
+        let ratio = targetFormat.sampleRate / buffer.format.sampleRate
+        let frameCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
+        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCapacity) else {
+            return nil
+        }
+
+        var didProvideInput = false
+        var conversionError: NSError?
+        let status = converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+            if didProvideInput {
+                outStatus.pointee = .noDataNow
+                return nil
+            }
+            didProvideInput = true
+            outStatus.pointee = .haveData
+            return buffer
+        }
+
+        guard status != .error, outputBuffer.frameLength > 0 else {
+            return nil
+        }
+
+        guard let int16Data = outputBuffer.int16ChannelData else { return nil }
+        let bytesPerFrame = Int(targetFormat.streamDescription.pointee.mBytesPerFrame)
+        return Data(bytes: int16Data[0], count: Int(outputBuffer.frameLength) * bytesPerFrame)
+    }
+}
+
+internal struct OpenAIRealtimeServerEvent: Decodable, Equatable {
+    struct RealtimeError: Decodable, Equatable {
+        let message: String?
+    }
+
+    let type: String
+    let itemID: String?
+    let delta: String?
+    let transcript: String?
+    let error: RealtimeError?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case itemID = "item_id"
+        case delta
+        case transcript
+        case error
+    }
+}

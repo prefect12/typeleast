@@ -6,6 +6,7 @@ internal final class LiveDictationCoordinator {
     static let shared = LiveDictationCoordinator()
 
     private let streamingTranscriber = StreamingSpeechTranscriber()
+    private let openAIRealtimeTranscriber = OpenAIRealtimeTranscriber()
 
     private init() {}
 
@@ -20,7 +21,7 @@ internal final class LiveDictationCoordinator {
             return false
         }
 
-        streamingTranscriber.start(language: settings.transcriptionLanguage) { text, isFinal in
+        let handler: StreamingSpeechTranscriber.UpdateHandler = { text, isFinal in
             updateHandler?(text, isFinal)
             NotificationCenter.default.post(
                 name: .streamingTranscriptUpdated,
@@ -28,15 +29,32 @@ internal final class LiveDictationCoordinator {
             )
         }
 
+        switch settings.transcriptionProvider {
+        case .openAIRealtime:
+            openAIRealtimeTranscriber.start(
+                language: settings.transcriptionLanguage,
+                updateHandler: handler
+            )
+        case .openai, .mimo, .gemini, .local, .parakeet:
+            streamingTranscriber.start(language: settings.transcriptionLanguage, updateHandler: handler)
+        }
+
         return true
     }
 
     func finishRecognition() async -> String? {
-        await streamingTranscriber.finish()
+        let settings = TranscriptionSettingsStore.shared
+        switch settings.transcriptionProvider {
+        case .openAIRealtime:
+            return await openAIRealtimeTranscriber.finish()
+        case .openai, .mimo, .gemini, .local, .parakeet:
+            return await streamingTranscriber.finish()
+        }
     }
 
     func cancel() {
         streamingTranscriber.cancel()
+        openAIRealtimeTranscriber.cancel()
         NotificationCenter.default.post(name: .streamingTranscriptUpdated, object: "")
     }
 }

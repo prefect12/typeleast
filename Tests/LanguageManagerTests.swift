@@ -135,6 +135,9 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertEqual(L10n.Recording.preparingAudio, "准备音频...")
         XCTAssertEqual(L10n.RecordingSettings.globalHotkey, "全局快捷键")
         XCTAssertEqual(L10n.RecordingSettings.changeHotkey, "更改…")
+        XCTAssertEqual(L10n.RecordingSettings.expressMode, "快捷模式")
+        XCTAssertEqual(L10n.RecordingSettings.recordingExperience, "录音体验")
+        XCTAssertEqual(L10n.RecordingSettings.livePreview, "实时转写预览")
         XCTAssertEqual(L10n.RecordingSettings.pressAnotherKey, "再按一个键")
         XCTAssertEqual(L10n.RecordingSettings.releaseToSave, "松开保存")
         XCTAssertEqual(L10n.RecordingSettings.holdMode, "快速模式")
@@ -167,6 +170,7 @@ class LanguageManagerTests: XCTestCase {
     func testL10nProviderDisplayName() {
         LanguageManager.shared.current = .english
         XCTAssertEqual(L10n.Provider.displayName(for: "openai"), "OpenAI")
+        XCTAssertEqual(L10n.Provider.displayName(for: "openaiRealtime"), "OpenAI Realtime")
         XCTAssertEqual(L10n.Provider.displayName(for: "mimo"), "MiMo")
         XCTAssertEqual(L10n.Provider.displayName(for: "local"), "Local Whisper")
         XCTAssertEqual(L10n.Provider.displayName(for: "funasr"), "FunASR")
@@ -176,6 +180,7 @@ class LanguageManagerTests: XCTestCase {
         XCTAssertEqual(L10n.Provider.displayName(for: "local"), "本地 Whisper")
         // OpenAI and FunASR don't change
         XCTAssertEqual(L10n.Provider.displayName(for: "openai"), "OpenAI")
+        XCTAssertEqual(L10n.Provider.displayName(for: "openaiRealtime"), "OpenAI 实时")
         XCTAssertEqual(L10n.Provider.displayName(for: "mimo"), "MiMo")
         XCTAssertEqual(L10n.Provider.audioLanguage, "音频语言")
     }

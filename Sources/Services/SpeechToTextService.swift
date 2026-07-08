@@ -39,6 +39,7 @@ internal class SpeechToTextService {
     private let correctionService = SemanticCorrectionService()
     @ObservationIgnored private lazy var providerRegistry = TranscriptionProviderClientRegistry(clients: [
         OpenAITranscriptionProviderClient(service: self),
+        OpenAIRealtimeTranscriptionProviderClient(),
         MiMoTranscriptionProviderClient(service: self),
         GeminiTranscriptionProviderClient(service: self),
         LocalWhisperTranscriptionProviderClient(service: self),
@@ -160,6 +161,14 @@ internal class SpeechToTextService {
 
     var resolvedOpenAITranscriptionModel: String {
         settingsStore.openAITranscriptionModel
+    }
+
+    var resolvedOpenAIRealtimeTranscriptionModel: String {
+        settingsStore.openAIRealtimeTranscriptionModel
+    }
+
+    var resolvedOpenAIRealtimeTranscriptionDelay: OpenAIRealtimeTranscriptionDelay {
+        settingsStore.openAIRealtimeTranscriptionDelay
     }
 
     var resolvedMiMoASRModel: String {
