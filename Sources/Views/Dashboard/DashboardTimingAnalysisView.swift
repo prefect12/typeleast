@@ -248,7 +248,6 @@ internal struct DashboardTimingAnalysisView: View {
                 header
                 controls
                 summaryGrid(snapshot)
-                breakdownChart(snapshot)
                 stageDistribution(snapshot)
                 detailRows(snapshot)
             }
