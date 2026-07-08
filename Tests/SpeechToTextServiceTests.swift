@@ -114,8 +114,8 @@ class SpeechToTextServiceTests: XCTestCase {
     func testASRPromptCanForceChinese() {
         let prompt = SpeechToTextService.technicalASRPrompt(language: .chinese)
 
-        XCTAssertTrue(prompt.contains("spoken language is Chinese"))
-        XCTAssertTrue(prompt.contains("preserve mixed English technical terms"))
+        XCTAssertTrue(prompt.contains("primarily Chinese"))
+        XCTAssertTrue(prompt.contains("preserve spoken English exactly"))
     }
     
     func testProviderSelectionDefaultsToOpenAI() async {
