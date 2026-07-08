@@ -19,13 +19,12 @@ internal final class LiveDictationCoordinator {
     @discardableResult
     func beginIfNeeded(
         targetApp: NSRunningApplication?,
-        updateHandler: StreamingSpeechTranscriber.UpdateHandler? = nil,
-        useExternalAudioCapture: Bool = false
-    ) -> AudioRecorder.PCM16AudioDataHandler? {
+        updateHandler: StreamingSpeechTranscriber.UpdateHandler? = nil
+    ) -> Bool {
         let settings = TranscriptionSettingsStore.shared
         guard settings.isStreamingTranscriptionEnabled else {
             cancel()
-            return nil
+            return false
         }
 
         activeTargetApp = targetApp
@@ -47,22 +46,13 @@ internal final class LiveDictationCoordinator {
         case .openAIRealtime:
             openAIRealtimeTranscriber.start(
                 language: settings.transcriptionLanguage,
-                updateHandler: handler,
-                capturesMicrophoneAudio: !useExternalAudioCapture
+                updateHandler: handler
             )
         case .openai, .mimo, .gemini, .local, .parakeet:
             streamingTranscriber.start(language: settings.transcriptionLanguage, updateHandler: handler)
         }
 
-        guard settings.transcriptionProvider == .openAIRealtime, useExternalAudioCapture else {
-            return nil
-        }
-
-        return { [weak self] data in
-            Task { @MainActor [weak self] in
-                self?.openAIRealtimeTranscriber.appendPCM16AudioData(data)
-            }
-        }
+        return true
     }
 
     func finishRecognition() async -> String? {

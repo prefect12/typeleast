@@ -57,11 +57,8 @@ internal extension AppDelegate {
         }
 
         let targetApp = captureLiveDictationTargetApp()
-        let realtimeAudioHandler = LiveDictationCoordinator.shared.beginIfNeeded(
-            targetApp: targetApp,
-            useExternalAudioCapture: TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime
-        )
-        if recorder.startRecording(pcm16AudioDataHandler: realtimeAudioHandler) {
+        if recorder.startRecording() {
+            LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
             isHoldRecordingActive = true
             updateMenuBarIcon(isRecording: true)
             SoundManager().playRecordingStartSound()
@@ -137,11 +134,8 @@ internal extension AppDelegate {
             }
 
             let targetApp = captureLiveDictationTargetApp()
-            let realtimeAudioHandler = LiveDictationCoordinator.shared.beginIfNeeded(
-                targetApp: targetApp,
-                useExternalAudioCapture: TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime
-            )
-            if recorder.startRecording(pcm16AudioDataHandler: realtimeAudioHandler) {
+            if recorder.startRecording() {
+                LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
                 updateMenuBarIcon(isRecording: true)
                 SoundManager().playRecordingStartSound()
                 showRecordingWindowForProcessing()

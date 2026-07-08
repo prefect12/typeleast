@@ -15,7 +15,6 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     private var webSocketTask: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var pendingStartTask: Task<Void, Never>?
-    private var audioDrainTask: Task<Void, Never>?
     private var audioEngine: AVAudioEngine?
     private var periodicCommitTask: Task<Void, Never>?
     private var completionContinuation: CheckedContinuation<String, Error>?
@@ -33,9 +32,8 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     private var hasSessionCreated = false
     private var hasSessionUpdated = false
     private var isSessionReadyForAudio = false
-    private var queuedStartupAudioChunks: [Data] = []
-    private var pendingSendAudioChunks: [Data] = []
-    private let maxQueuedStartupAudioChunks = 240
+    private var pendingAudioChunks: [String] = []
+    private let maxPendingAudioChunks = 240
 
     private struct TranscriptSegment {
         var text: String
@@ -61,11 +59,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         return url
     }
 
-    func start(
-        language: TranscriptionLanguage,
-        updateHandler: UpdateHandler? = nil,
-        capturesMicrophoneAudio: Bool = true
-    ) {
+    func start(language: TranscriptionLanguage, updateHandler: UpdateHandler? = nil) {
         cancel()
         currentText = ""
         finalTranscript = ""
@@ -78,28 +72,13 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         pendingStartTask = Task { [weak self] in
             guard let self else { return }
             do {
-                try await self.startStreaming(
-                    language: language,
-                    capturesMicrophoneAudio: capturesMicrophoneAudio
-                )
+                try await self.startStreaming(language: language)
             } catch {
                 Logger.speechToText.error("Failed to start OpenAI realtime transcription: \(error.localizedDescription)")
                 self.lastError = error
                 self.cleanup()
             }
         }
-    }
-
-    func appendPCM16AudioData(_ data: Data) {
-        guard !data.isEmpty else { return }
-
-        guard webSocketTask != nil, isSessionReadyForAudio else {
-            enqueueStartupAudioChunk(data)
-            return
-        }
-
-        pendingSendAudioChunks.append(data)
-        drainAudioSendQueue()
     }
 
     func finish(timeout: TimeInterval = 1.2) async -> String? {
@@ -128,7 +107,6 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
 
         do {
             try? await Task.sleep(for: .milliseconds(80))
-            await waitForAudioDrain()
             await waitForInFlightCommit()
             try await commitBufferedAudioIfNeeded()
 
@@ -159,10 +137,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         cleanup()
     }
 
-    private func startStreaming(
-        language: TranscriptionLanguage,
-        capturesMicrophoneAudio: Bool
-    ) async throws {
+    private func startStreaming(language: TranscriptionLanguage) async throws {
         guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") else {
             throw SpeechToTextError.apiKeyMissing("OpenAI")
         }
@@ -177,15 +152,13 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         task.resume()
 
         receiveMessages()
-        if capturesMicrophoneAudio {
-            try startAudioCapture()
-        }
+        try startAudioCapture()
         isStreaming = true
         try await waitForSessionCreated(timeout: 4)
         try await sendSessionUpdate(language: language)
         try await waitForSessionUpdated(timeout: 4)
         isSessionReadyForAudio = true
-        flushQueuedStartupAudioChunks()
+        try await flushPendingAudioChunks()
         startPeriodicCommits()
         try await commitBufferedAudioIfNeeded()
     }
@@ -227,10 +200,10 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         }
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: format) { [weak self] buffer, _ in
-            guard let audioData = RealtimeAudioPCMConverter.pcm16Mono24kData(from: buffer),
-                  !audioData.isEmpty else { return }
+            guard let audioData = Self.pcm16Mono24kData(from: buffer), !audioData.isEmpty else { return }
+            let encoded = audioData.base64EncodedString()
             Task { @MainActor [weak self] in
-                self?.appendPCM16AudioData(audioData)
+                await self?.sendAudioChunk(encoded)
             }
         }
 
@@ -246,13 +219,17 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         }
     }
 
-    private func sendAudioData(_ data: Data) async {
+    private func sendAudioChunk(_ base64Audio: String) async {
         guard webSocketTask != nil else { return }
+        guard isSessionReadyForAudio else {
+            enqueuePendingAudioChunk(base64Audio)
+            return
+        }
 
         do {
             try await sendEvent([
                 "type": "input_audio_buffer.append",
-                "audio": data.base64EncodedString()
+                "audio": base64Audio
             ])
             hasUncommittedAudio = true
         } catch {
@@ -261,39 +238,25 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         }
     }
 
-    private func enqueueStartupAudioChunk(_ data: Data) {
-        queuedStartupAudioChunks.append(data)
-        if queuedStartupAudioChunks.count > maxQueuedStartupAudioChunks {
-            queuedStartupAudioChunks.removeFirst(queuedStartupAudioChunks.count - maxQueuedStartupAudioChunks)
+    private func enqueuePendingAudioChunk(_ base64Audio: String) {
+        pendingAudioChunks.append(base64Audio)
+        if pendingAudioChunks.count > maxPendingAudioChunks {
+            pendingAudioChunks.removeFirst(pendingAudioChunks.count - maxPendingAudioChunks)
         }
     }
 
-    private func flushQueuedStartupAudioChunks() {
-        guard isSessionReadyForAudio, !queuedStartupAudioChunks.isEmpty else { return }
+    private func flushPendingAudioChunks() async throws {
+        guard isSessionReadyForAudio, !pendingAudioChunks.isEmpty else { return }
 
-        pendingSendAudioChunks.append(contentsOf: queuedStartupAudioChunks)
-        queuedStartupAudioChunks.removeAll(keepingCapacity: true)
-        drainAudioSendQueue()
-    }
+        let chunks = pendingAudioChunks
+        pendingAudioChunks.removeAll()
 
-    private func drainAudioSendQueue() {
-        guard audioDrainTask == nil else { return }
-        audioDrainTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                guard !self.pendingSendAudioChunks.isEmpty else {
-                    self.audioDrainTask = nil
-                    return
-                }
-                let data = self.pendingSendAudioChunks.removeFirst()
-                await self.sendAudioData(data)
-            }
-        }
-    }
-
-    private func waitForAudioDrain() async {
-        while audioDrainTask != nil {
-            try? await Task.sleep(for: .milliseconds(20))
+        for chunk in chunks {
+            try await sendEvent([
+                "type": "input_audio_buffer.append",
+                "audio": chunk
+            ])
+            hasUncommittedAudio = true
         }
     }
 
@@ -562,8 +525,6 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
 
     private func cleanup() {
         stopAudioCapture()
-        audioDrainTask?.cancel()
-        audioDrainTask = nil
         periodicCommitTask?.cancel()
         periodicCommitTask = nil
         audioEngine = nil
@@ -574,8 +535,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         updateHandler = nil
         isStreaming = false
         isSessionReadyForAudio = false
-        queuedStartupAudioChunks.removeAll(keepingCapacity: true)
-        pendingSendAudioChunks.removeAll(keepingCapacity: true)
+        pendingAudioChunks.removeAll()
         hasUncommittedAudio = false
         isCommitInFlight = false
     }
@@ -589,10 +549,46 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         hasSessionCreated = false
         hasSessionUpdated = false
         isSessionReadyForAudio = false
-        queuedStartupAudioChunks.removeAll(keepingCapacity: true)
-        pendingSendAudioChunks.removeAll(keepingCapacity: true)
+        pendingAudioChunks.removeAll()
         transcriptSegments.removeAll()
         transcriptSegmentOrder.removeAll()
+    }
+
+    nonisolated private static func pcm16Mono24kData(from buffer: AVAudioPCMBuffer) -> Data? {
+        guard let targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatInt16,
+            sampleRate: 24_000,
+            channels: 1,
+            interleaved: true
+        ), let converter = AVAudioConverter(from: buffer.format, to: targetFormat) else {
+            return nil
+        }
+
+        let ratio = targetFormat.sampleRate / buffer.format.sampleRate
+        let frameCapacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
+        guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: frameCapacity) else {
+            return nil
+        }
+
+        var didProvideInput = false
+        var conversionError: NSError?
+        let status = converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+            if didProvideInput {
+                outStatus.pointee = .noDataNow
+                return nil
+            }
+            didProvideInput = true
+            outStatus.pointee = .haveData
+            return buffer
+        }
+
+        guard status != .error, outputBuffer.frameLength > 0 else {
+            return nil
+        }
+
+        guard let int16Data = outputBuffer.int16ChannelData else { return nil }
+        let bytesPerFrame = Int(targetFormat.streamDescription.pointee.mBytesPerFrame)
+        return Data(bytes: int16Data[0], count: Int(outputBuffer.frameLength) * bytesPerFrame)
     }
 }
 

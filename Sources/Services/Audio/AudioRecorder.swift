@@ -5,15 +5,11 @@ import os.log
 
 @MainActor
 internal class AudioRecorder: NSObject, ObservableObject {
-    typealias PCM16AudioDataHandler = @Sendable (Data) -> Void
-
     @Published var isRecording = false
     @Published var audioLevel: Float = 0.0
     @Published var hasPermission = false
     
     private var audioRecorder: AVAudioRecorder?
-    private var audioEngine: AVAudioEngine?
-    private var wavWriter: PCM16WAVFileWriter?
     private var recordingURL: URL?
     private var levelUpdateTimer: Timer?
     private let volumeManager: MicrophoneVolumeManager
@@ -85,14 +81,14 @@ internal class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
-    func startRecording(pcm16AudioDataHandler: PCM16AudioDataHandler? = nil) -> Bool {
+    func startRecording() -> Bool {
         // Check permission first
         guard hasPermission else {
             return false
         }
         
         // Prevent re-entrancy - if already recording, return false
-        guard audioRecorder == nil, audioEngine == nil else {
+        guard audioRecorder == nil else {
             return false
         }
         
@@ -105,20 +101,9 @@ internal class AudioRecorder: NSObject, ObservableObject {
         
         let tempPath = FileManager.default.temporaryDirectory
         let timestamp = dateProvider().timeIntervalSince1970
-        let audioFilename = tempPath.appendingPathComponent(
-            pcm16AudioDataHandler == nil
-                ? "recording_\(timestamp).m4a"
-                : "recording_\(timestamp).wav"
-        )
+        let audioFilename = tempPath.appendingPathComponent("recording_\(timestamp).m4a")
         
         recordingURL = audioFilename
-
-        if let pcm16AudioDataHandler {
-            return startEngineRecording(
-                audioFilename: audioFilename,
-                pcm16AudioDataHandler: pcm16AudioDataHandler
-            )
-        }
         
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
@@ -155,65 +140,6 @@ internal class AudioRecorder: NSObject, ObservableObject {
             return false
         }
     }
-
-    private func startEngineRecording(
-        audioFilename: URL,
-        pcm16AudioDataHandler: @escaping PCM16AudioDataHandler
-    ) -> Bool {
-        let engine = AVAudioEngine()
-        let inputNode = engine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0 else {
-            return false
-        }
-
-        do {
-            let writer = try PCM16WAVFileWriter(url: audioFilename)
-            inputNode.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) { [weak self, writer] buffer, _ in
-                guard let pcmData = RealtimeAudioPCMConverter.pcm16Mono24kData(from: buffer),
-                      !pcmData.isEmpty else {
-                    return
-                }
-
-                do {
-                    try writer.append(pcmData)
-                } catch {
-                    Logger.audioRecorder.error("Failed to write realtime WAV data: \(error.localizedDescription)")
-                }
-
-                pcm16AudioDataHandler(pcmData)
-
-                let level = Self.normalizedLevel(from: buffer)
-                Task { @MainActor [weak self] in
-                    self?.audioLevel = level
-                }
-            }
-
-            engine.prepare()
-            try engine.start()
-
-            audioEngine = engine
-            wavWriter = writer
-            currentSessionStart = dateProvider()
-            lastRecordingDuration = nil
-            isRecording = true
-            return true
-        } catch {
-            Logger.audioRecorder.error("Failed to start realtime recording: \(error.localizedDescription)")
-            inputNode.removeTap(onBus: 0)
-            wavWriter?.cancel()
-            wavWriter = nil
-            audioEngine = nil
-            recordingURL = nil
-            if UserDefaults.standard.autoBoostMicrophoneVolume {
-                Task {
-                    await volumeManager.restoreMicrophoneVolume()
-                }
-            }
-            checkMicrophonePermission()
-            return false
-        }
-    }
     
     func stopRecording() -> URL? {
         let now = dateProvider()
@@ -221,20 +147,8 @@ internal class AudioRecorder: NSObject, ObservableObject {
         lastRecordingDuration = sessionDuration
         currentSessionStart = nil
 
-        if let audioEngine {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            audioEngine.stop()
-            self.audioEngine = nil
-            do {
-                try wavWriter?.finish()
-            } catch {
-                Logger.audioRecorder.error("Failed to finalize realtime WAV recording: \(error.localizedDescription)")
-            }
-            wavWriter = nil
-        } else {
-            audioRecorder?.stop()
-            audioRecorder = nil
-        }
+        audioRecorder?.stop()
+        audioRecorder = nil
         
         // Restore microphone volume if it was boosted
         if UserDefaults.standard.autoBoostMicrophoneVolume {
@@ -274,16 +188,8 @@ internal class AudioRecorder: NSObject, ObservableObject {
     
     func cancelRecording() {
         // Stop recording and cleanup without returning URL
-        if let audioEngine {
-            audioEngine.inputNode.removeTap(onBus: 0)
-            audioEngine.stop()
-            self.audioEngine = nil
-            wavWriter?.cancel()
-            wavWriter = nil
-        } else {
-            audioRecorder?.stop()
-            audioRecorder = nil
-        }
+        audioRecorder?.stop()
+        audioRecorder = nil
         currentSessionStart = nil
         lastRecordingDuration = nil
         
@@ -327,39 +233,6 @@ internal class AudioRecorder: NSObject, ObservableObject {
         let minDb: Float = -60.0
         let maxDb: Float = 0.0
         
-        let clampedLevel = max(minDb, min(maxDb, level))
-        return (clampedLevel - minDb) / (maxDb - minDb)
-    }
-
-    nonisolated private static func normalizedLevel(from buffer: AVAudioPCMBuffer) -> Float {
-        guard let channelData = buffer.floatChannelData,
-              buffer.frameLength > 0 else {
-            return 0
-        }
-
-        let channelCount = Int(buffer.format.channelCount)
-        let frameLength = Int(buffer.frameLength)
-        var sum: Float = 0
-        var sampleCount = 0
-
-        for channel in 0..<max(channelCount, 1) {
-            let samples = channelData[channel]
-            for frame in 0..<frameLength {
-                let sample = samples[frame]
-                sum += sample * sample
-                sampleCount += 1
-            }
-        }
-
-        guard sampleCount > 0 else { return 0 }
-        let rms = sqrt(sum / Float(sampleCount))
-        let db = 20 * log10(max(rms, 0.000_001))
-        return normalizeLevel(db)
-    }
-
-    nonisolated private static func normalizeLevel(_ level: Float) -> Float {
-        let minDb: Float = -60.0
-        let maxDb: Float = 0.0
         let clampedLevel = max(minDb, min(maxDb, level))
         return (clampedLevel - minDb) / (maxDb - minDb)
     }

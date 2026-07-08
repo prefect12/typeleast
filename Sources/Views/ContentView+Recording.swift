@@ -17,23 +17,22 @@ internal extension ContentView {
         lastAudioURL = nil
         streamingDraftText = ""
         LiveDictationCoordinator.shared.cancel()
-
-        let targetApp = findValidTargetApp()
-        let realtimeAudioHandler = LiveDictationCoordinator.shared.beginIfNeeded(
-            targetApp: targetApp,
-            updateHandler: { text, _ in
-                streamingDraftText = text
-            },
-            useExternalAudioCapture: transcriptionProvider == .openAIRealtime
-        )
-
-        let success = audioRecorder.startRecording(pcm16AudioDataHandler: realtimeAudioHandler)
+        
+        let success = audioRecorder.startRecording()
         if !success {
             errorMessage = LocalizedStrings.Errors.failedToStartRecording
             showError = true
             LiveDictationCoordinator.shared.cancel()
             return
         }
+
+        let targetApp = findValidTargetApp()
+        LiveDictationCoordinator.shared.beginIfNeeded(
+            targetApp: targetApp,
+            updateHandler: { text, _ in
+                streamingDraftText = text
+            }
+        )
     }
     
     func stopAndProcess() {
