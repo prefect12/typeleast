@@ -50,10 +50,10 @@ class SpeechToTextServiceTests: XCTestCase {
     
     // MARK: - Provider Selection Tests
 
-    func testOpenAITranscriptionModelDefaultsToGPT4OTranscribe() {
+    func testOpenAITranscriptionModelDefaultsToGPT4OMiniTranscribe() {
         defaults.removeObject(forKey: AppDefaults.Keys.openAITranscriptionModel)
 
-        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
+        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-mini-transcribe")
     }
 
     func testOpenAITranscriptionModelUsesConfiguredValue() {
@@ -65,7 +65,7 @@ class SpeechToTextServiceTests: XCTestCase {
     func testOpenAITranscriptionModelFallsBackWhenBlank() {
         defaults.set("   ", forKey: AppDefaults.Keys.openAITranscriptionModel)
 
-        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-transcribe")
+        XCTAssertEqual(service.resolvedOpenAITranscriptionModel, "gpt-4o-mini-transcribe")
     }
 
     func testMiMoASRModelDefaultsToV25ASR() {
