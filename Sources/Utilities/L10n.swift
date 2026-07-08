@@ -182,6 +182,8 @@ internal enum L10n {
     enum Recording {
         static var preparingAudio: String { isCN ? "准备音频..." : "Preparing audio..." }
         static var semanticCorrection: String { isCN ? "语义纠正中..." : "Semantic correction..." }
+        static var transcribingAudio: String { isCN ? "正在转录音频..." : "Transcribing audio..." }
+        static var realtimeFallback: String { isCN ? "实时转写未返回，正在转录音频..." : "Realtime transcript unavailable. Transcribing audio..." }
         static var transcribingFile: String { isCN ? "正在转录文件..." : "Transcribing file..." }
         static var finalizingStreaming: String { isCN ? "整理流式结果..." : "Finalizing streaming transcript..." }
         static var retrying: String { isCN ? "重新转录中..." : "Retrying transcription..." }

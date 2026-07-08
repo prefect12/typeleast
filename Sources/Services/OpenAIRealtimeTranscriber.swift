@@ -29,6 +29,11 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     private var lastError: Error?
     private var updateHandler: UpdateHandler?
     private let fallbackSegmentID = "fallback"
+    private var hasSessionCreated = false
+    private var hasSessionUpdated = false
+    private var isSessionReadyForAudio = false
+    private var pendingAudioChunks: [String] = []
+    private let maxPendingAudioChunks = 240
 
     private struct TranscriptSegment {
         var text: String
@@ -79,7 +84,16 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     func finish(timeout: TimeInterval = 1.2) async -> String? {
         if let pendingStartTask {
             self.pendingStartTask = nil
-            await pendingStartTask.value
+            let didFinishStarting = await waitForPendingStart(
+                pendingStartTask,
+                timeout: 2.5
+            )
+            if !didFinishStarting {
+                pendingStartTask.cancel()
+                let text = currentBestText()
+                cleanup()
+                return text.isEmpty ? nil : text
+            }
         }
         pendingStartTask = nil
 
@@ -138,10 +152,15 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         task.resume()
 
         receiveMessages()
-        try await sendSessionUpdate(language: language)
         try startAudioCapture()
         isStreaming = true
+        try await waitForSessionCreated(timeout: 4)
+        try await sendSessionUpdate(language: language)
+        try await waitForSessionUpdated(timeout: 4)
+        isSessionReadyForAudio = true
+        try await flushPendingAudioChunks()
         startPeriodicCommits()
+        try await commitBufferedAudioIfNeeded()
     }
 
     private func sendSessionUpdate(language: TranscriptionLanguage) async throws {
@@ -202,6 +221,11 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
 
     private func sendAudioChunk(_ base64Audio: String) async {
         guard webSocketTask != nil else { return }
+        guard isSessionReadyForAudio else {
+            enqueuePendingAudioChunk(base64Audio)
+            return
+        }
+
         do {
             try await sendEvent([
                 "type": "input_audio_buffer.append",
@@ -211,6 +235,28 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         } catch {
             Logger.speechToText.error("Failed to send OpenAI realtime audio chunk: \(error.localizedDescription)")
             lastError = error
+        }
+    }
+
+    private func enqueuePendingAudioChunk(_ base64Audio: String) {
+        pendingAudioChunks.append(base64Audio)
+        if pendingAudioChunks.count > maxPendingAudioChunks {
+            pendingAudioChunks.removeFirst(pendingAudioChunks.count - maxPendingAudioChunks)
+        }
+    }
+
+    private func flushPendingAudioChunks() async throws {
+        guard isSessionReadyForAudio, !pendingAudioChunks.isEmpty else { return }
+
+        let chunks = pendingAudioChunks
+        pendingAudioChunks.removeAll()
+
+        for chunk in chunks {
+            try await sendEvent([
+                "type": "input_audio_buffer.append",
+                "audio": chunk
+            ])
+            hasUncommittedAudio = true
         }
     }
 
@@ -262,6 +308,48 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         while isCommitInFlight {
             try? await Task.sleep(for: .milliseconds(50))
         }
+    }
+
+    private func waitForPendingStart(_ task: Task<Void, Never>, timeout: TimeInterval) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                await task.value
+                return true
+            }
+            group.addTask {
+                try? await Task.sleep(for: .milliseconds(Int(timeout * 1_000)))
+                return false
+            }
+
+            let result = await group.next() ?? false
+            group.cancelAll()
+            return result
+        }
+    }
+
+    private func waitForSessionCreated(timeout: TimeInterval) async throws {
+        try await waitForSessionFlag(timeout: timeout) { $0.hasSessionCreated }
+    }
+
+    private func waitForSessionUpdated(timeout: TimeInterval) async throws {
+        try await waitForSessionFlag(timeout: timeout) { $0.hasSessionUpdated }
+    }
+
+    private func waitForSessionFlag(
+        timeout: TimeInterval,
+        isReady: (OpenAIRealtimeTranscriber) -> Bool
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if isReady(self) {
+                return
+            }
+            if let lastError {
+                throw lastError
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        throw SpeechToTextError.transcriptionFailed("OpenAI realtime session timed out")
     }
 
     private func sendEvent(_ event: [String: Any]) async throws {
@@ -317,6 +405,10 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
 
     private func handle(_ event: OpenAIRealtimeServerEvent) {
         switch event.type {
+        case "session.created":
+            hasSessionCreated = true
+        case "session.updated":
+            hasSessionUpdated = true
         case "conversation.item.input_audio_transcription.delta":
             guard let delta = event.delta, !delta.isEmpty else { return }
             updateSegment(for: event, text: delta, isFinal: false, appending: true)
@@ -442,6 +534,8 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         webSocketTask = nil
         updateHandler = nil
         isStreaming = false
+        isSessionReadyForAudio = false
+        pendingAudioChunks.removeAll()
         hasUncommittedAudio = false
         isCommitInFlight = false
     }
@@ -452,6 +546,10 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         completedCommitCount = 0
         hasUncommittedAudio = false
         isCommitInFlight = false
+        hasSessionCreated = false
+        hasSessionUpdated = false
+        isSessionReadyForAudio = false
+        pendingAudioChunks.removeAll()
         transcriptSegments.removeAll()
         transcriptSegmentOrder.removeAll()
     }
