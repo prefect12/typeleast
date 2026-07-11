@@ -24,7 +24,7 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
         case .openai:
             return "OpenAI Whisper (Cloud)"
         case .openAIRealtime:
-            return "OpenAI Realtime (Streaming Test)"
+            return "OpenAI Realtime"
         case .mimo:
             return "Xiaomi MiMo V2.5 ASR (Cloud)"
         case .gemini:

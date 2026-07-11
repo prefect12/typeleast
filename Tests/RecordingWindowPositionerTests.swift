@@ -14,8 +14,8 @@ final class RecordingWindowPositionerTests: XCTestCase {
         ))
     }
 
-    func testProductionCanRequestAccessibilityOnceWhenUntrusted() {
-        XCTAssertTrue(RecordingWindowPositioner.shouldRequestAccessibilityPermission(
+    func testProductionNeverAutomaticallyOpensAccessibilitySettings() {
+        XCTAssertFalse(RecordingWindowPositioner.shouldRequestAccessibilityPermission(
             isTrusted: false,
             hasRequested: false,
             isTestEnvironment: false,

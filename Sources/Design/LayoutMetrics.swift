@@ -5,7 +5,7 @@ internal enum LayoutMetrics {
     enum RecordingWindow {
         static let minimumSize = CGSize(width: 180, height: 48)
         static let maximumSize = CGSize(width: 360, height: 104)
-        static func streamingTestSize(for style: RecordingHUDStyle) -> CGSize {
+        static func realtimeSize(for style: RecordingHUDStyle) -> CGSize {
             switch style {
             case .appleGlass:
                 return CGSize(width: 420, height: 82)

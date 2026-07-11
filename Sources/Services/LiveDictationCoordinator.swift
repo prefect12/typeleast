@@ -9,8 +9,13 @@ internal final class LiveDictationCoordinator {
     private let openAIRealtimeTranscriber = OpenAIRealtimeTranscriber()
     private let liveTextInsertionManager = LiveTextInsertionManager()
     private var activeTargetApp: NSRunningApplication?
+    private var isOpenAIRealtimeActive = false
 
     private init() {}
+
+    nonisolated static func shouldUseOpenAIRealtime(for provider: TranscriptionProvider) -> Bool {
+        provider == .openAIRealtime
+    }
 
     var hasInsertedLiveText: Bool {
         liveTextInsertionManager.hasInsertedText
@@ -31,7 +36,8 @@ internal final class LiveDictationCoordinator {
             return false
         }
 
-        if AppIdentity.isStreamingTest {
+        if Self.shouldUseOpenAIRealtime(for: settings.transcriptionProvider) {
+            isOpenAIRealtimeActive = true
             activeTargetApp = nil
             openAIRealtimeTranscriber.start(language: settings.transcriptionLanguage) { text, isFinal in
                 updateHandler?(text, isFinal)
@@ -40,6 +46,7 @@ internal final class LiveDictationCoordinator {
             return true
         }
 
+        isOpenAIRealtimeActive = false
         activeTargetApp = targetApp
         liveTextInsertionManager.begin()
 
@@ -59,14 +66,15 @@ internal final class LiveDictationCoordinator {
     }
 
     func appendPCM16AudioData(_ data: Data) {
-        guard AppIdentity.isStreamingTest else { return }
+        guard isOpenAIRealtimeActive else { return }
         openAIRealtimeTranscriber.appendPCM16AudioData(data)
     }
 
     func finishRecognition(finalizeLiveText: Bool) async -> String? {
-        let text = AppIdentity.isStreamingTest
+        let text = isOpenAIRealtimeActive
             ? await openAIRealtimeTranscriber.finish()
             : await streamingTranscriber.finish()
+        isOpenAIRealtimeActive = false
         let settings = TranscriptionSettingsStore.shared
 
         if let text, settings.isSmartPasteEnabled, finalizeLiveText {
@@ -92,6 +100,7 @@ internal final class LiveDictationCoordinator {
         streamingTranscriber.cancel()
         openAIRealtimeTranscriber.cancel()
         liveTextInsertionManager.cancel()
+        isOpenAIRealtimeActive = false
         activeTargetApp = nil
         NotificationCenter.default.post(name: .streamingTranscriptUpdated, object: "")
     }

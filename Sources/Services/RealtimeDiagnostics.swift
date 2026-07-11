@@ -4,7 +4,8 @@ internal actor RealtimeDiagnostics {
     static let shared = RealtimeDiagnostics()
 
     func record(_ event: String, fields: [String: String] = [:]) {
-        guard AppIdentity.isStreamingTest,
+        let provider = UserDefaults.standard.string(forKey: AppDefaults.Keys.transcriptionProvider)
+        guard (AppIdentity.isStreamingTest || provider == TranscriptionProvider.openAIRealtime.rawValue),
               let directory = try? AppIdentity.applicationSupportDirectory() else { return }
 
         var payload = fields

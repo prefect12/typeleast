@@ -301,10 +301,7 @@ internal struct DashboardProvidersView: View {
     private var engineSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Picker("", selection: $transcriptionProvider) {
-                ForEach(
-                    TranscriptionProvider.allCases.filter { AppIdentity.isStreamingTest || $0 != .openAIRealtime },
-                    id: \.self
-                ) { provider in
+                ForEach(TranscriptionProvider.allCases, id: \.self) { provider in
                     Label(provider.displayName, systemImage: providerIcon(for: provider))
                         .tag(provider)
                 }

@@ -36,8 +36,10 @@ internal extension AppDelegate {
             return
         }
 
-        let windowSize = AppIdentity.isStreamingTest
-            ? LayoutMetrics.RecordingWindow.streamingTestSize(
+        let usesRealtimeLayout = AppIdentity.isStreamingTest
+            || TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime
+        let windowSize = usesRealtimeLayout
+            ? LayoutMetrics.RecordingWindow.realtimeSize(
                 for: TranscriptionSettingsStore.shared.recordingHUDStyle
             )
             : LayoutMetrics.RecordingWindow.size

@@ -16,12 +16,12 @@ internal extension ContentView {
         
         lastAudioURL = nil
         LiveDictationCoordinator.shared.cancel()
-        streamingDraftText = AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime
+        streamingDraftText = transcriptionProvider == .openAIRealtime
             ? L10n.Recording.realtimeConnecting
             : ""
 
         let targetApp = findValidTargetApp()
-        if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
+        if transcriptionProvider == .openAIRealtime {
             LiveDictationCoordinator.shared.beginIfNeeded(
                 targetApp: targetApp,
                 updateHandler: { text, _ in streamingDraftText = text }
@@ -29,7 +29,7 @@ internal extension ContentView {
         }
 
         let success: Bool
-        if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
+        if transcriptionProvider == .openAIRealtime {
             success = audioRecorder.startRecording { data in
                 Task { @MainActor in LiveDictationCoordinator.shared.appendPCM16AudioData(data) }
             }
@@ -43,7 +43,7 @@ internal extension ContentView {
             return
         }
 
-        if !(AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime) {
+        if transcriptionProvider != .openAIRealtime {
             LiveDictationCoordinator.shared.beginIfNeeded(
                 targetApp: targetApp,
                 updateHandler: { text, _ in streamingDraftText = text }
@@ -62,7 +62,7 @@ internal extension ContentView {
             let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
-            progressMessage = AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime
+            progressMessage = transcriptionProvider == .openAIRealtime
                 ? L10n.Recording.finalizingStreaming
                 : L10n.Recording.preparingAudio
             
@@ -89,7 +89,7 @@ internal extension ContentView {
                 
                 var modelReadyTime: TimeInterval?
                 let shouldUseStreamedFinalText = streamedText != nil && (
-                    (AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime)
+                    transcriptionProvider == .openAIRealtime
                     || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
                 )
                 let effectiveProvider: TranscriptionProvider =
@@ -124,7 +124,7 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
-                    if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
+                    if transcriptionProvider == .openAIRealtime {
                         progressMessage = L10n.isChinese
                             ? "实时连接失败，正在使用批量识别…"
                             : "Realtime unavailable, using batch transcription…"

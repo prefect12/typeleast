@@ -47,9 +47,9 @@ internal enum RecordingWindowPositioner {
         isTestEnvironment: Bool,
         isStreamingTest: Bool
     ) -> Bool {
-        // The isolated channel must never steal focus by opening System Settings when recording starts.
-        // Its Permissions page remains the explicit place to grant Accessibility access.
-        !isTrusted && !hasRequested && !isTestEnvironment && !isStreamingTest
+        // Recording must never steal focus by opening System Settings. Accessibility access is
+        // requested explicitly from the Permissions page in both production and test channels.
+        false
     }
 
     private static func openAccessibilitySettings() {

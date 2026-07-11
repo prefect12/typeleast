@@ -9,8 +9,8 @@ internal enum RecordingHUDPresentation {
         return "…" + String(text.suffix(limit))
     }
 
-    static func cornerRadius(for style: RecordingHUDStyle, isStreamingTest: Bool) -> CGFloat {
-        guard isStreamingTest else {
+    static func cornerRadius(for style: RecordingHUDStyle, usesRealtimeLayout: Bool) -> CGFloat {
+        guard usesRealtimeLayout else {
             return style == .candidateBar ? 14 : LayoutMetrics.RecordingWindow.cornerRadius
         }
         switch style {
@@ -60,7 +60,7 @@ internal struct WaveformRecordingView: View {
             resizeRecordingWindow(to: windowSize)
         }
         .onChange(of: statusText) { _, _ in
-            if !AppIdentity.isStreamingTest {
+            if !usesRealtimePresentation {
                 resizeRecordingWindow(to: windowSize)
             }
         }
@@ -94,12 +94,12 @@ internal struct WaveformRecordingView: View {
         let label = Text(visibleStatusText)
             .font(.system(size: fontSize, weight: textWeight))
             .foregroundStyle(textColor)
-            .lineLimit(recordingHUDStyle == .candidateBar && AppIdentity.isStreamingTest ? 2 : (AppIdentity.isStreamingTest ? 3 : 4))
+            .lineLimit(recordingHUDStyle == .candidateBar && usesRealtimePresentation ? 2 : (usesRealtimePresentation ? 3 : 4))
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .layoutPriority(1)
 
-        if AppIdentity.isStreamingTest {
+        if usesRealtimePresentation {
             label.frame(width: textWidth, alignment: .leading)
         } else {
             label.frame(maxWidth: textWidth, alignment: .leading)
@@ -314,8 +314,8 @@ internal struct WaveformRecordingView: View {
     }
 
     private var windowSize: CGSize {
-        if AppIdentity.isStreamingTest {
-            return LayoutMetrics.RecordingWindow.streamingTestSize(for: recordingHUDStyle)
+        if usesRealtimePresentation {
+            return LayoutMetrics.RecordingWindow.realtimeSize(for: recordingHUDStyle)
         }
         let contentSize = measuredTextSize()
 
@@ -403,7 +403,7 @@ internal struct WaveformRecordingView: View {
             if !draft.isEmpty {
                 return draft
             }
-            return AppIdentity.isStreamingTest ? L10n.Recording.realtimeListening : "Recording…"
+            return usesRealtimePresentation ? L10n.Recording.realtimeListening : "Recording…"
         case .processing(let message):
             return message
         case .downloadingModel(let message):
@@ -420,7 +420,7 @@ internal struct WaveformRecordingView: View {
     }
 
     private var visibleStatusText: String {
-        guard AppIdentity.isStreamingTest else { return statusText }
+        guard usesRealtimePresentation else { return statusText }
         return RecordingHUDPresentation.latestText(statusText)
     }
 
@@ -511,8 +511,13 @@ internal struct WaveformRecordingView: View {
     private var cornerRadius: CGFloat {
         RecordingHUDPresentation.cornerRadius(
             for: recordingHUDStyle,
-            isStreamingTest: AppIdentity.isStreamingTest
+            usesRealtimeLayout: usesRealtimePresentation
         )
+    }
+
+    private var usesRealtimePresentation: Bool {
+        AppIdentity.isStreamingTest
+            || TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime
     }
 
     private var fontSize: CGFloat {

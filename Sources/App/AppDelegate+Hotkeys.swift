@@ -152,8 +152,7 @@ internal extension AppDelegate {
         recorder: AudioRecorder,
         targetApp: NSRunningApplication?
     ) -> Bool {
-        if AppIdentity.isStreamingTest,
-           TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime {
+        if TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime {
             LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
             let started = recorder.startRecording { data in
                 Task { @MainActor in LiveDictationCoordinator.shared.appendPCM16AudioData(data) }

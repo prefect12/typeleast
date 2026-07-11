@@ -19,7 +19,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderDisplayNames() {
         XCTAssertEqual(TranscriptionProvider.openai.displayName, "OpenAI Whisper (Cloud)")
-        XCTAssertEqual(TranscriptionProvider.openAIRealtime.displayName, "OpenAI Realtime (Streaming Test)")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.displayName, "OpenAI Realtime")
         XCTAssertEqual(TranscriptionProvider.mimo.displayName, "Xiaomi MiMo V2.5 ASR (Cloud)")
         XCTAssertEqual(TranscriptionProvider.gemini.displayName, "Google Gemini (Cloud)")
         XCTAssertEqual(TranscriptionProvider.local.displayName, "Whisper (Local)")
@@ -33,6 +33,12 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertEqual(TranscriptionProvider.gemini.rawValue, "gemini")
         XCTAssertEqual(TranscriptionProvider.local.rawValue, "local")
         XCTAssertEqual(TranscriptionProvider.parakeet.rawValue, "parakeet")
+    }
+
+    func testProductionCoordinatorRoutesRealtimeProviderToRealtimeTransport() {
+        XCTAssertTrue(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .openAIRealtime))
+        XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .openai))
+        XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .local))
     }
     
     func testTranscriptionProviderFromRawValue() {
