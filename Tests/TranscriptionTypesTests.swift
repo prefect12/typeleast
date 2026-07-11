@@ -8,8 +8,9 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderCases() {
         let allCases = TranscriptionProvider.allCases
-        XCTAssertEqual(allCases.count, 5)
+        XCTAssertEqual(allCases.count, 6)
         XCTAssertTrue(allCases.contains(.openai))
+        XCTAssertTrue(allCases.contains(.openAIRealtime))
         XCTAssertTrue(allCases.contains(.mimo))
         XCTAssertTrue(allCases.contains(.gemini))
         XCTAssertTrue(allCases.contains(.local))
@@ -18,6 +19,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderDisplayNames() {
         XCTAssertEqual(TranscriptionProvider.openai.displayName, "OpenAI Whisper (Cloud)")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.displayName, "OpenAI Realtime (Streaming Test)")
         XCTAssertEqual(TranscriptionProvider.mimo.displayName, "Xiaomi MiMo V2.5 ASR (Cloud)")
         XCTAssertEqual(TranscriptionProvider.gemini.displayName, "Google Gemini (Cloud)")
         XCTAssertEqual(TranscriptionProvider.local.displayName, "Whisper (Local)")
@@ -26,6 +28,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderRawValues() {
         XCTAssertEqual(TranscriptionProvider.openai.rawValue, "openai")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.rawValue, "openaiRealtime")
         XCTAssertEqual(TranscriptionProvider.mimo.rawValue, "mimo")
         XCTAssertEqual(TranscriptionProvider.gemini.rawValue, "gemini")
         XCTAssertEqual(TranscriptionProvider.local.rawValue, "local")
@@ -34,6 +37,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderFromRawValue() {
         XCTAssertEqual(TranscriptionProvider(rawValue: "openai"), .openai)
+        XCTAssertEqual(TranscriptionProvider(rawValue: "openaiRealtime"), .openAIRealtime)
         XCTAssertEqual(TranscriptionProvider(rawValue: "mimo"), .mimo)
         XCTAssertEqual(TranscriptionProvider(rawValue: "gemini"), .gemini)
         XCTAssertEqual(TranscriptionProvider(rawValue: "local"), .local)

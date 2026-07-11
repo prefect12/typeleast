@@ -1,4 +1,4 @@
-.PHONY: help build build-notarize test clean update-brew-cask publish-brew-cask release
+.PHONY: help build build-streaming-test build-notarize test clean update-brew-cask publish-brew-cask release
 
 SCRIPTS := scripts
 
@@ -8,6 +8,7 @@ help:
 	@echo ""
 	@echo "Available targets:"
 	@echo "  build              - Build the release app bundle"
+	@echo "  build-streaming-test - Build the isolated streaming test app bundle"
 	@echo "  build-notarize     - Build and notarize the app"
 	@echo "  test               - Run tests"
 	@echo "  clean              - Clean build artifacts"
@@ -18,6 +19,9 @@ help:
 # Build the app
 build:
 	$(SCRIPTS)/build.sh
+
+build-streaming-test:
+	$(SCRIPTS)/build.sh --channel streaming-test
 
 # Build and notarize the app
 build-notarize:

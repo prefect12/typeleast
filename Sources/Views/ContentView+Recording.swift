@@ -15,10 +15,27 @@ internal extension ContentView {
         }
         
         lastAudioURL = nil
-        streamingDraftText = ""
+        streamingDraftText = AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime
+            ? (L10n.isChinese ? "正在连接 · TEST" : "Connecting · TEST")
+            : ""
         LiveDictationCoordinator.shared.cancel()
-        
-        let success = audioRecorder.startRecording()
+
+        let targetApp = findValidTargetApp()
+        if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
+            LiveDictationCoordinator.shared.beginIfNeeded(
+                targetApp: targetApp,
+                updateHandler: { text, _ in streamingDraftText = text }
+            )
+        }
+
+        let success: Bool
+        if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
+            success = audioRecorder.startRecording { data in
+                Task { @MainActor in LiveDictationCoordinator.shared.appendPCM16AudioData(data) }
+            }
+        } else {
+            success = audioRecorder.startRecording()
+        }
         if !success {
             errorMessage = LocalizedStrings.Errors.failedToStartRecording
             showError = true
@@ -26,13 +43,12 @@ internal extension ContentView {
             return
         }
 
-        let targetApp = findValidTargetApp()
-        LiveDictationCoordinator.shared.beginIfNeeded(
-            targetApp: targetApp,
-            updateHandler: { text, _ in
-                streamingDraftText = text
-            }
-        )
+        if !(AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime) {
+            LiveDictationCoordinator.shared.beginIfNeeded(
+                targetApp: targetApp,
+                updateHandler: { text, _ in streamingDraftText = text }
+            )
+        }
     }
     
     func stopAndProcess() {
@@ -70,8 +86,14 @@ internal extension ContentView {
                     : Date().timeIntervalSince(streamingFinishStart)
                 
                 var modelReadyTime: TimeInterval?
-                let shouldUseStreamedFinalText = streamedText != nil
-                    && TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
+                let shouldUseStreamedFinalText = streamedText != nil && (
+                    (AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime)
+                    || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
+                )
+                let effectiveProvider: TranscriptionProvider =
+                    transcriptionProvider == .openAIRealtime && !shouldUseStreamedFinalText
+                    ? .openai
+                    : transcriptionProvider
 
                 if !shouldUseStreamedFinalText, transcriptionProvider == .local {
                     let modelReadyStart = Date()
@@ -81,8 +103,8 @@ internal extension ContentView {
 
                 let request = TranscriptionPipelineRequest(
                     audioURL: audioURL,
-                    provider: transcriptionProvider,
-                    whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                    provider: effectiveProvider,
+                    whisperModel: effectiveProvider == .local ? selectedWhisperModel : nil,
                     duration: sessionDuration,
                     estimatedDuration: nil,
                     sourceAppInfo: currentSourceAppInfo(),
@@ -100,6 +122,20 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
+                    if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
+                        progressMessage = L10n.isChinese
+                            ? "实时连接失败，正在使用批量识别…"
+                            : "Realtime unavailable, using batch transcription…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "result",
+                                fields: [
+                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
+                                    "fallback": "true"
+                                ]
+                            )
+                        }
+                    }
                     result = try await transcriptionPipeline.run(
                         request,
                         progressHandler: { progressMessage = $0 }
@@ -184,8 +220,9 @@ internal extension ContentView {
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
 
+                let externalProvider = transcriptionProvider.fileTranscriptionFallback ?? transcriptionProvider
                 var modelReadyTime: TimeInterval?
-                if transcriptionProvider == .local {
+                if externalProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
@@ -200,8 +237,8 @@ internal extension ContentView {
                 let result = try await transcriptionPipeline.run(
                     TranscriptionPipelineRequest(
                         audioURL: audioURL,
-                        provider: transcriptionProvider,
-                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                        provider: externalProvider,
+                        whisperModel: externalProvider == .local ? selectedWhisperModel : nil,
                         duration: nil,
                         estimatedDuration: estimatedDuration,
                         sourceAppInfo: currentSourceAppInfo(),

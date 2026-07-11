@@ -45,7 +45,8 @@ internal extension ContentView {
             targetApp = targetAppForPaste
         }
         
-        if let stored = targetApp, stored.isTerminated {
+        if let stored = targetApp,
+           stored.isTerminated || AppIdentity.isTypeleastBundleIdentifier(stored.bundleIdentifier) {
             targetApp = nil
         }
         
@@ -60,7 +61,7 @@ internal extension ContentView {
         let runningApps = NSWorkspace.shared.runningApplications
         
         return runningApps.first { app in
-            app.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            !AppIdentity.isTypeleastBundleIdentifier(app.bundleIdentifier) &&
             app.bundleIdentifier != "com.tinyspeck.slackmacgap" &&
             app.bundleIdentifier != "com.cron.electron" &&
             app.activationPolicy == .regular &&

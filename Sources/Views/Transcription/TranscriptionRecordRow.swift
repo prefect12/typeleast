@@ -158,7 +158,7 @@ internal struct TranscriptionRecordRow: View {
     
     private func providerColor(for provider: TranscriptionProvider) -> Color {
         switch provider {
-        case .openai:
+        case .openai, .openAIRealtime:
             return .green
         case .mimo:
             return .cyan

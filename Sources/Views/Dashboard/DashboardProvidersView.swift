@@ -72,7 +72,7 @@ internal struct DashboardProvidersView: View {
                 Text(L10n.Provider.audioLanguageFooter)
             }
 
-            if transcriptionProvider == .openai || transcriptionProvider == .mimo || transcriptionProvider == .gemini {
+            if transcriptionProvider == .openai || transcriptionProvider == .openAIRealtime || transcriptionProvider == .mimo || transcriptionProvider == .gemini {
                 Section("API Credentials") {
                     credentialsSection
                 }
@@ -301,7 +301,10 @@ internal struct DashboardProvidersView: View {
     private var engineSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Picker("", selection: $transcriptionProvider) {
-                ForEach(TranscriptionProvider.allCases, id: \.self) { provider in
+                ForEach(
+                    TranscriptionProvider.allCases.filter { AppIdentity.isStreamingTest || $0 != .openAIRealtime },
+                    id: \.self
+                ) { provider in
                     Label(provider.displayName, systemImage: providerIcon(for: provider))
                         .tag(provider)
                 }
@@ -322,6 +325,8 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return EngineConfig(tagline: "Industry-leading accuracy via cloud")
+        case .openAIRealtime:
+            return EngineConfig(tagline: "Live cloud transcription with batch fallback")
         case .mimo:
             return EngineConfig(tagline: "MiMo V2.5 speech recognition via Xiaomi Cloud")
         case .gemini:
@@ -341,7 +346,7 @@ internal struct DashboardProvidersView: View {
 
     private func statusInfo(for provider: TranscriptionProvider) -> (String, Bool) {
         switch provider {
-        case .openai:
+        case .openai, .openAIRealtime:
             return openAIKey.isEmpty ? ("Setup", false) : ("Ready", true)
         case .mimo:
             return miMoKey.isEmpty ? ("Setup", false) : ("Ready", true)
@@ -359,6 +364,8 @@ internal struct DashboardProvidersView: View {
         switch provider {
         case .openai:
             return "cloud"
+        case .openAIRealtime:
+            return "waveform.and.mic"
         case .mimo:
             return "waveform"
         case .gemini:
@@ -374,7 +381,7 @@ internal struct DashboardProvidersView: View {
     private var credentialsSection: some View {
         VStack(alignment: .leading, spacing: DashboardTheme.Spacing.md) {
             // Show relevant key based on provider
-            if transcriptionProvider == .openai {
+            if transcriptionProvider == .openai || transcriptionProvider == .openAIRealtime {
                 apiKeyField(
                     provider: "OpenAI",
                     hint: "Get your key at platform.openai.com",

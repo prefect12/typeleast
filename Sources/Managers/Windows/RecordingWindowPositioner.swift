@@ -169,7 +169,7 @@ internal enum RecordingWindowPositioner {
               let app,
               !app.isTerminated,
               app.processIdentifier > 0,
-              app.bundleIdentifier != Bundle.main.bundleIdentifier else {
+              !AppIdentity.isTypeleastBundleIdentifier(app.bundleIdentifier) else {
             return nil
         }
 

@@ -183,7 +183,7 @@ internal enum L10n {
         static var preparingAudio: String { isCN ? "准备音频..." : "Preparing audio..." }
         static var semanticCorrection: String { isCN ? "语义纠正中..." : "Semantic correction..." }
         static var transcribingFile: String { isCN ? "正在转录文件..." : "Transcribing file..." }
-        static var finalizingStreaming: String { isCN ? "整理流式结果..." : "Finalizing streaming transcript..." }
+        static var finalizingStreaming: String { isCN ? "正在完成…" : "Finalizing…" }
         static var retrying: String { isCN ? "重新转录中..." : "Retrying transcription..." }
     }
 
@@ -240,6 +240,7 @@ internal enum L10n {
         static func displayName(for provider: String) -> String {
             switch provider.lowercased() {
             case "openai": return "OpenAI"
+            case "openairealtime": return "OpenAI Realtime"
             case "mimo": return "MiMo"
             case "gemini": return "Gemini"
             case "local": return isCN ? "本地 Whisper" : "Local Whisper"

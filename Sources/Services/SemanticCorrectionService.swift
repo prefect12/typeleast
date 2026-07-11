@@ -51,7 +51,7 @@ internal final class SemanticCorrectionService {
             return await correctLocallyWithMLX(text: text, category: category)
         case .cloud:
             switch providerUsed {
-            case .openai:
+            case .openai, .openAIRealtime:
                 logger.info("Running cloud correction: OpenAI")
                 return (await correctWithOpenAI(text: text, category: category), nil)
             case .gemini:

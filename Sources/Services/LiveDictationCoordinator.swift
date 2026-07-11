@@ -6,6 +6,7 @@ internal final class LiveDictationCoordinator {
     static let shared = LiveDictationCoordinator()
 
     private let streamingTranscriber = StreamingSpeechTranscriber()
+    private let openAIRealtimeTranscriber = OpenAIRealtimeTranscriber()
     private let liveTextInsertionManager = LiveTextInsertionManager()
     private var activeTargetApp: NSRunningApplication?
 
@@ -24,6 +25,19 @@ internal final class LiveDictationCoordinator {
         guard settings.isStreamingTranscriptionEnabled else {
             cancel()
             return false
+        }
+        if AppIdentity.isStreamingTest, settings.transcriptionProvider != .openAIRealtime {
+            cancel()
+            return false
+        }
+
+        if AppIdentity.isStreamingTest {
+            activeTargetApp = nil
+            openAIRealtimeTranscriber.start(language: settings.transcriptionLanguage) { text, isFinal in
+                updateHandler?(text, isFinal)
+                NotificationCenter.default.post(name: .streamingTranscriptUpdated, object: text)
+            }
+            return true
         }
 
         activeTargetApp = targetApp
@@ -44,8 +58,15 @@ internal final class LiveDictationCoordinator {
         return true
     }
 
+    func appendPCM16AudioData(_ data: Data) {
+        guard AppIdentity.isStreamingTest else { return }
+        openAIRealtimeTranscriber.appendPCM16AudioData(data)
+    }
+
     func finishRecognition(finalizeLiveText: Bool) async -> String? {
-        let text = await streamingTranscriber.finish()
+        let text = AppIdentity.isStreamingTest
+            ? await openAIRealtimeTranscriber.finish()
+            : await streamingTranscriber.finish()
         let settings = TranscriptionSettingsStore.shared
 
         if let text, settings.isSmartPasteEnabled, finalizeLiveText {
@@ -69,6 +90,7 @@ internal final class LiveDictationCoordinator {
 
     func cancel() {
         streamingTranscriber.cancel()
+        openAIRealtimeTranscriber.cancel()
         liveTextInsertionManager.cancel()
         activeTargetApp = nil
         NotificationCenter.default.post(name: .streamingTranscriptUpdated, object: "")

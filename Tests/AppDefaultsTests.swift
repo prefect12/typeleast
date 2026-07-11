@@ -53,6 +53,41 @@ final class AppDefaultsTests: XCTestCase {
         XCTAssertEqual(defaults.object(forKey: AppDefaults.Keys.transcriptionHistoryEnabled) as? Bool, false)
         XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionRetentionPeriod), RetentionPeriod.forever.rawValue)
     }
+
+    func testStreamingTestCopiesOpenAIKeyWithoutChangingProductionItem() throws {
+        let keychain = MockKeychainService()
+        try keychain.save("production-key", service: AppIdentity.productionKeychainService, account: "OpenAI")
+
+        AppDefaults.copyProductionOpenAIKeyToStreamingTestIfNeeded(
+            keychain: keychain,
+            defaults: defaults,
+            isStreamingTest: true,
+            destinationService: AppIdentity.streamingTestKeychainService
+        )
+
+        XCTAssertEqual(
+            try keychain.get(service: AppIdentity.streamingTestKeychainService, account: "OpenAI"),
+            "production-key"
+        )
+        XCTAssertEqual(
+            try keychain.get(service: AppIdentity.productionKeychainService, account: "OpenAI"),
+            "production-key"
+        )
+    }
+
+    func testStreamingTestDefaultsAreIsolatedAndDeterministic() {
+        AppDefaults.configureStreamingTestDefaultsIfNeeded(
+            defaults: defaults,
+            isStreamingTest: true
+        )
+
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionProvider), "openaiRealtime")
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionLanguage), "zh-en")
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "⌃⌥Space")
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.startAtLogin), false)
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled), false)
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.enableStreamingTranscription), true)
+    }
 }
 
 private extension UserDefaults {

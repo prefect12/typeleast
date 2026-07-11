@@ -59,6 +59,15 @@ internal struct WaveformRecordingView: View {
                 .lineLimit(4)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
+
+            if AppIdentity.isStreamingTest {
+                Text("TEST")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.orange.gradient, in: Capsule())
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
     }

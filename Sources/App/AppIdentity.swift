@@ -1,27 +1,48 @@
 import Foundation
 
 internal enum AppIdentity {
+    #if TYPELEAST_STREAMING_TEST
+    static let isStreamingTest = true
+    static let displayName = "Typeleast Streaming Test"
+    static let bundleIdentifier = "com.typeleast.streaming-test"
+    static let appBundleName = "Typeleast Streaming Test.app"
+    static let releaseArchiveName = "TypeleastStreamingTest.zip"
+    static let keychainService = "Typeleast Streaming Test"
+    static let appSupportDirectoryName = "TypeleastStreamingTest"
+    static let swiftDataStoreName = "TypeleastStreamingTest.store"
+    #else
+    static let isStreamingTest = false
     static let displayName = "Typeleast"
+    static let bundleIdentifier = productionBundleIdentifier
+    static let appBundleName = "Typeleast.app"
+    static let releaseArchiveName = "Typeleast.zip"
+    static let keychainService = productionKeychainService
+    static let appSupportDirectoryName = "Typeleast"
+    static let swiftDataStoreName = "Typeleast.store"
+    #endif
 
     static let packageName = "Typeleast"
     static let executableName = "Typeleast"
-    static let appBundleName = "Typeleast.app"
-    static let releaseArchiveName = "Typeleast.zip"
 
-    static let bundleIdentifier = "com.typeleast.app"
+    static let productionBundleIdentifier = "com.typeleast.app"
+    static let streamingTestBundleIdentifier = "com.typeleast.streaming-test"
     static let developmentBundleIdentifier = "com.typeleast-dev.app"
 
-    static let keychainService = "Typeleast"
+    static let productionKeychainService = "Typeleast"
+    static let streamingTestKeychainService = "Typeleast Streaming Test"
 
-    static let appSupportDirectoryName = "Typeleast"
-
-    static let recordingWindowTitle = "Typeleast Recording"
-    static let dashboardWindowTitle = "Typeleast Dashboard"
-    static let welcomeWindowTitle = "Welcome to Typeleast"
-
-    static let swiftDataStoreName = "Typeleast.store"
+    static var recordingWindowTitle: String { "\(displayName) Recording" }
+    static var dashboardWindowTitle: String { "\(displayName) Dashboard" }
+    static var welcomeWindowTitle: String { "Welcome to \(displayName)" }
 
     static let appSupportOverrideEnvironmentKey = "TYPELEAST_APP_SUPPORT_DIR"
+
+    static func isTypeleastBundleIdentifier(_ identifier: String?) -> Bool {
+        guard let identifier else { return false }
+        return identifier == productionBundleIdentifier
+            || identifier == streamingTestBundleIdentifier
+            || identifier == developmentBundleIdentifier
+    }
 
     static func applicationSupportBaseDirectory(
         fileManager: FileManager = .default,

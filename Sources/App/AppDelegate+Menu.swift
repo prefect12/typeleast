@@ -5,6 +5,12 @@ import UniformTypeIdentifiers
 internal extension AppDelegate {
     func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
+        if AppIdentity.isStreamingTest {
+            let testHeader = NSMenuItem(title: "Typeleast Streaming Test · TEST", action: nil, keyEquivalent: "")
+            testHeader.isEnabled = false
+            menu.addItem(testHeader)
+            menu.addItem(NSMenuItem.separator())
+        }
         menu.addItem(NSMenuItem(title: L10n.Menu.record, action: #selector(toggleRecordWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: L10n.Menu.transcribeAudioFile, action: #selector(transcribeAudioFile), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: L10n.Menu.dashboard, action: #selector(showDashboard), keyEquivalent: ""))

@@ -214,6 +214,7 @@ private final class FakeTranscriptionSettingsStore: TranscriptionSettingsReadabl
     var selectedWhisperModel: WhisperModel = .base
     var selectedParakeetModel: ParakeetModel = .v3Multilingual
     var openAITranscriptionModel: String
+    var openAIRealtimeTranscriptionModel: String = AppDefaults.defaultOpenAIRealtimeTranscriptionModel
     var miMoASRModel: String = AppDefaults.defaultMiMoASRModel
     var transcriptionLanguage: TranscriptionLanguage = .auto
     var recordingHUDStyle: RecordingHUDStyle = AppDefaults.defaultRecordingHUDStyle

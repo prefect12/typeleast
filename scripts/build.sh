@@ -6,6 +6,13 @@
 
 # Change to repo root (parent of scripts/)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Keep test-channel output completely separate from the production bundle and build tree.
+if [[ "${1:-}" == "--channel" && "${2:-}" == "streaming-test" ]]; then
+  shift 2
+  exec "$SCRIPT_DIR/build-streaming-test.sh" "$@"
+fi
+
 cd "$SCRIPT_DIR/.." || exit 1
 
 # Parse command line arguments
@@ -18,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   *)
     echo "Unknown option: $1"
-    echo "Usage: $0 [--notarize]"
+    echo "Usage: $0 [--notarize] | --channel streaming-test [--install]"
     exit 1
     ;;
   esac

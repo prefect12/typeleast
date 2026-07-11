@@ -32,7 +32,17 @@ internal class AppSetupHelper {
     static func createMenuBarIcon() -> NSImage {
         let iconSize = getAdaptiveMenuBarIconSize()
         let config = NSImage.SymbolConfiguration(pointSize: iconSize, weight: .medium)
-        let image = NSImage(systemSymbolName: "microphone.circle", accessibilityDescription: LocalizedStrings.Accessibility.microphoneIcon)?.withSymbolConfiguration(config)
+        let symbolName = AppIdentity.isStreamingTest ? "microphone.badge.plus" : "microphone.circle"
+        let image = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: AppIdentity.isStreamingTest
+                ? "Typeleast Streaming Test"
+                : LocalizedStrings.Accessibility.microphoneIcon
+        )?.withSymbolConfiguration(config)
+        if AppIdentity.isStreamingTest {
+            image?.isTemplate = false
+            return image?.tinted(with: .systemOrange) ?? NSImage()
+        }
         image?.isTemplate = true // This makes it adapt to menu bar appearance
         return image ?? NSImage()
     }
@@ -142,7 +152,10 @@ internal class AppSetupHelper {
         
         do {
             let files = try FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: [.creationDateKey], options: [])
-            let audioFiles = files.filter { $0.lastPathComponent.hasPrefix("recording_") && $0.pathExtension == "m4a" }
+            let audioFiles = files.filter {
+                $0.lastPathComponent.hasPrefix("recording_")
+                    && ($0.pathExtension == "m4a" || $0.pathExtension == "wav")
+            }
             
             let cutoffDate = Date().addingTimeInterval(-24 * 60 * 60) // 24 hours ago
             
