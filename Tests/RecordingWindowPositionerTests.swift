@@ -5,6 +5,30 @@ final class RecordingWindowPositionerTests: XCTestCase {
     private let windowSize = LayoutMetrics.RecordingWindow.size
     private let visibleFrame = CGRect(x: 0, y: 0, width: 1200, height: 800)
 
+    func testStreamingTestNeverAutomaticallyOpensAccessibilitySettings() {
+        XCTAssertFalse(RecordingWindowPositioner.shouldRequestAccessibilityPermission(
+            isTrusted: false,
+            hasRequested: false,
+            isTestEnvironment: false,
+            isStreamingTest: true
+        ))
+    }
+
+    func testProductionCanRequestAccessibilityOnceWhenUntrusted() {
+        XCTAssertTrue(RecordingWindowPositioner.shouldRequestAccessibilityPermission(
+            isTrusted: false,
+            hasRequested: false,
+            isTestEnvironment: false,
+            isStreamingTest: false
+        ))
+        XCTAssertFalse(RecordingWindowPositioner.shouldRequestAccessibilityPermission(
+            isTrusted: false,
+            hasRequested: true,
+            isTestEnvironment: false,
+            isStreamingTest: false
+        ))
+    }
+
     func testPreferredOriginUsesCaretBelowWhenThereIsRoom() {
         let caret = CGRect(x: 420, y: 300, width: 2, height: 20)
 

@@ -25,9 +25,12 @@ internal enum RecordingWindowPositioner {
     }
 
     private static func requestAccessibilityPermissionIfNeeded() {
-        guard !AXIsProcessTrusted(),
-              !hasRequestedAccessibilityPermission,
-              NSClassFromString("XCTestCase") == nil else {
+        guard shouldRequestAccessibilityPermission(
+            isTrusted: AXIsProcessTrusted(),
+            hasRequested: hasRequestedAccessibilityPermission,
+            isTestEnvironment: NSClassFromString("XCTestCase") != nil,
+            isStreamingTest: AppIdentity.isStreamingTest
+        ) else {
             return
         }
 
@@ -36,6 +39,17 @@ internal enum RecordingWindowPositioner {
         let options = [checkOptionPrompt: true] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
         openAccessibilitySettings()
+    }
+
+    static func shouldRequestAccessibilityPermission(
+        isTrusted: Bool,
+        hasRequested: Bool,
+        isTestEnvironment: Bool,
+        isStreamingTest: Bool
+    ) -> Bool {
+        // The isolated channel must never steal focus by opening System Settings when recording starts.
+        // Its Permissions page remains the explicit place to grant Accessibility access.
+        !isTrusted && !hasRequested && !isTestEnvironment && !isStreamingTest
     }
 
     private static func openAccessibilitySettings() {
