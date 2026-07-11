@@ -81,9 +81,11 @@ internal enum AppDefaults {
             Keys.enableStreamingTranscription: true,
             Keys.recordingHUDStyle: defaultRecordingHUDStyle.rawValue,
             Keys.immediateRecording: false,
-            Keys.globalHotkey: AppIdentity.isStreamingTest ? "⌃⌥Space" : "⌘⇧Space",
+            Keys.globalHotkey: AppIdentity.isStreamingTest
+                ? GlobalShortcutDisplay.storedValue(for: .rightCommand)
+                : "⌘⇧Space",
 
-            Keys.pressAndHoldEnabled: AppIdentity.isStreamingTest ? false : PressAndHoldConfiguration.defaults.enabled,
+            Keys.pressAndHoldEnabled: AppIdentity.isStreamingTest || PressAndHoldConfiguration.defaults.enabled,
             Keys.pressAndHoldKeyIdentifier: PressAndHoldConfiguration.defaults.key.rawValue,
             Keys.pressAndHoldMode: PressAndHoldConfiguration.defaults.mode.rawValue,
 
@@ -100,14 +102,18 @@ internal enum AppDefaults {
         isStreamingTest: Bool = AppIdentity.isStreamingTest
     ) {
         guard isStreamingTest else { return }
-        let marker = "streamingTestDefaultsConfigured"
+        // V3 restores the requested press-and-hold Right Command interaction for the test channel.
+        let marker = "streamingTestDefaultsConfiguredV3"
         guard !defaults.bool(forKey: marker) else { return }
 
         defaults.set(TranscriptionProvider.openAIRealtime.rawValue, forKey: Keys.transcriptionProvider)
         defaults.set(TranscriptionLanguage.chineseEnglish.rawValue, forKey: Keys.transcriptionLanguage)
         defaults.set(false, forKey: Keys.startAtLogin)
-        defaults.set("⌃⌥Space", forKey: Keys.globalHotkey)
-        defaults.set(false, forKey: Keys.pressAndHoldEnabled)
+        defaults.set(GlobalShortcutDisplay.storedValue(for: .rightCommand), forKey: Keys.globalHotkey)
+        defaults.set(false, forKey: Keys.immediateRecording)
+        defaults.set(true, forKey: Keys.pressAndHoldEnabled)
+        defaults.set(PressAndHoldKey.rightCommand.rawValue, forKey: Keys.pressAndHoldKeyIdentifier)
+        defaults.set(PressAndHoldMode.hold.rawValue, forKey: Keys.pressAndHoldMode)
         defaults.set(true, forKey: Keys.enableStreamingTranscription)
         defaults.set(true, forKey: Keys.enableSmartPaste)
         defaults.set(true, forKey: marker)

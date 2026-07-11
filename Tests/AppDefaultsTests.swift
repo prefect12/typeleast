@@ -83,10 +83,38 @@ final class AppDefaultsTests: XCTestCase {
 
         XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionProvider), "openaiRealtime")
         XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionLanguage), "zh-en")
-        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "⌃⌥Space")
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "modifierOnly:rightCommand")
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.immediateRecording), false)
         XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.startAtLogin), false)
-        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled), false)
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled), true)
         XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.enableStreamingTranscription), true)
+    }
+
+    func testStreamingTestV3MigrationRestoresRightCommandHoldMode() {
+        defaults.set(true, forKey: "streamingTestDefaultsConfiguredV2")
+        defaults.set("⌃⌥Space", forKey: AppDefaults.Keys.globalHotkey)
+        defaults.set(true, forKey: AppDefaults.Keys.immediateRecording)
+        defaults.set(false, forKey: AppDefaults.Keys.pressAndHoldEnabled)
+        defaults.set(PressAndHoldKey.rightCommand.rawValue, forKey: AppDefaults.Keys.pressAndHoldKeyIdentifier)
+        defaults.set(PressAndHoldMode.doubleTapToggle.rawValue, forKey: AppDefaults.Keys.pressAndHoldMode)
+
+        AppDefaults.configureStreamingTestDefaultsIfNeeded(
+            defaults: defaults,
+            isStreamingTest: true
+        )
+
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "modifierOnly:rightCommand")
+        XCTAssertFalse(defaults.bool(forKey: AppDefaults.Keys.immediateRecording))
+        XCTAssertTrue(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled))
+        XCTAssertEqual(
+            defaults.string(forKey: AppDefaults.Keys.pressAndHoldKeyIdentifier),
+            PressAndHoldConfiguration.defaults.key.rawValue
+        )
+        XCTAssertEqual(
+            defaults.string(forKey: AppDefaults.Keys.pressAndHoldMode),
+            PressAndHoldMode.hold.rawValue
+        )
+        XCTAssertTrue(defaults.bool(forKey: "streamingTestDefaultsConfiguredV3"))
     }
 }
 
