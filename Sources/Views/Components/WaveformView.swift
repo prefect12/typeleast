@@ -8,6 +8,17 @@ internal enum RecordingHUDPresentation {
         guard text.count > limit else { return text }
         return "…" + String(text.suffix(limit))
     }
+
+    static func cornerRadius(for style: RecordingHUDStyle, isStreamingTest: Bool) -> CGFloat {
+        guard isStreamingTest else {
+            return style == .candidateBar ? 14 : LayoutMetrics.RecordingWindow.cornerRadius
+        }
+        switch style {
+        case .appleGlass: return 18
+        case .siriAura: return 34
+        case .candidateBar: return 14
+        }
+    }
 }
 
 /// Recording control view - standard macOS look and feel
@@ -63,14 +74,7 @@ internal struct WaveformRecordingView: View {
             statusIndicator
                 .frame(width: leadingIndicatorWidth, height: indicatorHeight, alignment: .center)
 
-            Text(visibleStatusText)
-                .font(.system(size: fontSize, weight: textWeight))
-                .foregroundStyle(textColor)
-                .frame(maxWidth: textWidth, alignment: .leading)
-                .lineLimit(AppIdentity.isStreamingTest ? 3 : 4)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .layoutPriority(1)
+            statusLabel
 
             if AppIdentity.isStreamingTest {
                 Text("TEST")
@@ -83,6 +87,23 @@ internal struct WaveformRecordingView: View {
             }
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var statusLabel: some View {
+        let label = Text(visibleStatusText)
+            .font(.system(size: fontSize, weight: textWeight))
+            .foregroundStyle(textColor)
+            .lineLimit(recordingHUDStyle == .candidateBar && AppIdentity.isStreamingTest ? 2 : (AppIdentity.isStreamingTest ? 3 : 4))
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .layoutPriority(1)
+
+        if AppIdentity.isStreamingTest {
+            label.frame(width: textWidth, alignment: .leading)
+        } else {
+            label.frame(maxWidth: textWidth, alignment: .leading)
+        }
     }
 
     @ViewBuilder
@@ -107,13 +128,12 @@ internal struct WaveformRecordingView: View {
                     endPoint: .bottomTrailing
                 )
                 if isRecording {
-                    Circle()
-                        .fill(siriGradient)
-                        .frame(width: 86 + CGFloat(audioLevel) * 34, height: 86 + CGFloat(audioLevel) * 34)
-                        .blur(radius: 22)
-                        .opacity(0.13 + Double(audioLevel) * 0.12)
-                        .offset(x: auraPhase ? windowSize.width * 0.62 : windowSize.width * 0.48, y: auraPhase ? -8 : 8)
-                        .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: auraPhase)
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.22), Color.blue.opacity(0.06), Color.clear],
+                        startPoint: auraPhase ? .topLeading : .bottomLeading,
+                        endPoint: auraPhase ? .bottomTrailing : .topTrailing
+                    )
+                    .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: auraPhase)
                 }
             case .siriAura:
                 ZStack {
@@ -121,8 +141,9 @@ internal struct WaveformRecordingView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color(red: 0.35, green: 0.72, blue: 1.0).opacity(0.30),
-                                    Color(red: 0.96, green: 0.36, blue: 0.86).opacity(0.20),
+                                    Color.white.opacity(0.88),
+                                    Color(red: 0.35, green: 0.72, blue: 1.0).opacity(0.52),
+                                    Color(red: 0.96, green: 0.36, blue: 0.86).opacity(0.38),
                                     Color.clear
                                 ],
                                 center: .center,
@@ -130,19 +151,17 @@ internal struct WaveformRecordingView: View {
                                 endRadius: 58
                             )
                         )
-                        .frame(
-                            width: 116 + CGFloat(audioLevel) * 44,
-                            height: 116 + CGFloat(audioLevel) * 44
-                        )
-                        .blur(radius: 14 + CGFloat(audioLevel) * 5)
+                        .frame(width: 148 + CGFloat(audioLevel) * 54, height: 148 + CGFloat(audioLevel) * 54)
+                        .blur(radius: 17 + CGFloat(audioLevel) * 5)
                         .opacity(isRecording ? 1 : 0.58)
                         .scaleEffect(auraPhase ? 1.08 : 0.92)
-                        .offset(x: -38 + (auraPhase ? 8 : -2))
+                        .offset(x: -50 + (auraPhase ? 10 : -2))
                         .animation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true), value: auraPhase)
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.58),
-                            Color(red: 0.93, green: 0.97, blue: 1.0).opacity(0.26)
+                            Color.white.opacity(0.54),
+                            Color(red: 0.90, green: 0.96, blue: 1.0).opacity(0.30),
+                            Color(red: 1.0, green: 0.90, blue: 0.98).opacity(0.16)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -208,13 +227,12 @@ internal struct WaveformRecordingView: View {
             switch recordingHUDStyle {
             case .appleGlass:
                 shape
-                    .strokeBorder(siriLinearGradient.opacity(auraPhase ? 0.62 : 0.28), lineWidth: 1.2)
-                    .blur(radius: 0.6)
+                    .strokeBorder(Color.white.opacity(auraPhase ? 0.82 : 0.52), lineWidth: 1.1)
                     .animation(.easeInOut(duration: 1.35).repeatForever(autoreverses: true), value: auraPhase)
             case .siriAura:
                 shape
-                    .strokeBorder(siriLinearGradient.opacity(auraPhase ? 0.80 : 0.36), lineWidth: 1.4)
-                    .shadow(color: Color(red: 0.36, green: 0.66, blue: 1.0).opacity(auraPhase ? 0.24 : 0.08), radius: 10)
+                    .strokeBorder(siriLinearGradient.opacity(auraPhase ? 0.96 : 0.56), lineWidth: 1.8)
+                    .shadow(color: Color(red: 0.36, green: 0.66, blue: 1.0).opacity(auraPhase ? 0.38 : 0.14), radius: 12)
                     .animation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true), value: auraPhase)
             case .candidateBar:
                 shape
@@ -297,7 +315,7 @@ internal struct WaveformRecordingView: View {
 
     private var windowSize: CGSize {
         if AppIdentity.isStreamingTest {
-            return LayoutMetrics.RecordingWindow.streamingTestSize
+            return LayoutMetrics.RecordingWindow.streamingTestSize(for: recordingHUDStyle)
         }
         let contentSize = measuredTextSize()
 
@@ -313,6 +331,7 @@ internal struct WaveformRecordingView: View {
         rowContentWidth
             - leadingIndicatorWidth
             - (AppIdentity.isStreamingTest ? 54 : 0)
+            - (AppIdentity.isStreamingTest ? 20 : 10)
     }
 
     private var rowContentWidth: CGFloat {
@@ -490,12 +509,10 @@ internal struct WaveformRecordingView: View {
     }
 
     private var cornerRadius: CGFloat {
-        switch recordingHUDStyle {
-        case .candidateBar:
-            return 14
-        default:
-            return LayoutMetrics.RecordingWindow.cornerRadius
-        }
+        RecordingHUDPresentation.cornerRadius(
+            for: recordingHUDStyle,
+            isStreamingTest: AppIdentity.isStreamingTest
+        )
     }
 
     private var fontSize: CGFloat {

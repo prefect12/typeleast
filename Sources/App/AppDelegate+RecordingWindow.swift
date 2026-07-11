@@ -37,7 +37,9 @@ internal extension AppDelegate {
         }
 
         let windowSize = AppIdentity.isStreamingTest
-            ? LayoutMetrics.RecordingWindow.streamingTestSize
+            ? LayoutMetrics.RecordingWindow.streamingTestSize(
+                for: TranscriptionSettingsStore.shared.recordingHUDStyle
+            )
             : LayoutMetrics.RecordingWindow.size
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: windowSize),

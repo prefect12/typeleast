@@ -5,7 +5,16 @@ internal enum LayoutMetrics {
     enum RecordingWindow {
         static let minimumSize = CGSize(width: 180, height: 48)
         static let maximumSize = CGSize(width: 360, height: 104)
-        static let streamingTestSize = CGSize(width: 420, height: 82)
+        static func streamingTestSize(for style: RecordingHUDStyle) -> CGSize {
+            switch style {
+            case .appleGlass:
+                return CGSize(width: 420, height: 82)
+            case .siriAura:
+                return CGSize(width: 430, height: 82)
+            case .candidateBar:
+                return CGSize(width: 420, height: 68)
+            }
+        }
         static let size = minimumSize
         static let cornerRadius: CGFloat = 18
         static let edgePadding: CGFloat = 12

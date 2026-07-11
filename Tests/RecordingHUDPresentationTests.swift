@@ -15,8 +15,20 @@ final class RecordingHUDPresentationTests: XCTestCase {
         XCTAssertEqual(visible.count, 101)
     }
 
-    func testStreamingTestHUDHasStableReadableSize() {
-        XCTAssertGreaterThanOrEqual(LayoutMetrics.RecordingWindow.streamingTestSize.width, 400)
-        XCTAssertGreaterThanOrEqual(LayoutMetrics.RecordingWindow.streamingTestSize.height, 72)
+    func testStreamingTestHUDStylesKeepReadableButDistinctShapes() {
+        let glassSize = LayoutMetrics.RecordingWindow.streamingTestSize(for: .appleGlass)
+        let auraSize = LayoutMetrics.RecordingWindow.streamingTestSize(for: .siriAura)
+        let candidateSize = LayoutMetrics.RecordingWindow.streamingTestSize(for: .candidateBar)
+
+        XCTAssertGreaterThanOrEqual(glassSize.width, 400)
+        XCTAssertGreaterThanOrEqual(auraSize.width, 400)
+        XCTAssertGreaterThanOrEqual(candidateSize.width, 400)
+        XCTAssertGreaterThan(auraSize.width, glassSize.width)
+        XCTAssertLessThan(candidateSize.height, glassSize.height)
+
+        XCTAssertGreaterThan(
+            RecordingHUDPresentation.cornerRadius(for: .siriAura, isStreamingTest: true),
+            RecordingHUDPresentation.cornerRadius(for: .appleGlass, isStreamingTest: true)
+        )
     }
 }

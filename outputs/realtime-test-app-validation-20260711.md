@@ -43,7 +43,8 @@ An additional 17.04-second probe produced 58 delta events, first delta at 4,057 
 - Test settings are OpenAI Realtime / `zh-en` / hold Right Command / start at login disabled.
 - Shortcut migration V3 restores the requested hold-to-record interaction: press and hold Right Command to record, release to stop and finalize.
 - The test channel never automatically opens System Settings from recording-window positioning; permissions are user-initiated from its Permissions page.
-- The Realtime HUD uses a stable 420×82 layout, reserves space for the TEST badge, keeps the newest transcript tail visible, and reports connecting/listening/live-caption-unavailable states without resizing on every delta.
+- The Realtime HUD uses stable style-specific layouts, reserves space for the TEST badge, keeps the newest transcript tail visible, and reports connecting/listening/live-caption-unavailable states without resizing on every delta.
+- HUD styles keep separate visual identities in the test channel: Siri Aura uses a wider high-radius glow treatment, Apple Glass stays neutral, and Candidate Bar uses a shorter waveform layout. Short status text keeps a fixed readable column instead of wrapping mid-word.
 - Production and test Keychain items both exist under different service names.
 - Production and test SwiftData stores are in separate directories.
 
