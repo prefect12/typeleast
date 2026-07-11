@@ -12,7 +12,7 @@ import time
 import websockets
 
 
-async def run_once(audio: bytes) -> dict:
+async def run_once(audio: bytes, expected_text: str | None = None) -> dict:
     started = time.monotonic()
     commit_at = None
     metrics = {
@@ -73,6 +73,8 @@ async def run_once(audio: bytes) -> dict:
                 elif event_type.endswith(".completed"):
                     metrics["completed_ms"] = round((now - started) * 1_000)
                     metrics["completed"] = True
+                    if expected_text is not None:
+                        metrics["exact_match"] = event.get("transcript", "").strip() == expected_text
                     return
                 elif event_type in ("error", "conversation.item.input_audio_transcription.failed"):
                     raise RuntimeError(event.get("error", {}).get("message", "transcription error"))
@@ -98,6 +100,7 @@ async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("pcm_file")
     parser.add_argument("--repeat", type=int, default=1)
+    parser.add_argument("--expected-text")
     arguments = parser.parse_args()
     if not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit("OPENAI_API_KEY is required")
@@ -105,7 +108,7 @@ async def main() -> None:
 
     results = []
     for index in range(arguments.repeat):
-        result = await run_once(audio)
+        result = await run_once(audio, arguments.expected_text)
         result["run"] = index + 1
         results.append(result)
         print(json.dumps(result, sort_keys=True), flush=True)
@@ -123,6 +126,8 @@ async def main() -> None:
             item["commit_to_completed_ms"] for item in completed
         )),
     }
+    if arguments.expected_text is not None:
+        summary["exact_matches"] = sum(bool(item.get("exact_match")) for item in results)
     print(json.dumps({"summary": summary}, sort_keys=True), flush=True)
     if len(completed) != len(results):
         raise SystemExit(1)

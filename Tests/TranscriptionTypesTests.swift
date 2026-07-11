@@ -40,6 +40,14 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .openai))
         XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .local))
     }
+
+    func testShortRealtimeUtterancesUseBatchVerification() {
+        XCTAssertFalse(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: nil))
+        XCTAssertFalse(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 0))
+        XCTAssertTrue(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 1.0))
+        XCTAssertTrue(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 2.5))
+        XCTAssertFalse(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 2.51))
+    }
     
     func testTranscriptionProviderFromRawValue() {
         XCTAssertEqual(TranscriptionProvider(rawValue: "openai"), .openai)

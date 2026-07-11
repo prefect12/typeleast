@@ -109,6 +109,7 @@ class SpeechToTextServiceTests: XCTestCase {
 
         XCTAssertTrue(prompt.contains("Detect the spoken language automatically"))
         XCTAssertTrue(prompt.contains("do not translate"))
+        XCTAssertTrue(prompt.contains("Preserve very short utterances as equally short text"))
     }
 
     func testASRPromptCanForceChinese() {

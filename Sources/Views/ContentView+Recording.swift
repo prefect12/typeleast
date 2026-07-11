@@ -88,7 +88,12 @@ internal extension ContentView {
                     : Date().timeIntervalSince(streamingFinishStart)
                 
                 var modelReadyTime: TimeInterval?
-                let shouldUseStreamedFinalText = streamedText != nil && (
+                let shouldVerifyShortRealtime = transcriptionProvider == .openAIRealtime
+                    && streamedText != nil
+                    && LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(
+                        recordingDuration: sessionDuration
+                    )
+                let shouldUseStreamedFinalText = streamedText != nil && !shouldVerifyShortRealtime && (
                     transcriptionProvider == .openAIRealtime
                     || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
                 )
@@ -124,7 +129,22 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
-                    if transcriptionProvider == .openAIRealtime {
+                    if shouldVerifyShortRealtime {
+                        progressMessage = L10n.isChinese
+                            ? "正在确认短句…"
+                            : "Verifying short phrase…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "short_utterance_verification",
+                                fields: [
+                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
+                                    "maximum_duration_ms": String(
+                                        Int(LiveDictationCoordinator.shortRealtimeVerificationMaximumDuration * 1_000)
+                                    )
+                                ]
+                            )
+                        }
+                    } else if transcriptionProvider == .openAIRealtime {
                         progressMessage = L10n.isChinese
                             ? "实时连接失败，正在使用批量识别…"
                             : "Realtime unavailable, using batch transcription…"
@@ -138,10 +158,32 @@ internal extension ContentView {
                             )
                         }
                     }
-                    result = try await transcriptionPipeline.run(
-                        request,
-                        progressHandler: { progressMessage = $0 }
-                    )
+                    do {
+                        result = try await transcriptionPipeline.run(
+                            request,
+                            progressHandler: { progressMessage = $0 }
+                        )
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        guard shouldVerifyShortRealtime, let streamedText else { throw error }
+                        let realtimeRequest = TranscriptionPipelineRequest(
+                            audioURL: audioURL,
+                            provider: .openAIRealtime,
+                            whisperModel: nil,
+                            duration: sessionDuration,
+                            estimatedDuration: nil,
+                            sourceAppInfo: request.sourceAppInfo,
+                            modelReadyTime: nil,
+                            processStart: processStart
+                        )
+                        result = try await transcriptionPipeline.runPretranscribed(
+                            realtimeRequest,
+                            rawText: streamedText,
+                            asrTime: streamingFinalizeTime ?? 0,
+                            progressHandler: { progressMessage = $0 }
+                        )
+                    }
                 }
 
                 if didInsertLiveText {

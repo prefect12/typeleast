@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 internal final class LiveDictationCoordinator {
     static let shared = LiveDictationCoordinator()
+    nonisolated static let shortRealtimeVerificationMaximumDuration: TimeInterval = 2.5
 
     private let streamingTranscriber = StreamingSpeechTranscriber()
     private let openAIRealtimeTranscriber = OpenAIRealtimeTranscriber()
@@ -15,6 +16,11 @@ internal final class LiveDictationCoordinator {
 
     nonisolated static func shouldUseOpenAIRealtime(for provider: TranscriptionProvider) -> Bool {
         provider == .openAIRealtime
+    }
+
+    nonisolated static func shouldVerifyRealtimeWithBatch(recordingDuration: TimeInterval?) -> Bool {
+        guard let recordingDuration, recordingDuration > 0 else { return false }
+        return recordingDuration <= shortRealtimeVerificationMaximumDuration
     }
 
     var hasInsertedLiveText: Bool {

@@ -50,6 +50,7 @@ internal class SpeechToTextService {
         \(language.speechInstruction)
         Preserve and correctly spell GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, creator, matching, pipeline, queue, worker, webhook, monitoring, monitor, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT.
         Common speech variants: 进 Hub, 金 Hub, or Git Hub usually means GitHub; 瑞坡 usually means repo; 批啊 or P R usually means PR; 康佩恩 usually means campaign; 格拉法纳 means Grafana; 普罗米修斯 means Prometheus; 观测云 means Guance.
+        Transcribe verbatim. Do not add, infer, complete, paraphrase, translate, or answer. Preserve very short utterances as equally short text.
         Return only the transcription without commentary.
         """
     }
