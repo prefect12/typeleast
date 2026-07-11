@@ -12,6 +12,7 @@ internal extension AppDelegate {
 
         // Ensure a single, consistent set of defaults before any UI/services read from UserDefaults/AppStorage.
         AppDefaults.register()
+        AppDefaults.configureProductionRealtimeDefaultsIfNeeded()
         AppDefaults.configureStreamingTestDefaultsIfNeeded()
         AppDefaults.copyProductionOpenAIKeyToStreamingTestIfNeeded()
         _ = AppSetupHelper.checkFirstRun()

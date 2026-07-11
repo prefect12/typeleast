@@ -119,6 +119,28 @@ internal enum AppDefaults {
         defaults.set(true, forKey: marker)
     }
 
+    /// Applies the validated Realtime configuration exactly once when upgrading the production app.
+    /// Later user changes are preserved because the migration marker prevents another override.
+    internal static func configureProductionRealtimeDefaultsIfNeeded(
+        defaults: UserDefaults = .standard,
+        bundleIdentifier: String = AppIdentity.bundleIdentifier
+    ) {
+        guard bundleIdentifier == productionBundleIdentifier else { return }
+        let marker = "productionRealtimeDefaultsConfiguredV1"
+        guard !defaults.bool(forKey: marker) else { return }
+
+        defaults.set(TranscriptionProvider.openAIRealtime.rawValue, forKey: Keys.transcriptionProvider)
+        defaults.set(TranscriptionLanguage.chineseEnglish.rawValue, forKey: Keys.transcriptionLanguage)
+        defaults.set(RecordingHUDStyle.siriAura.rawValue, forKey: Keys.recordingHUDStyle)
+        defaults.set(GlobalShortcutDisplay.storedValue(for: .rightCommand), forKey: Keys.globalHotkey)
+        defaults.set(false, forKey: Keys.immediateRecording)
+        defaults.set(true, forKey: Keys.pressAndHoldEnabled)
+        defaults.set(PressAndHoldKey.rightCommand.rawValue, forKey: Keys.pressAndHoldKeyIdentifier)
+        defaults.set(PressAndHoldMode.hold.rawValue, forKey: Keys.pressAndHoldMode)
+        defaults.set(true, forKey: Keys.enableStreamingTranscription)
+        defaults.set(true, forKey: marker)
+    }
+
     /// Test builds import only the OpenAI credential, once, into their own Keychain service.
     /// The production item is never updated or deleted.
     internal static func copyProductionOpenAIKeyToStreamingTestIfNeeded(
