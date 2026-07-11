@@ -36,7 +36,9 @@ internal extension AppDelegate {
             return
         }
 
-        let windowSize = LayoutMetrics.RecordingWindow.size
+        let windowSize = AppIdentity.isStreamingTest
+            ? LayoutMetrics.RecordingWindow.streamingTestSize
+            : LayoutMetrics.RecordingWindow.size
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: windowSize),
             styleMask: [.borderless],

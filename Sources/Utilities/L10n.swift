@@ -184,6 +184,11 @@ internal enum L10n {
         static var semanticCorrection: String { isCN ? "语义纠正中..." : "Semantic correction..." }
         static var transcribingFile: String { isCN ? "正在转录文件..." : "Transcribing file..." }
         static var finalizingStreaming: String { isCN ? "正在完成…" : "Finalizing…" }
+        static var realtimeConnecting: String { isCN ? "正在连接实时字幕…" : "Connecting live captions…" }
+        static var realtimeListening: String { isCN ? "正在聆听，字幕即将出现…" : "Listening — captions will appear shortly…" }
+        static var realtimeUnavailableWhileRecording: String {
+            isCN ? "实时字幕暂不可用，录音仍在继续…" : "Live captions unavailable; recording continues…"
+        }
         static var retrying: String { isCN ? "重新转录中..." : "Retrying transcription..." }
     }
 

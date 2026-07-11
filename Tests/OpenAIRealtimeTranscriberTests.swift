@@ -84,12 +84,16 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
     }
 
     func testHandshakeBuffersAudioAndFinishCommitsOnce() async throws {
-        let transport = MockRealtimeSocketTransport(messages: [
-            .text(#"{"type":"session.created"}"#),
-            .text(#"{"type":"session.updated"}"#),
-            .text(#"{"type":"conversation.item.input_audio_transcription.delta","item_id":"1","delta":"中英 "}"#),
-            .text(#"{"type":"conversation.item.input_audio_transcription.completed","item_id":"1","transcript":"中英 test"}"#)
-        ], sendDelayMilliseconds: 10)
+        let transport = MockRealtimeSocketTransport(
+            messages: [
+                .text(#"{"type":"session.created"}"#),
+                .text(#"{"type":"session.updated"}"#),
+                .text(#"{"type":"conversation.item.input_audio_transcription.delta","item_id":"1","delta":"中英 "}"#),
+                .text(#"{"type":"conversation.item.input_audio_transcription.completed","item_id":"1","transcript":"中英 test"}"#)
+            ],
+            failWhenMessagesExhausted: true,
+            sendDelayMilliseconds: 10
+        )
         let keychain = MockKeychainService()
         try keychain.save("test-key", service: AppIdentity.keychainService, account: "OpenAI")
         let transcriber = OpenAIRealtimeTranscriber(
@@ -97,7 +101,8 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
             transportFactory: { _ in transport }
         )
 
-        transcriber.start(language: .chineseEnglish)
+        var updates: [String] = []
+        transcriber.start(language: .chineseEnglish) { text, _ in updates.append(text) }
         let chunks = [
             Data(repeating: 1, count: 1_600),
             Data(repeating: 2, count: 1_600),
@@ -116,6 +121,9 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
             "input_audio_buffer.commit"
         ])
         XCTAssertEqual(transport.sentAudioPayloads(), chunks.map { $0.base64EncodedString() })
+        XCTAssertTrue(updates.contains(L10n.Recording.realtimeConnecting))
+        XCTAssertTrue(updates.contains(L10n.Recording.realtimeListening))
+        XCTAssertEqual(updates.last, "中英 test")
     }
 
     func testHandshakeTimeoutReturnsNoRealtimeFinal() async throws {
@@ -128,11 +136,13 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
             transportFactory: { _ in transport }
         )
 
-        transcriber.start(language: .auto)
+        var updates: [String] = []
+        transcriber.start(language: .auto) { text, _ in updates.append(text) }
         let text = await transcriber.finish(timeout: .milliseconds(40))
 
         XCTAssertNil(text)
         XCTAssertEqual(transcriber.state, .failed(.handshakeTimeout))
+        XCTAssertEqual(updates.last, L10n.Recording.realtimeUnavailableWhileRecording)
     }
 
     func testMixedLanguageSessionDoesNotSendLanguageHint() async throws {

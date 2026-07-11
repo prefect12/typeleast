@@ -12,7 +12,7 @@
 
 ## Automated validation
 
-- Full Swift suite: 551 passed, 3 existing snapshot tests skipped, 0 failures.
+- Full Swift suite: 554 executed, 3 existing snapshot tests skipped, 0 failures.
 - Focused Realtime state-machine suite: 8 passed, 0 failures.
 - Code signature: `codesign --verify --deep --strict` passed.
 - Universal executable: arm64 + x86_64.
@@ -43,6 +43,7 @@ An additional 17.04-second probe produced 58 delta events, first delta at 4,057 
 - Test settings are OpenAI Realtime / `zh-en` / hold Right Command / start at login disabled.
 - Shortcut migration V3 restores the requested hold-to-record interaction: press and hold Right Command to record, release to stop and finalize.
 - The test channel never automatically opens System Settings from recording-window positioning; permissions are user-initiated from its Permissions page.
+- The Realtime HUD uses a stable 420×82 layout, reserves space for the TEST badge, keeps the newest transcript tail visible, and reports connecting/listening/live-caption-unavailable states without resizing on every delta.
 - Production and test Keychain items both exist under different service names.
 - Production and test SwiftData stores are in separate directories.
 

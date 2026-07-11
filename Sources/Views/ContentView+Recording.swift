@@ -15,10 +15,10 @@ internal extension ContentView {
         }
         
         lastAudioURL = nil
-        streamingDraftText = AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime
-            ? (L10n.isChinese ? "正在连接 · TEST" : "Connecting · TEST")
-            : ""
         LiveDictationCoordinator.shared.cancel()
+        streamingDraftText = AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime
+            ? L10n.Recording.realtimeConnecting
+            : ""
 
         let targetApp = findValidTargetApp()
         if AppIdentity.isStreamingTest, transcriptionProvider == .openAIRealtime {
@@ -62,7 +62,9 @@ internal extension ContentView {
             let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
-            progressMessage = L10n.Recording.preparingAudio
+            progressMessage = AppIdentity.isStreamingTest && transcriptionProvider == .openAIRealtime
+                ? L10n.Recording.finalizingStreaming
+                : L10n.Recording.preparingAudio
             
             do {
                 try Task.checkCancellation()

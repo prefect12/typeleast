@@ -1,6 +1,15 @@
 import SwiftUI
 import AppKit
 
+internal enum RecordingHUDPresentation {
+    static let maximumVisibleCharacters = 150
+
+    static func latestText(_ text: String, limit: Int = maximumVisibleCharacters) -> String {
+        guard text.count > limit else { return text }
+        return "…" + String(text.suffix(limit))
+    }
+}
+
 /// Recording control view - standard macOS look and feel
 internal struct WaveformRecordingView: View {
     let status: AppStatus
@@ -40,7 +49,9 @@ internal struct WaveformRecordingView: View {
             resizeRecordingWindow(to: windowSize)
         }
         .onChange(of: statusText) { _, _ in
-            resizeRecordingWindow(to: windowSize)
+            if !AppIdentity.isStreamingTest {
+                resizeRecordingWindow(to: windowSize)
+            }
         }
         .onChange(of: recordingHUDStyle) { _, _ in
             resizeRecordingWindow(to: windowSize)
@@ -52,13 +63,14 @@ internal struct WaveformRecordingView: View {
             statusIndicator
                 .frame(width: leadingIndicatorWidth, height: indicatorHeight, alignment: .center)
 
-            Text(statusText)
+            Text(visibleStatusText)
                 .font(.system(size: fontSize, weight: textWeight))
                 .foregroundStyle(textColor)
                 .frame(maxWidth: textWidth, alignment: .leading)
-                .lineLimit(4)
+                .lineLimit(AppIdentity.isStreamingTest ? 3 : 4)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
 
             if AppIdentity.isStreamingTest {
                 Text("TEST")
@@ -67,6 +79,7 @@ internal struct WaveformRecordingView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(Color.orange.gradient, in: Capsule())
+                    .fixedSize()
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -283,6 +296,9 @@ internal struct WaveformRecordingView: View {
     }
 
     private var windowSize: CGSize {
+        if AppIdentity.isStreamingTest {
+            return LayoutMetrics.RecordingWindow.streamingTestSize
+        }
         let contentSize = measuredTextSize()
 
         return clampedWindowSize(
@@ -294,7 +310,9 @@ internal struct WaveformRecordingView: View {
     }
 
     private var textWidth: CGFloat {
-        rowContentWidth - leadingIndicatorWidth
+        rowContentWidth
+            - leadingIndicatorWidth
+            - (AppIdentity.isStreamingTest ? 54 : 0)
     }
 
     private var rowContentWidth: CGFloat {
@@ -329,7 +347,7 @@ internal struct WaveformRecordingView: View {
             - horizontalPadding * 2
             - leadingIndicatorWidth
         let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let rect = NSString(string: statusText).boundingRect(
+        let rect = NSString(string: visibleStatusText).boundingRect(
             with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: attributes
@@ -366,7 +384,7 @@ internal struct WaveformRecordingView: View {
             if !draft.isEmpty {
                 return draft
             }
-            return "Recording…"
+            return AppIdentity.isStreamingTest ? L10n.Recording.realtimeListening : "Recording…"
         case .processing(let message):
             return message
         case .downloadingModel(let message):
@@ -380,6 +398,11 @@ internal struct WaveformRecordingView: View {
         case .error(let message):
             return message
         }
+    }
+
+    private var visibleStatusText: String {
+        guard AppIdentity.isStreamingTest else { return statusText }
+        return RecordingHUDPresentation.latestText(statusText)
     }
 
     private var buttonTitle: String {

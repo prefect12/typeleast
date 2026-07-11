@@ -306,6 +306,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
                 guard let transport = self.transport else { return }
                 do {
                     self.handle(try self.decode(await transport.receive()))
+                    if self.receivedCompleted { return }
                 } catch is CancellationError {
                     return
                 } catch {
@@ -384,17 +385,24 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
         state = newState
         Task { await RealtimeDiagnostics.shared.record("state", fields: ["value": "\(newState)"]) }
         switch newState {
+        case .connecting:
+            updateHandler?(L10n.Recording.realtimeConnecting, false)
         case .ready:
             recordTiming("handshake")
+            if currentText.isEmpty {
+                updateHandler?(L10n.Recording.realtimeListening, false)
+            }
         case .finalizing:
             recordTiming("finalize")
+        case .failed(let failure) where failure != .cancelled:
+            updateHandler?(L10n.Recording.realtimeUnavailableWhileRecording, false)
         default:
             break
         }
     }
 
     private func fail(_ failure: RealtimeTranscriptionFailure) {
-        guard state != .completed else { return }
+        guard state != .completed, !receivedCompleted else { return }
         transition(to: .failed(failure))
         Task { await RealtimeDiagnostics.shared.record("fallback", fields: ["reason": failure.rawValue]) }
         closeTransport()
