@@ -20,11 +20,12 @@ final class RecordingHUDPresentationTests: XCTestCase {
         let auraSize = LayoutMetrics.RecordingWindow.realtimeSize(for: .siriAura)
         let candidateSize = LayoutMetrics.RecordingWindow.realtimeSize(for: .candidateBar)
 
-        XCTAssertGreaterThanOrEqual(glassSize.width, 400)
-        XCTAssertGreaterThanOrEqual(auraSize.width, 400)
-        XCTAssertGreaterThanOrEqual(candidateSize.width, 400)
-        XCTAssertGreaterThan(auraSize.width, glassSize.width)
+        XCTAssertEqual(glassSize, CGSize(width: 420, height: 82))
+        XCTAssertEqual(auraSize, CGSize(width: 348, height: 64))
+        XCTAssertEqual(candidateSize, CGSize(width: 420, height: 68))
+        XCTAssertLessThan(auraSize.width, glassSize.width)
         XCTAssertLessThan(candidateSize.height, glassSize.height)
+        XCTAssertLessThan(auraSize.width * auraSize.height, 430 * 82 * 0.65)
 
         XCTAssertGreaterThan(
             RecordingHUDPresentation.cornerRadius(for: .siriAura, usesRealtimeLayout: true),

@@ -10,7 +10,7 @@ internal enum LayoutMetrics {
             case .appleGlass:
                 return CGSize(width: 420, height: 82)
             case .siriAura:
-                return CGSize(width: 430, height: 82)
+                return CGSize(width: 348, height: 64)
             case .candidateBar:
                 return CGSize(width: 420, height: 68)
             }

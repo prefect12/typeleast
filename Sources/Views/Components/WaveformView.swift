@@ -15,7 +15,7 @@ internal enum RecordingHUDPresentation {
         }
         switch style {
         case .appleGlass: return 18
-        case .siriAura: return 34
+        case .siriAura: return 30
         case .candidateBar: return 14
         }
     }
@@ -94,7 +94,10 @@ internal struct WaveformRecordingView: View {
         let label = Text(visibleStatusText)
             .font(.system(size: fontSize, weight: textWeight))
             .foregroundStyle(textColor)
-            .lineLimit(recordingHUDStyle == .candidateBar && usesRealtimePresentation ? 2 : (usesRealtimePresentation ? 3 : 4))
+            .lineLimit(statusLineLimit)
+            .truncationMode(
+                usesRealtimePresentation && recordingHUDStyle == .siriAura ? .head : .tail
+            )
             .multilineTextAlignment(.leading)
             .fixedSize(horizontal: false, vertical: true)
             .layoutPriority(1)
@@ -343,7 +346,7 @@ internal struct WaveformRecordingView: View {
         case .appleGlass:
             return 18
         case .siriAura:
-            return 22
+            return 20
         case .candidateBar:
             return 28
         }
@@ -352,7 +355,7 @@ internal struct WaveformRecordingView: View {
     private var indicatorHeight: CGFloat {
         switch recordingHUDStyle {
         case .siriAura:
-            return 30
+            return 28
         case .candidateBar:
             return 20
         default:
@@ -494,6 +497,8 @@ internal struct WaveformRecordingView: View {
         switch recordingHUDStyle {
         case .candidateBar:
             return 14
+        case .siriAura:
+            return 16
         default:
             return LayoutMetrics.RecordingWindow.horizontalPadding
         }
@@ -503,6 +508,8 @@ internal struct WaveformRecordingView: View {
         switch recordingHUDStyle {
         case .candidateBar:
             return 12
+        case .siriAura:
+            return 10
         default:
             return LayoutMetrics.RecordingWindow.verticalPadding
         }
@@ -524,9 +531,16 @@ internal struct WaveformRecordingView: View {
         switch recordingHUDStyle {
         case .candidateBar:
             return 14
+        case .siriAura:
+            return 14
         default:
             return 15
         }
+    }
+
+    private var statusLineLimit: Int {
+        guard usesRealtimePresentation else { return 4 }
+        return recordingHUDStyle == .appleGlass ? 3 : 2
     }
 
     private var textWeight: Font.Weight {
