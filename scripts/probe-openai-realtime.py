@@ -12,6 +12,18 @@ import time
 import websockets
 
 
+def script_profile(text: str) -> dict:
+    return {
+        "contains_han": any(
+            "\u3400" <= character <= "\u4dbf"
+            or "\u4e00" <= character <= "\u9fff"
+            or "\uf900" <= character <= "\ufaff"
+            for character in text
+        ),
+        "contains_latin": any(character.isascii() and character.isalpha() for character in text),
+    }
+
+
 async def run_once(audio: bytes, expected_text: str | None = None) -> dict:
     started = time.monotonic()
     commit_at = None
@@ -73,8 +85,10 @@ async def run_once(audio: bytes, expected_text: str | None = None) -> dict:
                 elif event_type.endswith(".completed"):
                     metrics["completed_ms"] = round((now - started) * 1_000)
                     metrics["completed"] = True
+                    transcript = event.get("transcript", "").strip()
+                    metrics.update(script_profile(transcript))
                     if expected_text is not None:
-                        metrics["exact_match"] = event.get("transcript", "").strip() == expected_text
+                        metrics["exact_match"] = transcript == expected_text
                     return
                 elif event_type in ("error", "conversation.item.input_audio_transcription.failed"):
                     raise RuntimeError(event.get("error", {}).get("message", "transcription error"))

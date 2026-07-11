@@ -23,6 +23,28 @@ internal final class LiveDictationCoordinator {
         return recordingDuration <= shortRealtimeVerificationMaximumDuration
     }
 
+    nonisolated static func shouldVerifyRealtimeLanguage(
+        transcript: String?,
+        language: TranscriptionLanguage
+    ) -> Bool {
+        guard language == .chineseEnglish || language == .chinese,
+              let transcript,
+              !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+
+        let scalarValues = transcript.unicodeScalars.map(\.value)
+        let containsLatinLetters = scalarValues.contains {
+            (0x41...0x5A).contains($0) || (0x61...0x7A).contains($0)
+        }
+        let containsHanCharacters = scalarValues.contains {
+            (0x3400...0x4DBF).contains($0)
+                || (0x4E00...0x9FFF).contains($0)
+                || (0xF900...0xFAFF).contains($0)
+        }
+        return containsLatinLetters && !containsHanCharacters
+    }
+
     var hasInsertedLiveText: Bool {
         liveTextInsertionManager.hasInsertedText
     }

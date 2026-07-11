@@ -93,7 +93,14 @@ internal extension ContentView {
                     && LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(
                         recordingDuration: sessionDuration
                     )
-                let shouldUseStreamedFinalText = streamedText != nil && !shouldVerifyShortRealtime && (
+                let shouldVerifyRealtimeLanguage = transcriptionProvider == .openAIRealtime
+                    && LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                        transcript: streamedText,
+                        language: TranscriptionSettingsStore.shared.transcriptionLanguage
+                    )
+                let shouldVerifyRealtimeWithBatch = shouldVerifyShortRealtime
+                    || shouldVerifyRealtimeLanguage
+                let shouldUseStreamedFinalText = streamedText != nil && !shouldVerifyRealtimeWithBatch && (
                     transcriptionProvider == .openAIRealtime
                     || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
                 )
@@ -129,7 +136,20 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
-                    if shouldVerifyShortRealtime {
+                    if shouldVerifyRealtimeLanguage {
+                        progressMessage = L10n.isChinese
+                            ? "正在确认原语言…"
+                            : "Verifying spoken language…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "language_preservation_verification",
+                                fields: [
+                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
+                                    "configured_language": TranscriptionSettingsStore.shared.transcriptionLanguage.rawValue
+                                ]
+                            )
+                        }
+                    } else if shouldVerifyShortRealtime {
                         progressMessage = L10n.isChinese
                             ? "正在确认短句…"
                             : "Verifying short phrase…"
@@ -166,7 +186,7 @@ internal extension ContentView {
                     } catch is CancellationError {
                         throw CancellationError()
                     } catch {
-                        guard shouldVerifyShortRealtime, let streamedText else { throw error }
+                        guard shouldVerifyRealtimeWithBatch, let streamedText else { throw error }
                         let realtimeRequest = TranscriptionPipelineRequest(
                             audioURL: audioURL,
                             provider: .openAIRealtime,
