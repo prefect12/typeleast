@@ -164,6 +164,7 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
         let sessionUpdate = try XCTUnwrap(transport.sentTexts.first)
         XCTAssertFalse(sessionUpdate.contains(#""language""#))
         XCTAssertTrue(sessionUpdate.contains("gpt-realtime-whisper"))
+        XCTAssertTrue(sessionUpdate.contains("intentionally mixes Mandarin Chinese and English"))
     }
 
     func testServerErrorFailsRealtimePath() async throws {

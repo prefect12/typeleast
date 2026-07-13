@@ -41,14 +41,6 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .local))
     }
 
-    func testShortRealtimeUtterancesUseBatchVerification() {
-        XCTAssertFalse(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: nil))
-        XCTAssertFalse(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 0))
-        XCTAssertTrue(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 1.0))
-        XCTAssertTrue(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 2.5))
-        XCTAssertFalse(LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(recordingDuration: 2.51))
-    }
-
     func testEnglishOnlyRealtimeTextIsVerifiedInChineseModes() {
         let translatedText = "I said Chinese directly was translated into English"
 
@@ -68,6 +60,21 @@ class TranscriptionTypesTests: XCTestCase {
             LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
                 transcript: translatedText,
                 language: .english
+            )
+        )
+    }
+
+    func testUnexpectedNonChineseScriptIsVerifiedInChineseModes() {
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: "これは別の言語です",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: "这是中文 mixed text",
+                language: .chineseEnglish
             )
         )
     }

@@ -88,18 +88,12 @@ internal extension ContentView {
                     : Date().timeIntervalSince(streamingFinishStart)
                 
                 var modelReadyTime: TimeInterval?
-                let shouldVerifyShortRealtime = transcriptionProvider == .openAIRealtime
-                    && streamedText != nil
-                    && LiveDictationCoordinator.shouldVerifyRealtimeWithBatch(
-                        recordingDuration: sessionDuration
-                    )
                 let shouldVerifyRealtimeLanguage = transcriptionProvider == .openAIRealtime
                     && LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
                         transcript: streamedText,
                         language: TranscriptionSettingsStore.shared.transcriptionLanguage
                     )
-                let shouldVerifyRealtimeWithBatch = shouldVerifyShortRealtime
-                    || shouldVerifyRealtimeLanguage
+                let shouldVerifyRealtimeWithBatch = shouldVerifyRealtimeLanguage
                 let shouldUseStreamedFinalText = streamedText != nil && !shouldVerifyRealtimeWithBatch && (
                     transcriptionProvider == .openAIRealtime
                     || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
@@ -146,21 +140,6 @@ internal extension ContentView {
                                 fields: [
                                     "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
                                     "configured_language": TranscriptionSettingsStore.shared.transcriptionLanguage.rawValue
-                                ]
-                            )
-                        }
-                    } else if shouldVerifyShortRealtime {
-                        progressMessage = L10n.isChinese
-                            ? "正在确认短句…"
-                            : "Verifying short phrase…"
-                        Task {
-                            await RealtimeDiagnostics.shared.record(
-                                "short_utterance_verification",
-                                fields: [
-                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
-                                    "maximum_duration_ms": String(
-                                        Int(LiveDictationCoordinator.shortRealtimeVerificationMaximumDuration * 1_000)
-                                    )
                                 ]
                             )
                         }
