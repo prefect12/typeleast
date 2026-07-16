@@ -41,6 +41,13 @@ class TranscriptionTypesTests: XCTestCase {
         XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .local))
     }
 
+    func testRealtimeLanguageHintsPreferChineseForMixedDictation() {
+        XCTAssertNil(TranscriptionLanguage.auto.openAIRealtimeLanguageHint)
+        XCTAssertEqual(TranscriptionLanguage.chinese.openAIRealtimeLanguageHint, "zh")
+        XCTAssertEqual(TranscriptionLanguage.chineseEnglish.openAIRealtimeLanguageHint, "zh")
+        XCTAssertEqual(TranscriptionLanguage.english.openAIRealtimeLanguageHint, "en")
+    }
+
     func testEnglishOnlyRealtimeTextIsVerifiedInChineseModes() {
         let translatedText = "I said Chinese directly was translated into English"
 
@@ -94,6 +101,42 @@ class TranscriptionTypesTests: XCTestCase {
         )
         XCTAssertFalse(
             LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: nil,
+                language: .chineseEnglish
+            )
+        )
+    }
+
+    func testMixedLanguageEnglishTriggersHighAccuracyFinalization() {
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "请检查 SDK and pipeline 是否正常",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "请检查 café 的配置",
+                language: .chineseEnglish
+            )
+        )
+    }
+
+    func testChineseOnlyTextKeepsRealtimeFastPath() {
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "为什么刚才两个额度都更新了",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "English words",
+                language: .english
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
                 transcript: nil,
                 language: .chineseEnglish
             )

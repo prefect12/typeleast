@@ -254,8 +254,7 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     private func sendSessionUpdate(language: TranscriptionLanguage) async throws {
         var transcription: [String: Any] = [
             "model": settingsStore.openAIRealtimeTranscriptionModel,
-            "delay": "minimal",
-            "prompt": language.speechInstruction
+            "delay": "minimal"
         ]
         if let hint = language.openAIRealtimeLanguageHint { transcription["language"] = hint }
 

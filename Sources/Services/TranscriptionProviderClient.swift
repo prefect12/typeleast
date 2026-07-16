@@ -3,6 +3,13 @@ import Foundation
 internal struct TranscriptionProviderRequest {
     let audioURL: URL
     let whisperModel: WhisperModel?
+    let openAIModelOverride: String?
+
+    init(audioURL: URL, whisperModel: WhisperModel?, openAIModelOverride: String? = nil) {
+        self.audioURL = audioURL
+        self.whisperModel = whisperModel
+        self.openAIModelOverride = openAIModelOverride
+    }
 }
 
 internal protocol TranscriptionProviderClient: Sendable {
@@ -11,7 +18,12 @@ internal protocol TranscriptionProviderClient: Sendable {
 }
 
 internal protocol RawTranscriptionServicing: AnyObject {
-    func transcribeRaw(audioURL: URL, provider: TranscriptionProvider, model: WhisperModel?) async throws -> String
+    func transcribeRaw(
+        audioURL: URL,
+        provider: TranscriptionProvider,
+        model: WhisperModel?,
+        openAIModelOverride: String?
+    ) async throws -> String
 }
 
 extension SpeechToTextService: RawTranscriptionServicing {}
@@ -40,7 +52,10 @@ internal final class OpenAITranscriptionProviderClient: TranscriptionProviderCli
     }
 
     func transcribe(_ request: TranscriptionProviderRequest) async throws -> String {
-        try await service.transcribeWithOpenAI(audioURL: request.audioURL)
+        try await service.transcribeWithOpenAI(
+            audioURL: request.audioURL,
+            modelOverride: request.openAIModelOverride
+        )
     }
 }
 

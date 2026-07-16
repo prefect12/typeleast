@@ -129,9 +129,9 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
 
     var openAIRealtimeLanguageHint: String? {
         switch self {
-        case .auto, .chineseEnglish:
+        case .auto:
             return nil
-        case .chinese:
+        case .chinese, .chineseEnglish:
             return "zh"
         default:
             return rawValue

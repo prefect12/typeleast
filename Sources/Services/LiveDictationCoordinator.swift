@@ -43,6 +43,24 @@ internal final class LiveDictationCoordinator {
         return !containsHanCharacters || containsUnexpectedScript
     }
 
+    nonisolated static func shouldUseHighAccuracyEnglishFinalization(
+        transcript: String?,
+        language: TranscriptionLanguage
+    ) -> Bool {
+        guard language == .chineseEnglish,
+              let transcript,
+              !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return false
+        }
+
+        return transcript.unicodeScalars.contains { scalar in
+            let value = scalar.value
+            return (0x0041...0x005A).contains(value) // Basic Latin uppercase
+                || (0x0061...0x007A).contains(value) // Basic Latin lowercase
+                || (0x00C0...0x024F).contains(value) // Latin-1 and Latin Extended
+        }
+    }
+
     var hasInsertedLiveText: Bool {
         liveTextInsertionManager.hasInsertedText
     }

@@ -93,7 +93,13 @@ internal extension ContentView {
                         transcript: streamedText,
                         language: TranscriptionSettingsStore.shared.transcriptionLanguage
                     )
+                let shouldUseHighAccuracyEnglishFinalization = transcriptionProvider == .openAIRealtime
+                    && LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                        transcript: streamedText,
+                        language: TranscriptionSettingsStore.shared.transcriptionLanguage
+                    )
                 let shouldVerifyRealtimeWithBatch = shouldVerifyRealtimeLanguage
+                    || shouldUseHighAccuracyEnglishFinalization
                 let shouldUseStreamedFinalText = streamedText != nil && !shouldVerifyRealtimeWithBatch && (
                     transcriptionProvider == .openAIRealtime
                     || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
@@ -113,6 +119,9 @@ internal extension ContentView {
                     audioURL: audioURL,
                     provider: effectiveProvider,
                     whisperModel: effectiveProvider == .local ? selectedWhisperModel : nil,
+                    openAIModelOverride: shouldUseHighAccuracyEnglishFinalization
+                        ? AppDefaults.highAccuracyEnglishTranscriptionModel
+                        : nil,
                     duration: sessionDuration,
                     estimatedDuration: nil,
                     sourceAppInfo: currentSourceAppInfo(),
@@ -130,7 +139,20 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
-                    if shouldVerifyRealtimeLanguage {
+                    if shouldUseHighAccuracyEnglishFinalization {
+                        progressMessage = L10n.isChinese
+                            ? "正在优化英文识别…"
+                            : "Finalizing English transcription…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "high_accuracy_english_finalization",
+                                fields: [
+                                    "model": AppDefaults.highAccuracyEnglishTranscriptionModel,
+                                    "configured_language": TranscriptionSettingsStore.shared.transcriptionLanguage.rawValue
+                                ]
+                            )
+                        }
+                    } else if shouldVerifyRealtimeLanguage {
                         progressMessage = L10n.isChinese
                             ? "正在确认原语言…"
                             : "Verifying spoken language…"

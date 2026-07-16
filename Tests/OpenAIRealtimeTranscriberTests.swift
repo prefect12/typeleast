@@ -145,7 +145,7 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
         XCTAssertEqual(updates.last, L10n.Recording.realtimeUnavailableWhileRecording)
     }
 
-    func testMixedLanguageSessionDoesNotSendLanguageHint() async throws {
+    func testMixedLanguageSessionUsesChineseHintWithoutUnsupportedPrompt() async throws {
         let transport = MockRealtimeSocketTransport(messages: [
             .text(#"{"type":"session.created"}"#),
             .text(#"{"type":"session.updated"}"#)
@@ -162,9 +162,10 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
         transcriber.cancel()
 
         let sessionUpdate = try XCTUnwrap(transport.sentTexts.first)
-        XCTAssertFalse(sessionUpdate.contains(#""language""#))
+        XCTAssertTrue(sessionUpdate.contains(#""language":"zh""#))
         XCTAssertTrue(sessionUpdate.contains("gpt-realtime-whisper"))
-        XCTAssertTrue(sessionUpdate.contains("intentionally mixes Mandarin Chinese and English"))
+        XCTAssertTrue(sessionUpdate.contains(#""delay":"minimal""#))
+        XCTAssertFalse(sessionUpdate.contains(#""prompt""#))
     }
 
     func testServerErrorFailsRealtimePath() async throws {
