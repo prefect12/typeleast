@@ -15,10 +15,27 @@ internal extension ContentView {
         }
         
         lastAudioURL = nil
-        streamingDraftText = ""
         LiveDictationCoordinator.shared.cancel()
-        
-        let success = audioRecorder.startRecording()
+        streamingDraftText = transcriptionProvider == .openAIRealtime
+            ? L10n.Recording.realtimeConnecting
+            : ""
+
+        let targetApp = findValidTargetApp()
+        if transcriptionProvider == .openAIRealtime {
+            LiveDictationCoordinator.shared.beginIfNeeded(
+                targetApp: targetApp,
+                updateHandler: { text, _ in streamingDraftText = text }
+            )
+        }
+
+        let success: Bool
+        if transcriptionProvider == .openAIRealtime {
+            success = audioRecorder.startRecording { data in
+                Task { @MainActor in LiveDictationCoordinator.shared.appendPCM16AudioData(data) }
+            }
+        } else {
+            success = audioRecorder.startRecording()
+        }
         if !success {
             errorMessage = LocalizedStrings.Errors.failedToStartRecording
             showError = true
@@ -26,13 +43,12 @@ internal extension ContentView {
             return
         }
 
-        let targetApp = findValidTargetApp()
-        LiveDictationCoordinator.shared.beginIfNeeded(
-            targetApp: targetApp,
-            updateHandler: { text, _ in
-                streamingDraftText = text
-            }
-        )
+        if transcriptionProvider != .openAIRealtime {
+            LiveDictationCoordinator.shared.beginIfNeeded(
+                targetApp: targetApp,
+                updateHandler: { text, _ in streamingDraftText = text }
+            )
+        }
     }
     
     func stopAndProcess() {
@@ -46,7 +62,9 @@ internal extension ContentView {
             let processStart = Date()
             isProcessing = true
             transcriptionStartTime = Date()
-            progressMessage = L10n.Recording.preparingAudio
+            progressMessage = transcriptionProvider == .openAIRealtime
+                ? L10n.Recording.finalizingStreaming
+                : L10n.Recording.preparingAudio
             
             do {
                 try Task.checkCancellation()
@@ -70,8 +88,26 @@ internal extension ContentView {
                     : Date().timeIntervalSince(streamingFinishStart)
                 
                 var modelReadyTime: TimeInterval?
-                let shouldUseStreamedFinalText = streamedText != nil
-                    && TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
+                let shouldVerifyRealtimeLanguage = transcriptionProvider == .openAIRealtime
+                    && LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                        transcript: streamedText,
+                        language: TranscriptionSettingsStore.shared.transcriptionLanguage
+                    )
+                let shouldUseHighAccuracyEnglishFinalization = transcriptionProvider == .openAIRealtime
+                    && LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                        transcript: streamedText,
+                        language: TranscriptionSettingsStore.shared.transcriptionLanguage
+                    )
+                let shouldVerifyRealtimeWithBatch = shouldVerifyRealtimeLanguage
+                    || shouldUseHighAccuracyEnglishFinalization
+                let shouldUseStreamedFinalText = streamedText != nil && !shouldVerifyRealtimeWithBatch && (
+                    transcriptionProvider == .openAIRealtime
+                    || TranscriptionSettingsStore.shared.transcriptionLanguage.canUseAppleStreamingAsFinalText
+                )
+                let effectiveProvider: TranscriptionProvider =
+                    transcriptionProvider == .openAIRealtime && !shouldUseStreamedFinalText
+                    ? .openai
+                    : transcriptionProvider
 
                 if !shouldUseStreamedFinalText, transcriptionProvider == .local {
                     let modelReadyStart = Date()
@@ -81,8 +117,11 @@ internal extension ContentView {
 
                 let request = TranscriptionPipelineRequest(
                     audioURL: audioURL,
-                    provider: transcriptionProvider,
-                    whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                    provider: effectiveProvider,
+                    whisperModel: effectiveProvider == .local ? selectedWhisperModel : nil,
+                    openAIModelOverride: shouldUseHighAccuracyEnglishFinalization
+                        ? AppDefaults.highAccuracyEnglishTranscriptionModel
+                        : nil,
                     duration: sessionDuration,
                     estimatedDuration: nil,
                     sourceAppInfo: currentSourceAppInfo(),
@@ -100,10 +139,72 @@ internal extension ContentView {
                         progressHandler: { progressMessage = $0 }
                     )
                 } else {
-                    result = try await transcriptionPipeline.run(
-                        request,
-                        progressHandler: { progressMessage = $0 }
-                    )
+                    if shouldUseHighAccuracyEnglishFinalization {
+                        progressMessage = L10n.isChinese
+                            ? "正在优化英文识别…"
+                            : "Finalizing English transcription…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "high_accuracy_english_finalization",
+                                fields: [
+                                    "model": AppDefaults.highAccuracyEnglishTranscriptionModel,
+                                    "configured_language": TranscriptionSettingsStore.shared.transcriptionLanguage.rawValue
+                                ]
+                            )
+                        }
+                    } else if shouldVerifyRealtimeLanguage {
+                        progressMessage = L10n.isChinese
+                            ? "正在确认原语言…"
+                            : "Verifying spoken language…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "language_preservation_verification",
+                                fields: [
+                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
+                                    "configured_language": TranscriptionSettingsStore.shared.transcriptionLanguage.rawValue
+                                ]
+                            )
+                        }
+                    } else if transcriptionProvider == .openAIRealtime {
+                        progressMessage = L10n.isChinese
+                            ? "实时连接失败，正在使用批量识别…"
+                            : "Realtime unavailable, using batch transcription…"
+                        Task {
+                            await RealtimeDiagnostics.shared.record(
+                                "result",
+                                fields: [
+                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
+                                    "fallback": "true"
+                                ]
+                            )
+                        }
+                    }
+                    do {
+                        result = try await transcriptionPipeline.run(
+                            request,
+                            progressHandler: { progressMessage = $0 }
+                        )
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        guard shouldVerifyRealtimeWithBatch, let streamedText else { throw error }
+                        let realtimeRequest = TranscriptionPipelineRequest(
+                            audioURL: audioURL,
+                            provider: .openAIRealtime,
+                            whisperModel: nil,
+                            duration: sessionDuration,
+                            estimatedDuration: nil,
+                            sourceAppInfo: request.sourceAppInfo,
+                            modelReadyTime: nil,
+                            processStart: processStart
+                        )
+                        result = try await transcriptionPipeline.runPretranscribed(
+                            realtimeRequest,
+                            rawText: streamedText,
+                            asrTime: streamingFinalizeTime ?? 0,
+                            progressHandler: { progressMessage = $0 }
+                        )
+                    }
                 }
 
                 if didInsertLiveText {
@@ -184,8 +285,9 @@ internal extension ContentView {
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
 
+                let externalProvider = transcriptionProvider.fileTranscriptionFallback ?? transcriptionProvider
                 var modelReadyTime: TimeInterval?
-                if transcriptionProvider == .local {
+                if externalProvider == .local {
                     let modelReadyStart = Date()
                     try await ensureWhisperModelIsReadyForTranscription(selectedWhisperModel)
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
@@ -200,8 +302,8 @@ internal extension ContentView {
                 let result = try await transcriptionPipeline.run(
                     TranscriptionPipelineRequest(
                         audioURL: audioURL,
-                        provider: transcriptionProvider,
-                        whisperModel: transcriptionProvider == .local ? selectedWhisperModel : nil,
+                        provider: externalProvider,
+                        whisperModel: externalProvider == .local ? selectedWhisperModel : nil,
                         duration: nil,
                         estimatedDuration: estimatedDuration,
                         sourceAppInfo: currentSourceAppInfo(),

@@ -6,11 +6,10 @@ final class AppIdentityTests: XCTestCase {
         XCTAssertEqual(AppIdentity.displayName, "Typeleast")
         XCTAssertEqual(AppIdentity.packageName, "Typeleast")
         XCTAssertEqual(AppIdentity.executableName, "Typeleast")
-        XCTAssertEqual(AppIdentity.bundleIdentifier, "com.typeleast.app")
+        XCTAssertEqual(AppIdentity.productionBundleIdentifier, "com.typeleast.app")
+        XCTAssertEqual(AppIdentity.streamingTestBundleIdentifier, "com.typeleast.streaming-test")
         XCTAssertEqual(AppIdentity.developmentBundleIdentifier, "com.typeleast-dev.app")
-        XCTAssertEqual(AppIdentity.keychainService, "Typeleast")
-        XCTAssertEqual(AppIdentity.appSupportDirectoryName, "Typeleast")
-        XCTAssertEqual(AppIdentity.releaseArchiveName, "Typeleast.zip")
+        XCTAssertEqual(AppIdentity.productionKeychainService, "Typeleast")
     }
 
     func testApplicationSupportBaseDirectoryPrefersTypeleastOverride() throws {

@@ -5,6 +5,7 @@ internal struct TranscriptionPipelineRequest {
     let audioURL: URL
     let provider: TranscriptionProvider
     let whisperModel: WhisperModel?
+    var openAIModelOverride: String? = nil
     let duration: TimeInterval?
     let estimatedDuration: TimeInterval?
     let sourceAppInfo: SourceAppInfo
@@ -55,7 +56,8 @@ internal final class TranscriptionPipeline {
         let rawText = try await speechService.transcribeRaw(
             audioURL: request.audioURL,
             provider: request.provider,
-            model: request.whisperModel
+            model: request.whisperModel,
+            openAIModelOverride: request.openAIModelOverride
         )
         let asrTime = Date().timeIntervalSince(asrStart)
 
@@ -181,7 +183,9 @@ internal final class TranscriptionPipeline {
         case .parakeet:
             return settingsStore.selectedParakeetModel.rawValue
         case .openai:
-            return settingsStore.openAITranscriptionModel
+            return request.openAIModelOverride ?? settingsStore.openAITranscriptionModel
+        case .openAIRealtime:
+            return settingsStore.openAIRealtimeTranscriptionModel
         case .mimo:
             return settingsStore.miMoASRModel
         case .gemini:

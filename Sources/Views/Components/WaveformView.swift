@@ -1,6 +1,30 @@
 import SwiftUI
 import AppKit
 
+internal enum RecordingHUDPresentation {
+    static let maximumVisibleCharacters = 150
+
+    static func latestText(_ text: String, limit: Int = maximumVisibleCharacters) -> String {
+        guard text.count > limit else { return text }
+        return "…" + String(text.suffix(limit))
+    }
+
+    static func tickerOffset(containerWidth: CGFloat, contentWidth: CGFloat) -> CGFloat {
+        min(0, containerWidth - contentWidth)
+    }
+
+    static func cornerRadius(for style: RecordingHUDStyle, usesRealtimeLayout: Bool) -> CGFloat {
+        guard usesRealtimeLayout else {
+            return style == .candidateBar ? 14 : LayoutMetrics.RecordingWindow.cornerRadius
+        }
+        switch style {
+        case .appleGlass: return 18
+        case .siriAura: return 22
+        case .candidateBar: return 14
+        }
+    }
+}
+
 /// Recording control view - standard macOS look and feel
 internal struct WaveformRecordingView: View {
     let status: AppStatus
@@ -40,7 +64,9 @@ internal struct WaveformRecordingView: View {
             resizeRecordingWindow(to: windowSize)
         }
         .onChange(of: statusText) { _, _ in
-            resizeRecordingWindow(to: windowSize)
+            if !usesRealtimePresentation {
+                resizeRecordingWindow(to: windowSize)
+            }
         }
         .onChange(of: recordingHUDStyle) { _, _ in
             resizeRecordingWindow(to: windowSize)
@@ -48,19 +74,50 @@ internal struct WaveformRecordingView: View {
     }
 
     private var statusRow: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: statusRowSpacing) {
             statusIndicator
                 .frame(width: leadingIndicatorWidth, height: indicatorHeight, alignment: .center)
 
-            Text(statusText)
-                .font(.system(size: fontSize, weight: textWeight))
-                .foregroundStyle(textColor)
-                .frame(maxWidth: textWidth, alignment: .leading)
-                .lineLimit(4)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
+            statusLabel
+
+            if AppIdentity.isStreamingTest {
+                Text("TEST")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Color.orange.gradient, in: Capsule())
+                    .fixedSize()
+            }
         }
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var statusLabel: some View {
+        if usesRealtimePresentation && recordingHUDStyle == .siriAura {
+            ScrollingTickerText(
+                text: visibleStatusText,
+                font: .system(size: fontSize, weight: textWeight),
+                color: textColor
+            )
+            .frame(width: textWidth, height: indicatorHeight)
+        } else {
+            let label = Text(visibleStatusText)
+                .font(.system(size: fontSize, weight: textWeight))
+                .foregroundStyle(textColor)
+                .lineLimit(statusLineLimit)
+                .truncationMode(.tail)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+
+            if usesRealtimePresentation {
+                label.frame(width: textWidth, alignment: .leading)
+            } else {
+                label.frame(maxWidth: textWidth, alignment: .leading)
+            }
+        }
     }
 
     @ViewBuilder
@@ -85,13 +142,12 @@ internal struct WaveformRecordingView: View {
                     endPoint: .bottomTrailing
                 )
                 if isRecording {
-                    Circle()
-                        .fill(siriGradient)
-                        .frame(width: 86 + CGFloat(audioLevel) * 34, height: 86 + CGFloat(audioLevel) * 34)
-                        .blur(radius: 22)
-                        .opacity(0.13 + Double(audioLevel) * 0.12)
-                        .offset(x: auraPhase ? windowSize.width * 0.62 : windowSize.width * 0.48, y: auraPhase ? -8 : 8)
-                        .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: auraPhase)
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.22), Color.blue.opacity(0.06), Color.clear],
+                        startPoint: auraPhase ? .topLeading : .bottomLeading,
+                        endPoint: auraPhase ? .bottomTrailing : .topTrailing
+                    )
+                    .animation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true), value: auraPhase)
                 }
             case .siriAura:
                 ZStack {
@@ -99,8 +155,9 @@ internal struct WaveformRecordingView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color(red: 0.35, green: 0.72, blue: 1.0).opacity(0.30),
-                                    Color(red: 0.96, green: 0.36, blue: 0.86).opacity(0.20),
+                                    Color.white.opacity(0.88),
+                                    Color(red: 0.35, green: 0.72, blue: 1.0).opacity(0.52),
+                                    Color(red: 0.96, green: 0.36, blue: 0.86).opacity(0.38),
                                     Color.clear
                                 ],
                                 center: .center,
@@ -108,19 +165,17 @@ internal struct WaveformRecordingView: View {
                                 endRadius: 58
                             )
                         )
-                        .frame(
-                            width: 116 + CGFloat(audioLevel) * 44,
-                            height: 116 + CGFloat(audioLevel) * 44
-                        )
-                        .blur(radius: 14 + CGFloat(audioLevel) * 5)
+                        .frame(width: 96 + CGFloat(audioLevel) * 30, height: 96 + CGFloat(audioLevel) * 30)
+                        .blur(radius: 13 + CGFloat(audioLevel) * 3)
                         .opacity(isRecording ? 1 : 0.58)
                         .scaleEffect(auraPhase ? 1.08 : 0.92)
-                        .offset(x: -38 + (auraPhase ? 8 : -2))
+                        .offset(x: -34 + (auraPhase ? 7 : -2))
                         .animation(.easeInOut(duration: 1.25).repeatForever(autoreverses: true), value: auraPhase)
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.58),
-                            Color(red: 0.93, green: 0.97, blue: 1.0).opacity(0.26)
+                            Color.white.opacity(0.54),
+                            Color(red: 0.90, green: 0.96, blue: 1.0).opacity(0.30),
+                            Color(red: 1.0, green: 0.90, blue: 0.98).opacity(0.16)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -186,13 +241,12 @@ internal struct WaveformRecordingView: View {
             switch recordingHUDStyle {
             case .appleGlass:
                 shape
-                    .strokeBorder(siriLinearGradient.opacity(auraPhase ? 0.62 : 0.28), lineWidth: 1.2)
-                    .blur(radius: 0.6)
+                    .strokeBorder(Color.white.opacity(auraPhase ? 0.82 : 0.52), lineWidth: 1.1)
                     .animation(.easeInOut(duration: 1.35).repeatForever(autoreverses: true), value: auraPhase)
             case .siriAura:
                 shape
-                    .strokeBorder(siriLinearGradient.opacity(auraPhase ? 0.80 : 0.36), lineWidth: 1.4)
-                    .shadow(color: Color(red: 0.36, green: 0.66, blue: 1.0).opacity(auraPhase ? 0.24 : 0.08), radius: 10)
+                    .strokeBorder(siriLinearGradient.opacity(auraPhase ? 0.96 : 0.56), lineWidth: 1.8)
+                    .shadow(color: Color(red: 0.36, green: 0.66, blue: 1.0).opacity(auraPhase ? 0.38 : 0.14), radius: 12)
                     .animation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true), value: auraPhase)
             case .candidateBar:
                 shape
@@ -244,15 +298,15 @@ internal struct WaveformRecordingView: View {
             ZStack {
                 Circle()
                     .fill(siriGradient)
-                    .frame(width: 28 + CGFloat(audioLevel) * 10, height: 28 + CGFloat(audioLevel) * 10)
-                    .blur(radius: 8)
+                    .frame(width: 22 + CGFloat(audioLevel) * 6, height: 22 + CGFloat(audioLevel) * 6)
+                    .blur(radius: 6)
                     .opacity(indicatorPulse ? 0.76 : 0.30)
                 Circle()
                     .fill(Color.white.opacity(0.92))
-                    .frame(width: 11, height: 11)
+                    .frame(width: 9, height: 9)
                 Circle()
                     .fill(siriGradient)
-                    .frame(width: 8 + CGFloat(audioLevel) * 3, height: 8 + CGFloat(audioLevel) * 3)
+                    .frame(width: 6 + CGFloat(audioLevel) * 2, height: 6 + CGFloat(audioLevel) * 2)
             }
             .animation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true), value: indicatorPulse)
         case .candidateBar:
@@ -274,6 +328,9 @@ internal struct WaveformRecordingView: View {
     }
 
     private var windowSize: CGSize {
+        if usesRealtimePresentation {
+            return LayoutMetrics.RecordingWindow.realtimeSize(for: recordingHUDStyle)
+        }
         let contentSize = measuredTextSize()
 
         return clampedWindowSize(
@@ -285,7 +342,10 @@ internal struct WaveformRecordingView: View {
     }
 
     private var textWidth: CGFloat {
-        rowContentWidth - leadingIndicatorWidth
+        rowContentWidth
+            - leadingIndicatorWidth
+            - (AppIdentity.isStreamingTest ? 54 : 0)
+            - (AppIdentity.isStreamingTest ? 20 : statusRowSpacing)
     }
 
     private var rowContentWidth: CGFloat {
@@ -297,7 +357,7 @@ internal struct WaveformRecordingView: View {
         case .appleGlass:
             return 18
         case .siriAura:
-            return 22
+            return 18
         case .candidateBar:
             return 28
         }
@@ -306,7 +366,7 @@ internal struct WaveformRecordingView: View {
     private var indicatorHeight: CGFloat {
         switch recordingHUDStyle {
         case .siriAura:
-            return 30
+            return 22
         case .candidateBar:
             return 20
         default:
@@ -320,7 +380,7 @@ internal struct WaveformRecordingView: View {
             - horizontalPadding * 2
             - leadingIndicatorWidth
         let attributes: [NSAttributedString.Key: Any] = [.font: font]
-        let rect = NSString(string: statusText).boundingRect(
+        let rect = NSString(string: visibleStatusText).boundingRect(
             with: CGSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: attributes
@@ -357,7 +417,7 @@ internal struct WaveformRecordingView: View {
             if !draft.isEmpty {
                 return draft
             }
-            return "Recording…"
+            return usesRealtimePresentation ? L10n.Recording.realtimeListening : "Recording…"
         case .processing(let message):
             return message
         case .downloadingModel(let message):
@@ -371,6 +431,11 @@ internal struct WaveformRecordingView: View {
         case .error(let message):
             return message
         }
+    }
+
+    private var visibleStatusText: String {
+        guard usesRealtimePresentation else { return statusText }
+        return RecordingHUDPresentation.latestText(statusText)
     }
 
     private var buttonTitle: String {
@@ -443,6 +508,8 @@ internal struct WaveformRecordingView: View {
         switch recordingHUDStyle {
         case .candidateBar:
             return 14
+        case .siriAura:
+            return 12
         default:
             return LayoutMetrics.RecordingWindow.horizontalPadding
         }
@@ -452,27 +519,47 @@ internal struct WaveformRecordingView: View {
         switch recordingHUDStyle {
         case .candidateBar:
             return 12
+        case .siriAura:
+            return 8
         default:
             return LayoutMetrics.RecordingWindow.verticalPadding
         }
     }
 
     private var cornerRadius: CGFloat {
-        switch recordingHUDStyle {
-        case .candidateBar:
-            return 14
-        default:
-            return LayoutMetrics.RecordingWindow.cornerRadius
-        }
+        RecordingHUDPresentation.cornerRadius(
+            for: recordingHUDStyle,
+            usesRealtimeLayout: usesRealtimePresentation
+        )
+    }
+
+    private var usesRealtimePresentation: Bool {
+        AppIdentity.isStreamingTest
+            || TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime
     }
 
     private var fontSize: CGFloat {
         switch recordingHUDStyle {
         case .candidateBar:
             return 14
+        case .siriAura:
+            return 13
         default:
             return 15
         }
+    }
+
+    private var statusLineLimit: Int {
+        guard usesRealtimePresentation else { return 4 }
+        switch recordingHUDStyle {
+        case .appleGlass: return 3
+        case .siriAura: return 1
+        case .candidateBar: return 2
+        }
+    }
+
+    private var statusRowSpacing: CGFloat {
+        recordingHUDStyle == .siriAura ? 8 : 10
     }
 
     private var textWeight: Font.Weight {
@@ -557,6 +644,49 @@ internal struct WaveformRecordingView: View {
             startPoint: auraPhase ? .topLeading : .bottomLeading,
             endPoint: auraPhase ? .bottomTrailing : .topTrailing
         )
+    }
+}
+
+private struct TickerTextWidthPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct ScrollingTickerText: View {
+    let text: String
+    let font: Font
+    let color: Color
+    @State private var contentWidth: CGFloat = 0
+
+    var body: some View {
+        GeometryReader { proxy in
+            Text(text)
+                .font(font)
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .background {
+                    GeometryReader { textProxy in
+                        Color.clear.preference(
+                            key: TickerTextWidthPreferenceKey.self,
+                            value: textProxy.size.width
+                        )
+                    }
+                }
+                .offset(
+                    x: RecordingHUDPresentation.tickerOffset(
+                        containerWidth: proxy.size.width,
+                        contentWidth: contentWidth
+                    )
+                )
+                .animation(.easeOut(duration: 0.18), value: contentWidth)
+                .frame(maxHeight: .infinity, alignment: .center)
+        }
+        .clipped()
+        .onPreferenceChange(TickerTextWidthPreferenceKey.self) { contentWidth = $0 }
     }
 }
 

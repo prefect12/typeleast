@@ -26,6 +26,7 @@ final class TranscriptionSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.selectedWhisperModel, AppDefaults.defaultWhisperModel)
         XCTAssertEqual(store.selectedParakeetModel, AppDefaults.defaultParakeetModel)
         XCTAssertEqual(store.openAITranscriptionModel, AppDefaults.defaultOpenAITranscriptionModel)
+        XCTAssertEqual(store.openAIRealtimeTranscriptionModel, AppDefaults.defaultOpenAIRealtimeTranscriptionModel)
         XCTAssertEqual(store.miMoASRModel, AppDefaults.defaultMiMoASRModel)
         XCTAssertEqual(store.transcriptionLanguage, AppDefaults.defaultTranscriptionLanguage)
         XCTAssertEqual(store.recordingHUDStyle, AppDefaults.defaultRecordingHUDStyle)

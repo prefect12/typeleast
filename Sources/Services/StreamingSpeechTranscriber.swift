@@ -16,10 +16,62 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var pendingStartTask: Task<Void, Never>?
     private var updateHandler: UpdateHandler?
+    private var usesExternalAudio = false
+    private var pendingExternalAudio: [Data] = []
+    private var pendingExternalAudioBytes = 0
+    private let maximumPendingExternalAudioBytes = Int(RealtimeAudioPCMConverter.sampleRate * 2)
+        * RealtimeAudioPCMConverter.bytesPerFrame
 
     func start(language: TranscriptionLanguage, updateHandler: UpdateHandler? = nil) {
+        start(language: language, usesExternalAudio: false, updateHandler: updateHandler)
+    }
+
+    func startWithExternalAudio(
+        language: TranscriptionLanguage,
+        updateHandler: UpdateHandler? = nil
+    ) {
+        start(language: language, usesExternalAudio: true, updateHandler: updateHandler)
+    }
+
+    func appendPCM16AudioData(_ data: Data) {
+        guard usesExternalAudio, !data.isEmpty else { return }
+        guard isStreaming, let request = recognitionRequest else {
+            guard pendingExternalAudioBytes + data.count <= maximumPendingExternalAudioBytes else { return }
+            pendingExternalAudio.append(data)
+            pendingExternalAudioBytes += data.count
+            return
+        }
+        appendPCM16AudioData(data, to: request)
+    }
+
+    private func appendPCM16AudioData(_ data: Data, to request: SFSpeechAudioBufferRecognitionRequest) {
+        guard let format = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: RealtimeAudioPCMConverter.sampleRate,
+                channels: 1,
+                interleaved: true
+              ) else { return }
+
+        let frameCount = AVAudioFrameCount(data.count / MemoryLayout<Int16>.size)
+        guard frameCount > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else { return }
+        buffer.frameLength = frameCount
+        data.withUnsafeBytes { bytes in
+            guard let source = bytes.baseAddress,
+                  let destination = buffer.int16ChannelData?[0] else { return }
+            memcpy(destination, source, data.count)
+        }
+        request.append(buffer)
+    }
+
+    private func start(
+        language: TranscriptionLanguage,
+        usesExternalAudio: Bool,
+        updateHandler: UpdateHandler?
+    ) {
         cancel()
         currentText = ""
+        self.usesExternalAudio = usesExternalAudio
         self.updateHandler = updateHandler
 
         guard !AppEnvironment.isRunningTests else { return }
@@ -30,7 +82,7 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
             guard !Task.isCancelled else { return }
 
             do {
-                try self.startAuthorized(language: language)
+                try self.startAuthorized(language: language, usesExternalAudio: usesExternalAudio)
             } catch {
                 Logger.speechToText.error("Failed to start streaming speech recognition: \(error.localizedDescription)")
                 self.cleanup()
@@ -83,7 +135,7 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
         }
     }
 
-    private func startAuthorized(language: TranscriptionLanguage) throws {
+    private func startAuthorized(language: TranscriptionLanguage, usesExternalAudio: Bool) throws {
         let recognizer = SFSpeechRecognizer(locale: language.streamingRecognitionLocale)
             ?? SFSpeechRecognizer()
         guard let recognizer, recognizer.isAvailable else {
@@ -93,18 +145,23 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
         let engine = AVAudioEngine()
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
+        if recognizer.supportsOnDeviceRecognition {
+            request.requiresOnDeviceRecognition = true
+        }
         if #available(macOS 13.0, *) {
             request.addsPunctuation = true
         }
 
-        let inputNode = engine.inputNode
-        let format = inputNode.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            throw SpeechToTextError.transcriptionFailed("Microphone input format is unavailable")
-        }
+        if !usesExternalAudio {
+            let inputNode = engine.inputNode
+            let format = inputNode.outputFormat(forBus: 0)
+            guard format.sampleRate > 0, format.channelCount > 0 else {
+                throw SpeechToTextError.transcriptionFailed("Microphone input format is unavailable")
+            }
 
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-            request.append(buffer)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+                request.append(buffer)
+            }
         }
 
         recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
@@ -119,16 +176,32 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
 
                 if error != nil {
                     self.isStreaming = false
+                    Task {
+                        await RealtimeDiagnostics.shared.record(
+                            "apple_speech_failed",
+                            fields: ["error": error?.localizedDescription ?? "unknown"]
+                        )
+                    }
                 }
             }
         }
 
-        engine.prepare()
-        try engine.start()
-
-        audioEngine = engine
+        if !usesExternalAudio {
+            engine.prepare()
+            try engine.start()
+            audioEngine = engine
+        }
         recognitionRequest = request
         isStreaming = true
+        pendingExternalAudio.forEach { appendPCM16AudioData($0, to: request) }
+        pendingExternalAudio.removeAll(keepingCapacity: false)
+        pendingExternalAudioBytes = 0
+        Task {
+            await RealtimeDiagnostics.shared.record(
+                "apple_speech_started",
+                fields: ["on_device": request.requiresOnDeviceRecognition ? "true" : "false"]
+            )
+        }
     }
 
     private func cleanup() {
@@ -138,6 +211,9 @@ internal final class StreamingSpeechTranscriber: ObservableObject {
         audioEngine = nil
         updateHandler = nil
         isStreaming = false
+        usesExternalAudio = false
+        pendingExternalAudio.removeAll(keepingCapacity: false)
+        pendingExternalAudioBytes = 0
     }
 }
 

@@ -25,9 +25,12 @@ internal enum RecordingWindowPositioner {
     }
 
     private static func requestAccessibilityPermissionIfNeeded() {
-        guard !AXIsProcessTrusted(),
-              !hasRequestedAccessibilityPermission,
-              NSClassFromString("XCTestCase") == nil else {
+        guard shouldRequestAccessibilityPermission(
+            isTrusted: AXIsProcessTrusted(),
+            hasRequested: hasRequestedAccessibilityPermission,
+            isTestEnvironment: NSClassFromString("XCTestCase") != nil,
+            isStreamingTest: AppIdentity.isStreamingTest
+        ) else {
             return
         }
 
@@ -36,6 +39,17 @@ internal enum RecordingWindowPositioner {
         let options = [checkOptionPrompt: true] as CFDictionary
         AXIsProcessTrustedWithOptions(options)
         openAccessibilitySettings()
+    }
+
+    static func shouldRequestAccessibilityPermission(
+        isTrusted: Bool,
+        hasRequested: Bool,
+        isTestEnvironment: Bool,
+        isStreamingTest: Bool
+    ) -> Bool {
+        // Recording must never steal focus by opening System Settings. Accessibility access is
+        // requested explicitly from the Permissions page in both production and test channels.
+        false
     }
 
     private static func openAccessibilitySettings() {
@@ -169,7 +183,7 @@ internal enum RecordingWindowPositioner {
               let app,
               !app.isTerminated,
               app.processIdentifier > 0,
-              app.bundleIdentifier != Bundle.main.bundleIdentifier else {
+              !AppIdentity.isTypeleastBundleIdentifier(app.bundleIdentifier) else {
             return nil
         }
 

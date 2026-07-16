@@ -53,6 +53,110 @@ final class AppDefaultsTests: XCTestCase {
         XCTAssertEqual(defaults.object(forKey: AppDefaults.Keys.transcriptionHistoryEnabled) as? Bool, false)
         XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionRetentionPeriod), RetentionPeriod.forever.rawValue)
     }
+
+    func testStreamingTestCopiesOpenAIKeyWithoutChangingProductionItem() throws {
+        let keychain = MockKeychainService()
+        try keychain.save("production-key", service: AppIdentity.productionKeychainService, account: "OpenAI")
+
+        AppDefaults.copyProductionOpenAIKeyToStreamingTestIfNeeded(
+            keychain: keychain,
+            defaults: defaults,
+            isStreamingTest: true,
+            destinationService: AppIdentity.streamingTestKeychainService
+        )
+
+        XCTAssertEqual(
+            try keychain.get(service: AppIdentity.streamingTestKeychainService, account: "OpenAI"),
+            "production-key"
+        )
+        XCTAssertEqual(
+            try keychain.get(service: AppIdentity.productionKeychainService, account: "OpenAI"),
+            "production-key"
+        )
+    }
+
+    func testStreamingTestDefaultsAreIsolatedAndDeterministic() {
+        AppDefaults.configureStreamingTestDefaultsIfNeeded(
+            defaults: defaults,
+            isStreamingTest: true
+        )
+
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionProvider), "openaiRealtime")
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionLanguage), "zh-en")
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "modifierOnly:rightCommand")
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.immediateRecording), false)
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.startAtLogin), false)
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled), true)
+        XCTAssertEqual(defaults.bool(forKey: AppDefaults.Keys.enableStreamingTranscription), true)
+    }
+
+    func testStreamingTestV3MigrationRestoresRightCommandHoldMode() {
+        defaults.set(true, forKey: "streamingTestDefaultsConfiguredV2")
+        defaults.set("⌃⌥Space", forKey: AppDefaults.Keys.globalHotkey)
+        defaults.set(true, forKey: AppDefaults.Keys.immediateRecording)
+        defaults.set(false, forKey: AppDefaults.Keys.pressAndHoldEnabled)
+        defaults.set(PressAndHoldKey.rightCommand.rawValue, forKey: AppDefaults.Keys.pressAndHoldKeyIdentifier)
+        defaults.set(PressAndHoldMode.doubleTapToggle.rawValue, forKey: AppDefaults.Keys.pressAndHoldMode)
+
+        AppDefaults.configureStreamingTestDefaultsIfNeeded(
+            defaults: defaults,
+            isStreamingTest: true
+        )
+
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "modifierOnly:rightCommand")
+        XCTAssertFalse(defaults.bool(forKey: AppDefaults.Keys.immediateRecording))
+        XCTAssertTrue(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled))
+        XCTAssertEqual(
+            defaults.string(forKey: AppDefaults.Keys.pressAndHoldKeyIdentifier),
+            PressAndHoldConfiguration.defaults.key.rawValue
+        )
+        XCTAssertEqual(
+            defaults.string(forKey: AppDefaults.Keys.pressAndHoldMode),
+            PressAndHoldMode.hold.rawValue
+        )
+        XCTAssertTrue(defaults.bool(forKey: "streamingTestDefaultsConfiguredV3"))
+    }
+
+    func testProductionRealtimeMigrationAppliesOnceAndPreservesLaterUserChoice() {
+        defaults.set(TranscriptionProvider.local.rawValue, forKey: AppDefaults.Keys.transcriptionProvider)
+        defaults.set(RecordingHUDStyle.appleGlass.rawValue, forKey: AppDefaults.Keys.recordingHUDStyle)
+        defaults.set("⌘⇧Space", forKey: AppDefaults.Keys.globalHotkey)
+
+        AppDefaults.configureProductionRealtimeDefaultsIfNeeded(
+            defaults: defaults,
+            bundleIdentifier: AppIdentity.productionBundleIdentifier
+        )
+
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionProvider), TranscriptionProvider.openAIRealtime.rawValue)
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionLanguage), TranscriptionLanguage.chineseEnglish.rawValue)
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.recordingHUDStyle), RecordingHUDStyle.siriAura.rawValue)
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.globalHotkey), "modifierOnly:rightCommand")
+        XCTAssertFalse(defaults.bool(forKey: AppDefaults.Keys.immediateRecording))
+        XCTAssertTrue(defaults.bool(forKey: AppDefaults.Keys.pressAndHoldEnabled))
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.pressAndHoldKeyIdentifier), PressAndHoldKey.rightCommand.rawValue)
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.pressAndHoldMode), PressAndHoldMode.hold.rawValue)
+        XCTAssertTrue(defaults.bool(forKey: AppDefaults.Keys.enableStreamingTranscription))
+        XCTAssertTrue(defaults.bool(forKey: "productionRealtimeDefaultsConfiguredV1"))
+
+        defaults.set(TranscriptionProvider.openai.rawValue, forKey: AppDefaults.Keys.transcriptionProvider)
+        AppDefaults.configureProductionRealtimeDefaultsIfNeeded(
+            defaults: defaults,
+            bundleIdentifier: AppIdentity.productionBundleIdentifier
+        )
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionProvider), TranscriptionProvider.openai.rawValue)
+    }
+
+    func testProductionRealtimeMigrationDoesNotTouchTestChannel() {
+        defaults.set(TranscriptionProvider.local.rawValue, forKey: AppDefaults.Keys.transcriptionProvider)
+
+        AppDefaults.configureProductionRealtimeDefaultsIfNeeded(
+            defaults: defaults,
+            bundleIdentifier: AppIdentity.streamingTestBundleIdentifier
+        )
+
+        XCTAssertEqual(defaults.string(forKey: AppDefaults.Keys.transcriptionProvider), TranscriptionProvider.local.rawValue)
+        XCTAssertFalse(defaults.bool(forKey: "productionRealtimeDefaultsConfiguredV1"))
+    }
 }
 
 private extension UserDefaults {

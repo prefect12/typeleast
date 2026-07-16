@@ -60,6 +60,7 @@ final class TranscriptionPipelineTests: XCTestCase {
                 audioURL: audioURL,
                 provider: .openai,
                 whisperModel: nil,
+                openAIModelOverride: AppDefaults.highAccuracyEnglishTranscriptionModel,
                 duration: 2.5,
                 estimatedDuration: nil,
                 sourceAppInfo: SourceAppInfo(
@@ -77,6 +78,10 @@ final class TranscriptionPipelineTests: XCTestCase {
         XCTAssertNotNil(result.savedRecordID)
         XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Hello Typeleast")
         XCTAssertEqual(speechService.requests.map(\.provider), [.openai])
+        XCTAssertEqual(
+            speechService.requests.map(\.openAIModelOverride),
+            [AppDefaults.highAccuracyEnglishTranscriptionModel]
+        )
         XCTAssertEqual(usageStore.snapshot.totalSessions, 1)
         XCTAssertEqual(usageStore.snapshot.totalWords, 2)
         XCTAssertEqual(usageStore.snapshot.totalCharacters, 15)
@@ -194,6 +199,7 @@ private final class FakeRawTranscriptionService: RawTranscriptionServicing {
         let audioURL: URL
         let provider: TranscriptionProvider
         let model: WhisperModel?
+        let openAIModelOverride: String?
     }
 
     private let text: String
@@ -203,8 +209,20 @@ private final class FakeRawTranscriptionService: RawTranscriptionServicing {
         self.text = text
     }
 
-    func transcribeRaw(audioURL: URL, provider: TranscriptionProvider, model: WhisperModel?) async throws -> String {
-        requests.append(CapturedRequest(audioURL: audioURL, provider: provider, model: model))
+    func transcribeRaw(
+        audioURL: URL,
+        provider: TranscriptionProvider,
+        model: WhisperModel?,
+        openAIModelOverride: String?
+    ) async throws -> String {
+        requests.append(
+            CapturedRequest(
+                audioURL: audioURL,
+                provider: provider,
+                model: model,
+                openAIModelOverride: openAIModelOverride
+            )
+        )
         return text
     }
 }
@@ -214,6 +232,7 @@ private final class FakeTranscriptionSettingsStore: TranscriptionSettingsReadabl
     var selectedWhisperModel: WhisperModel = .base
     var selectedParakeetModel: ParakeetModel = .v3Multilingual
     var openAITranscriptionModel: String
+    var openAIRealtimeTranscriptionModel: String = AppDefaults.defaultOpenAIRealtimeTranscriptionModel
     var miMoASRModel: String = AppDefaults.defaultMiMoASRModel
     var transcriptionLanguage: TranscriptionLanguage = .auto
     var recordingHUDStyle: RecordingHUDStyle = AppDefaults.defaultRecordingHUDStyle

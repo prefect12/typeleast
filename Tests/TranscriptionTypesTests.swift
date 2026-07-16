@@ -8,8 +8,9 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderCases() {
         let allCases = TranscriptionProvider.allCases
-        XCTAssertEqual(allCases.count, 5)
+        XCTAssertEqual(allCases.count, 6)
         XCTAssertTrue(allCases.contains(.openai))
+        XCTAssertTrue(allCases.contains(.openAIRealtime))
         XCTAssertTrue(allCases.contains(.mimo))
         XCTAssertTrue(allCases.contains(.gemini))
         XCTAssertTrue(allCases.contains(.local))
@@ -18,6 +19,7 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderDisplayNames() {
         XCTAssertEqual(TranscriptionProvider.openai.displayName, "OpenAI Whisper (Cloud)")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.displayName, "OpenAI Realtime")
         XCTAssertEqual(TranscriptionProvider.mimo.displayName, "Xiaomi MiMo V2.5 ASR (Cloud)")
         XCTAssertEqual(TranscriptionProvider.gemini.displayName, "Google Gemini (Cloud)")
         XCTAssertEqual(TranscriptionProvider.local.displayName, "Whisper (Local)")
@@ -26,14 +28,124 @@ class TranscriptionTypesTests: XCTestCase {
     
     func testTranscriptionProviderRawValues() {
         XCTAssertEqual(TranscriptionProvider.openai.rawValue, "openai")
+        XCTAssertEqual(TranscriptionProvider.openAIRealtime.rawValue, "openaiRealtime")
         XCTAssertEqual(TranscriptionProvider.mimo.rawValue, "mimo")
         XCTAssertEqual(TranscriptionProvider.gemini.rawValue, "gemini")
         XCTAssertEqual(TranscriptionProvider.local.rawValue, "local")
         XCTAssertEqual(TranscriptionProvider.parakeet.rawValue, "parakeet")
     }
+
+    func testProductionCoordinatorRoutesRealtimeProviderToRealtimeTransport() {
+        XCTAssertTrue(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .openAIRealtime))
+        XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .openai))
+        XCTAssertFalse(LiveDictationCoordinator.shouldUseOpenAIRealtime(for: .local))
+    }
+
+    func testRealtimeLanguageHintsPreferChineseForMixedDictation() {
+        XCTAssertNil(TranscriptionLanguage.auto.openAIRealtimeLanguageHint)
+        XCTAssertEqual(TranscriptionLanguage.chinese.openAIRealtimeLanguageHint, "zh")
+        XCTAssertEqual(TranscriptionLanguage.chineseEnglish.openAIRealtimeLanguageHint, "zh")
+        XCTAssertEqual(TranscriptionLanguage.english.openAIRealtimeLanguageHint, "en")
+    }
+
+    func testEnglishOnlyRealtimeTextIsVerifiedInChineseModes() {
+        let translatedText = "I said Chinese directly was translated into English"
+
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: translatedText,
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: translatedText,
+                language: .chinese
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: translatedText,
+                language: .english
+            )
+        )
+    }
+
+    func testUnexpectedNonChineseScriptIsVerifiedInChineseModes() {
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: "これは別の言語です",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: "这是中文 mixed text",
+                language: .chineseEnglish
+            )
+        )
+    }
+
+    func testChineseAndMixedRealtimeTextSkipLanguageVerification() {
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: "我直接说中文",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: "我要发布一个 campaign",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldVerifyRealtimeLanguage(
+                transcript: nil,
+                language: .chineseEnglish
+            )
+        )
+    }
+
+    func testMixedLanguageEnglishTriggersHighAccuracyFinalization() {
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "请检查 SDK and pipeline 是否正常",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertTrue(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "请检查 café 的配置",
+                language: .chineseEnglish
+            )
+        )
+    }
+
+    func testChineseOnlyTextKeepsRealtimeFastPath() {
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "为什么刚才两个额度都更新了",
+                language: .chineseEnglish
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: "English words",
+                language: .english
+            )
+        )
+        XCTAssertFalse(
+            LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                transcript: nil,
+                language: .chineseEnglish
+            )
+        )
+    }
     
     func testTranscriptionProviderFromRawValue() {
         XCTAssertEqual(TranscriptionProvider(rawValue: "openai"), .openai)
+        XCTAssertEqual(TranscriptionProvider(rawValue: "openaiRealtime"), .openAIRealtime)
         XCTAssertEqual(TranscriptionProvider(rawValue: "mimo"), .mimo)
         XCTAssertEqual(TranscriptionProvider(rawValue: "gemini"), .gemini)
         XCTAssertEqual(TranscriptionProvider(rawValue: "local"), .local)

@@ -142,7 +142,7 @@ internal class WindowController {
     private func storePreviousApp() {
         let workspace = NSWorkspace.shared
         if let frontmostApp = workspace.frontmostApplication,
-           frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier {
+           !AppIdentity.isTypeleastBundleIdentifier(frontmostApp.bundleIdentifier) {
             previousApp = frontmostApp
             WindowController.storedTargetApp = frontmostApp
             

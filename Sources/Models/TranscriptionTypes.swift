@@ -13,6 +13,7 @@ internal enum WhisperModelError: Error, LocalizedError, Sendable {
 
 internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
     case openai = "openai"
+    case openAIRealtime = "openaiRealtime"
     case mimo = "mimo"
     case gemini = "gemini" 
     case local = "local"
@@ -22,6 +23,8 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
         switch self {
         case .openai:
             return "OpenAI Whisper (Cloud)"
+        case .openAIRealtime:
+            return "OpenAI Realtime"
         case .mimo:
             return "Xiaomi MiMo V2.5 ASR (Cloud)"
         case .gemini:
@@ -31,6 +34,10 @@ internal enum TranscriptionProvider: String, CaseIterable, Codable, Sendable {
         case .parakeet:
             return "Parakeet (Advanced)"
         }
+    }
+
+    var fileTranscriptionFallback: TranscriptionProvider? {
+        self == .openAIRealtime ? .openai : nil
     }
 }
 
@@ -117,6 +124,17 @@ internal enum TranscriptionLanguage: String, CaseIterable, Codable, Sendable, Id
             return "The spoken language is French. Transcribe in French and do not translate."
         case .german:
             return "The spoken language is German. Transcribe in German and do not translate."
+        }
+    }
+
+    var openAIRealtimeLanguageHint: String? {
+        switch self {
+        case .auto:
+            return nil
+        case .chinese, .chineseEnglish:
+            return "zh"
+        default:
+            return rawValue
         }
     }
 }

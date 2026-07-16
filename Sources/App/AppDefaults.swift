@@ -7,7 +7,7 @@ import Foundation
 ///   accidentally clobber user preferences or treat a first-run as "already configured".
 /// - AppStorage initial values across the app should match these constants.
 internal enum AppDefaults {
-    private static let productionBundleIdentifier = AppIdentity.bundleIdentifier
+    private static let productionBundleIdentifier = AppIdentity.productionBundleIdentifier
     private static let developmentBundleIdentifier = AppIdentity.developmentBundleIdentifier
 
     internal enum Keys {
@@ -47,10 +47,14 @@ internal enum AppDefaults {
     internal static let currentWelcomeVersion = "1.1"
 
     // Chosen defaults.
-    internal static let defaultTranscriptionProvider: TranscriptionProvider = .local
+    internal static var defaultTranscriptionProvider: TranscriptionProvider {
+        AppIdentity.isStreamingTest ? .openAIRealtime : .local
+    }
     internal static let defaultWhisperModel: WhisperModel = .base
     internal static let defaultParakeetModel: ParakeetModel = .v3Multilingual
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-mini-transcribe"
+    internal static let highAccuracyEnglishTranscriptionModel = "gpt-4o-transcribe"
+    internal static let defaultOpenAIRealtimeTranscriptionModel = "gpt-realtime-whisper"
     internal static let defaultMiMoASRModel = "mimo-v2.5-asr"
     internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
     internal static let defaultRecordingHUDStyle: RecordingHUDStyle = .appleGlass
@@ -69,7 +73,7 @@ internal enum AppDefaults {
             Keys.semanticCorrectionMode: defaultSemanticCorrectionMode.rawValue,
             Keys.semanticCorrectionModelRepo: defaultSemanticCorrectionModelRepo,
 
-            Keys.startAtLogin: true,
+            Keys.startAtLogin: !AppIdentity.isStreamingTest,
             Keys.playCompletionSound: true,
             Keys.transcriptionHistoryEnabled: true,
             Keys.transcriptionRetentionPeriod: RetentionPeriod.forever.rawValue,
@@ -78,9 +82,11 @@ internal enum AppDefaults {
             Keys.enableStreamingTranscription: true,
             Keys.recordingHUDStyle: defaultRecordingHUDStyle.rawValue,
             Keys.immediateRecording: false,
-            Keys.globalHotkey: "⌘⇧Space",
+            Keys.globalHotkey: AppIdentity.isStreamingTest
+                ? GlobalShortcutDisplay.storedValue(for: .rightCommand)
+                : "⌘⇧Space",
 
-            Keys.pressAndHoldEnabled: PressAndHoldConfiguration.defaults.enabled,
+            Keys.pressAndHoldEnabled: AppIdentity.isStreamingTest || PressAndHoldConfiguration.defaults.enabled,
             Keys.pressAndHoldKeyIdentifier: PressAndHoldConfiguration.defaults.key.rawValue,
             Keys.pressAndHoldMode: PressAndHoldConfiguration.defaults.mode.rawValue,
 
@@ -90,6 +96,73 @@ internal enum AppDefaults {
             Keys.hasSetupLocalLLM: false,
             Keys.hasSetupParakeet: false
         ])
+    }
+
+    internal static func configureStreamingTestDefaultsIfNeeded(
+        defaults: UserDefaults = .standard,
+        isStreamingTest: Bool = AppIdentity.isStreamingTest
+    ) {
+        guard isStreamingTest else { return }
+        // V3 restores the requested press-and-hold Right Command interaction for the test channel.
+        let marker = "streamingTestDefaultsConfiguredV3"
+        guard !defaults.bool(forKey: marker) else { return }
+
+        defaults.set(TranscriptionProvider.openAIRealtime.rawValue, forKey: Keys.transcriptionProvider)
+        defaults.set(TranscriptionLanguage.chineseEnglish.rawValue, forKey: Keys.transcriptionLanguage)
+        defaults.set(false, forKey: Keys.startAtLogin)
+        defaults.set(GlobalShortcutDisplay.storedValue(for: .rightCommand), forKey: Keys.globalHotkey)
+        defaults.set(false, forKey: Keys.immediateRecording)
+        defaults.set(true, forKey: Keys.pressAndHoldEnabled)
+        defaults.set(PressAndHoldKey.rightCommand.rawValue, forKey: Keys.pressAndHoldKeyIdentifier)
+        defaults.set(PressAndHoldMode.hold.rawValue, forKey: Keys.pressAndHoldMode)
+        defaults.set(true, forKey: Keys.enableStreamingTranscription)
+        defaults.set(true, forKey: Keys.enableSmartPaste)
+        defaults.set(true, forKey: marker)
+    }
+
+    /// Applies the validated Realtime configuration exactly once when upgrading the production app.
+    /// Later user changes are preserved because the migration marker prevents another override.
+    internal static func configureProductionRealtimeDefaultsIfNeeded(
+        defaults: UserDefaults = .standard,
+        bundleIdentifier: String = AppIdentity.bundleIdentifier
+    ) {
+        guard bundleIdentifier == productionBundleIdentifier else { return }
+        let marker = "productionRealtimeDefaultsConfiguredV1"
+        guard !defaults.bool(forKey: marker) else { return }
+
+        defaults.set(TranscriptionProvider.openAIRealtime.rawValue, forKey: Keys.transcriptionProvider)
+        defaults.set(TranscriptionLanguage.chineseEnglish.rawValue, forKey: Keys.transcriptionLanguage)
+        defaults.set(RecordingHUDStyle.siriAura.rawValue, forKey: Keys.recordingHUDStyle)
+        defaults.set(GlobalShortcutDisplay.storedValue(for: .rightCommand), forKey: Keys.globalHotkey)
+        defaults.set(false, forKey: Keys.immediateRecording)
+        defaults.set(true, forKey: Keys.pressAndHoldEnabled)
+        defaults.set(PressAndHoldKey.rightCommand.rawValue, forKey: Keys.pressAndHoldKeyIdentifier)
+        defaults.set(PressAndHoldMode.hold.rawValue, forKey: Keys.pressAndHoldMode)
+        defaults.set(true, forKey: Keys.enableStreamingTranscription)
+        defaults.set(true, forKey: marker)
+    }
+
+    /// Test builds import only the OpenAI credential, once, into their own Keychain service.
+    /// The production item is never updated or deleted.
+    internal static func copyProductionOpenAIKeyToStreamingTestIfNeeded(
+        keychain: KeychainServiceProtocol = KeychainService.shared,
+        defaults: UserDefaults = .standard,
+        isStreamingTest: Bool = AppIdentity.isStreamingTest,
+        destinationService: String = AppIdentity.keychainService
+    ) {
+        guard isStreamingTest else { return }
+        let migrationKey = "streamingTestOpenAIKeyMigrationAttempted"
+        guard !defaults.bool(forKey: migrationKey) else { return }
+        defer { defaults.set(true, forKey: migrationKey) }
+
+        guard keychain.getQuietly(service: destinationService, account: "OpenAI") == nil,
+              let productionKey = keychain.getQuietly(
+                service: AppIdentity.productionKeychainService,
+                account: "OpenAI"
+              ),
+              !productionKey.isEmpty else { return }
+
+        keychain.saveQuietly(productionKey, service: destinationService, account: "OpenAI")
     }
 
     /// Dev builds use a different bundle identifier and therefore a different preferences domain.

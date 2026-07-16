@@ -57,8 +57,7 @@ internal extension AppDelegate {
         }
 
         let targetApp = captureLiveDictationTargetApp()
-        if recorder.startRecording() {
-            LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
+        if beginShortcutRecording(recorder: recorder, targetApp: targetApp) {
             isHoldRecordingActive = true
             updateMenuBarIcon(isRecording: true)
             SoundManager().playRecordingStartSound()
@@ -134,8 +133,7 @@ internal extension AppDelegate {
             }
 
             let targetApp = captureLiveDictationTargetApp()
-            if recorder.startRecording() {
-                LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
+            if beginShortcutRecording(recorder: recorder, targetApp: targetApp) {
                 updateMenuBarIcon(isRecording: true)
                 SoundManager().playRecordingStartSound()
                 showRecordingWindowForProcessing()
@@ -148,6 +146,24 @@ internal extension AppDelegate {
                 )
             }
         }
+    }
+
+    private func beginShortcutRecording(
+        recorder: AudioRecorder,
+        targetApp: NSRunningApplication?
+    ) -> Bool {
+        if TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime {
+            LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp)
+            let started = recorder.startRecording { data in
+                Task { @MainActor in LiveDictationCoordinator.shared.appendPCM16AudioData(data) }
+            }
+            if !started { LiveDictationCoordinator.shared.cancel() }
+            return started
+        }
+
+        let started = recorder.startRecording()
+        if started { LiveDictationCoordinator.shared.beginIfNeeded(targetApp: targetApp) }
+        return started
     }
 
     private func updateMenuBarIcon(isRecording: Bool) {
@@ -163,7 +179,7 @@ internal extension AppDelegate {
 
     private func captureLiveDictationTargetApp() -> NSRunningApplication? {
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication,
-              frontmostApp.bundleIdentifier != Bundle.main.bundleIdentifier,
+              !AppIdentity.isTypeleastBundleIdentifier(frontmostApp.bundleIdentifier),
               !frontmostApp.isTerminated else {
             return WindowController.storedTargetApp
         }

@@ -48,8 +48,8 @@ internal class SpeechToTextService {
     internal static func technicalASRPrompt(language: TranscriptionLanguage = .auto) -> String {
         """
         \(language.speechInstruction)
-        Preserve and correctly spell GitHub, repo, repository, PR, pull request, branch, commit, merge, rebase, issue, release, deploy, rollback, campaign, CampaignStrategy, Arachne, creator, matching, pipeline, queue, worker, webhook, monitoring, monitor, alert, alarm, metric, metrics, dashboard, log, logs, trace, tracing, span, latency, timeout, QPS, RPS, p95, p99, SLA, SLO, Sentry, Grafana, Prometheus, OpenTelemetry, OTel, Datadog, Guance, Feishu, WeChat, Claude, Codex, ChatGPT.
-        Common speech variants: 进 Hub, 金 Hub, or Git Hub usually means GitHub; 瑞坡 usually means repo; 批啊 or P R usually means PR; 康佩恩 usually means campaign; 格拉法纳 means Grafana; 普罗米修斯 means Prometheus; 观测云 means Guance.
+        Preserve every spoken English word, proper noun, acronym, product name, command, path, and code identifier in English. Use the audio and surrounding sentence context rather than a built-in product-name replacement list.
+        Transcribe verbatim. Do not add, infer, complete, paraphrase, translate, or answer. Preserve very short utterances as equally short text.
         Return only the transcription without commentary.
         """
     }
@@ -77,7 +77,12 @@ internal class SpeechToTextService {
     }
     
     // Raw transcription without semantic correction
-    func transcribeRaw(audioURL: URL, provider: TranscriptionProvider, model: WhisperModel? = nil) async throws -> String {
+    func transcribeRaw(
+        audioURL: URL,
+        provider: TranscriptionProvider,
+        model: WhisperModel? = nil,
+        openAIModelOverride: String? = nil
+    ) async throws -> String {
         // Validate audio file before processing
         let validationResult = await AudioValidator.validateAudioFile(at: audioURL)
         switch validationResult {
@@ -85,7 +90,11 @@ internal class SpeechToTextService {
         case .invalid(let error):
             throw SpeechToTextError.transcriptionFailed(error.localizedDescription)
         }
-        let request = TranscriptionProviderRequest(audioURL: audioURL, whisperModel: model)
+        let request = TranscriptionProviderRequest(
+            audioURL: audioURL,
+            whisperModel: model,
+            openAIModelOverride: openAIModelOverride
+        )
         return try await providerRegistry.client(for: provider).transcribe(request)
     }
 
@@ -176,7 +185,7 @@ internal class SpeechToTextService {
         return custom.contains(".openai.azure.com")
     }
 
-    func transcribeWithOpenAI(audioURL: URL) async throws -> String {
+    func transcribeWithOpenAI(audioURL: URL, modelOverride: String? = nil) async throws -> String {
         // Get API key from keychain
         guard let apiKey = keychainService.getQuietly(service: AppIdentity.keychainService, account: "OpenAI") else {
             throw SpeechToTextError.apiKeyMissing("OpenAI")
@@ -192,7 +201,9 @@ internal class SpeechToTextService {
 
         let transcriptionURL = openAITranscriptionEndpoint
         let language = resolvedTranscriptionLanguage
-        guard let modelData = resolvedOpenAITranscriptionModel.data(using: .utf8),
+        let requestedModel = modelOverride?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let model = requestedModel.flatMap { $0.isEmpty ? nil : $0 } ?? resolvedOpenAITranscriptionModel
+        guard let modelData = model.data(using: .utf8),
               let promptData = Self.technicalASRPrompt(language: language).data(using: .utf8) else {
             throw SpeechToTextError.transcriptionFailed("Failed to encode OpenAI transcription request")
         }
@@ -491,7 +502,7 @@ internal class SpeechToTextService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
 
-        return normalizeTechnicalTerms(cleanedText)
+        return cleanedText
     }
 
     static func miMoAudioDataURI(data: Data, mimeType: String) -> String {
@@ -519,31 +530,6 @@ internal class SpeechToTextService {
         }
     }
 
-    private static func normalizeTechnicalTerms(_ text: String) -> String {
-        var normalizedText = text
-        let replacements: [(pattern: String, replacement: String)] = [
-            ("\\bgithub\\b", "GitHub"),
-            ("\\bgit\\s+hub\\b", "GitHub"),
-            ("进\\s*hub", "GitHub"),
-            ("金\\s*hub", "GitHub"),
-            ("\\bopen\\s+ai\\b", "OpenAI"),
-            ("\\bopenai\\b", "OpenAI"),
-            ("\\bchat\\s+gpt\\b", "ChatGPT"),
-            ("\\bchatgpt\\b", "ChatGPT"),
-            ("\\bp\\s+r\\b", "PR")
-        ]
-
-        for replacement in replacements {
-            normalizedText = normalizedText.replacingOccurrences(
-                of: replacement.pattern,
-                with: replacement.replacement,
-                options: [.regularExpression, .caseInsensitive]
-            )
-        }
-
-        return normalizedText
-    }
-    
 }
 
 // Response models

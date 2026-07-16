@@ -130,4 +130,6 @@ __pycache__
 AudioWhisper.iconset/
 Typeleast.iconset/
 .build-uv/
+.build-streaming-test/
+.artifacts/
 .beads/

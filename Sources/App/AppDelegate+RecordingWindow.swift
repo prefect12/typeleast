@@ -36,7 +36,13 @@ internal extension AppDelegate {
             return
         }
 
-        let windowSize = LayoutMetrics.RecordingWindow.size
+        let usesRealtimeLayout = AppIdentity.isStreamingTest
+            || TranscriptionSettingsStore.shared.transcriptionProvider == .openAIRealtime
+        let windowSize = usesRealtimeLayout
+            ? LayoutMetrics.RecordingWindow.realtimeSize(
+                for: TranscriptionSettingsStore.shared.recordingHUDStyle
+            )
+            : LayoutMetrics.RecordingWindow.size
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: windowSize),
             styleMask: [.borderless],
