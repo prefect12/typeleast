@@ -7,6 +7,7 @@ final class TranscriptionPipelineTests: XCTestCase {
     private var usageDefaultsSuite: String!
     private var sourceDefaultsSuite: String!
     private var audioURL: URL!
+    private var clipboard: FakeClipboard!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -15,7 +16,8 @@ final class TranscriptionPipelineTests: XCTestCase {
         audioURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("TranscriptionPipelineTests-\(UUID().uuidString).wav")
         try Data([0x00, 0x01, 0x02]).write(to: audioURL)
-        NSPasteboard.general.clearContents()
+        // The system pasteboard is shared by parallel test processes, so capture writes instead.
+        clipboard = FakeClipboard()
     }
 
     override func tearDown() async throws {
@@ -28,6 +30,7 @@ final class TranscriptionPipelineTests: XCTestCase {
         if let sourceDefaultsSuite {
             UserDefaults(suiteName: sourceDefaultsSuite)?.removePersistentDomain(forName: sourceDefaultsSuite)
         }
+        clipboard = nil
         audioURL = nil
         usageDefaultsSuite = nil
         sourceDefaultsSuite = nil
@@ -52,7 +55,8 @@ final class TranscriptionPipelineTests: XCTestCase {
             settingsStore: settingsStore,
             dataManager: dataManager,
             usageMetricsStore: usageStore,
-            sourceUsageStore: sourceStore
+            sourceUsageStore: sourceStore,
+            clipboard: clipboard
         )
 
         let result = try await pipeline.run(
@@ -76,7 +80,7 @@ final class TranscriptionPipelineTests: XCTestCase {
 
         XCTAssertEqual(result.text, "Hello Typeleast")
         XCTAssertNotNil(result.savedRecordID)
-        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Hello Typeleast")
+        XCTAssertEqual(clipboard.contents, "Hello Typeleast")
         XCTAssertEqual(speechService.requests.map(\.provider), [.openai])
         XCTAssertEqual(
             speechService.requests.map(\.openAIModelOverride),
@@ -116,7 +120,8 @@ final class TranscriptionPipelineTests: XCTestCase {
             settingsStore: settingsStore,
             dataManager: dataManager,
             usageMetricsStore: usageStore,
-            sourceUsageStore: sourceStore
+            sourceUsageStore: sourceStore,
+            clipboard: clipboard
         )
 
         let result = try await pipeline.run(
@@ -157,7 +162,8 @@ final class TranscriptionPipelineTests: XCTestCase {
             settingsStore: settingsStore,
             dataManager: dataManager,
             usageMetricsStore: usageStore,
-            sourceUsageStore: sourceStore
+            sourceUsageStore: sourceStore,
+            clipboard: clipboard
         )
 
         let result = try await pipeline.runPretranscribed(
@@ -182,7 +188,7 @@ final class TranscriptionPipelineTests: XCTestCase {
 
         XCTAssertEqual(result.text, "Streamed Typeleast text")
         XCTAssertTrue(speechService.requests.isEmpty)
-        XCTAssertEqual(NSPasteboard.general.string(forType: .string), "Streamed Typeleast text")
+        XCTAssertEqual(clipboard.contents, "Streamed Typeleast text")
         XCTAssertEqual(usageStore.snapshot.totalSessions, 1)
         XCTAssertEqual(sourceStore.allSources().first?.bundleIdentifier, "com.example.chat")
 
@@ -191,6 +197,236 @@ final class TranscriptionPipelineTests: XCTestCase {
         XCTAssertEqual(records.first?.text, "Streamed Typeleast text")
         XCTAssertEqual(records.first?.asrTime ?? 0, 0.42, accuracy: 0.001)
         XCTAssertGreaterThanOrEqual(records.first?.transcriptionTime ?? 0, 0.42)
+    }
+}
+
+/// Refinement tests share the pipeline fakes above but need no clipboard assertions, so they
+/// capture clipboard writes with a throwaway fake.
+@MainActor
+final class TranscriptionPipelineRefiningTests: XCTestCase {
+    private var usageDefaultsSuite: String!
+    private var sourceDefaultsSuite: String!
+    private var audioURL: URL!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        usageDefaultsSuite = "TranscriptionPipelineRefiningTests.usage.\(UUID().uuidString)"
+        sourceDefaultsSuite = "TranscriptionPipelineRefiningTests.source.\(UUID().uuidString)"
+        audioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TranscriptionPipelineRefiningTests-\(UUID().uuidString).wav")
+        try Data([0x00, 0x01, 0x02]).write(to: audioURL)
+    }
+
+    override func tearDown() async throws {
+        try? FileManager.default.removeItem(at: audioURL)
+        UserDefaults(suiteName: usageDefaultsSuite)?.removePersistentDomain(forName: usageDefaultsSuite)
+        UserDefaults(suiteName: sourceDefaultsSuite)?.removePersistentDomain(forName: sourceDefaultsSuite)
+        audioURL = nil
+        usageDefaultsSuite = nil
+        sourceDefaultsSuite = nil
+        try await super.tearDown()
+    }
+
+    func testRunRefiningUsesBatchTextWhenItArrivesInTime() async throws {
+        let speechService = ScriptedRawTranscriptionService(behavior: .text("Refined campaign text"))
+        let dataManager = MockDataManager()
+        let pipeline = try makePipeline(speechService: speechService, dataManager: dataManager)
+        let request = makeRequest(provider: .openai, modelOverride: "gpt-4o-transcribe")
+
+        let refinement = pipeline.startRawTranscription(
+            audioURL: audioURL,
+            provider: .openai,
+            openAIModelOverride: "gpt-4o-transcribe"
+        )
+        let result = try await pipeline.runRefining(
+            request,
+            refinement: refinement,
+            fallbackRequest: request.with(provider: .openAIRealtime),
+            fallbackText: "realtime 康佩恩 text",
+            fallbackASRTime: 0.3,
+            timeout: 2
+        )
+
+        XCTAssertEqual(result.text, "Refined campaign text")
+        XCTAssertEqual(speechService.requestedModelOverrides, ["gpt-4o-transcribe"])
+        let records = try await dataManager.fetchAllRecords()
+        XCTAssertEqual(records.first?.provider, TranscriptionProvider.openai.rawValue)
+        XCTAssertEqual(records.first?.modelUsed, "gpt-4o-transcribe")
+    }
+
+    func testRunRefiningFallsBackToStreamedTextWithoutWaitingForSlowBatch() async throws {
+        let speechService = ScriptedRawTranscriptionService(behavior: .hang)
+        let dataManager = MockDataManager()
+        let pipeline = try makePipeline(speechService: speechService, dataManager: dataManager)
+        let request = makeRequest(provider: .openai, modelOverride: "gpt-4o-transcribe")
+
+        let startedAt = Date()
+        let result = try await pipeline.runRefining(
+            request,
+            refinement: pipeline.startRawTranscription(audioURL: audioURL, provider: .openai),
+            fallbackRequest: request.with(provider: .openAIRealtime),
+            fallbackText: "realtime text",
+            fallbackASRTime: 0.3,
+            timeout: 0.1
+        )
+
+        XCTAssertEqual(result.text, "realtime text")
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 2)
+        let records = try await dataManager.fetchAllRecords()
+        XCTAssertEqual(records.first?.provider, TranscriptionProvider.openAIRealtime.rawValue)
+        XCTAssertEqual(records.first?.asrTime ?? 0, 0.3, accuracy: 0.001)
+    }
+
+    func testRunRefiningFallsBackToStreamedTextWhenBatchFails() async throws {
+        let speechService = ScriptedRawTranscriptionService(behavior: .failure)
+        let pipeline = try makePipeline(speechService: speechService, dataManager: MockDataManager())
+        let request = makeRequest(provider: .openai, modelOverride: nil)
+
+        let result = try await pipeline.runRefining(
+            request,
+            refinement: pipeline.startRawTranscription(audioURL: audioURL, provider: .openai),
+            fallbackRequest: request.with(provider: .openAIRealtime),
+            fallbackText: "realtime text",
+            fallbackASRTime: 0.3,
+            timeout: 2
+        )
+
+        XCTAssertEqual(result.text, "realtime text")
+    }
+
+    func testRunRefiningCapsExtraWaitOnceStreamedTextIsReady() async throws {
+        let speechService = ScriptedRawTranscriptionService(behavior: .delayedText("Refined text", .milliseconds(600)))
+        let pipeline = try makePipeline(speechService: speechService, dataManager: MockDataManager())
+        let request = makeRequest(provider: .openai, modelOverride: "gpt-4o-transcribe")
+
+        let startedAt = Date()
+        let result = try await pipeline.runRefining(
+            request,
+            refinement: pipeline.startRawTranscription(audioURL: audioURL, provider: .openai),
+            fallbackRequest: request.with(provider: .openAIRealtime),
+            fallbackText: "realtime text",
+            fallbackASRTime: 0.3,
+            timeout: 5,
+            maximumExtraWait: 0.1
+        )
+
+        XCTAssertEqual(result.text, "realtime text")
+        XCTAssertLessThan(Date().timeIntervalSince(startedAt), 0.5)
+    }
+
+    func testRunRefiningUsesBatchTextArrivingWithinExtraWait() async throws {
+        let speechService = ScriptedRawTranscriptionService(behavior: .delayedText("Refined text", .milliseconds(50)))
+        let pipeline = try makePipeline(speechService: speechService, dataManager: MockDataManager())
+        let request = makeRequest(provider: .openai, modelOverride: "gpt-4o-transcribe")
+
+        let result = try await pipeline.runRefining(
+            request,
+            refinement: pipeline.startRawTranscription(audioURL: audioURL, provider: .openai),
+            fallbackRequest: request.with(provider: .openAIRealtime),
+            fallbackText: "realtime text",
+            fallbackASRTime: 0.3,
+            timeout: 5,
+            maximumExtraWait: 2
+        )
+
+        XCTAssertEqual(result.text, "Refined text")
+    }
+
+    func testRunPrestartedFinishesEarlyStartedTranscription() async throws {
+        let speechService = ScriptedRawTranscriptionService(behavior: .text("Batch text"))
+        let dataManager = MockDataManager()
+        let pipeline = try makePipeline(speechService: speechService, dataManager: dataManager)
+
+        let prestarted = pipeline.startRawTranscription(audioURL: audioURL, provider: .openai)
+        let result = try await pipeline.run(makeRequest(provider: .openai, modelOverride: nil), prestarted: prestarted)
+
+        XCTAssertEqual(result.text, "Batch text")
+        XCTAssertEqual(speechService.requestedModelOverrides.count, 1)
+    }
+
+    func testRefinementTimeoutScalesWithAudioDurationAndIsCapped() {
+        XCTAssertEqual(TranscriptionPipeline.refinementTimeout(forAudioDuration: nil), 3, accuracy: 0.001)
+        XCTAssertEqual(TranscriptionPipeline.refinementTimeout(forAudioDuration: 10), 4, accuracy: 0.001)
+        XCTAssertEqual(TranscriptionPipeline.refinementTimeout(forAudioDuration: 120), 6, accuracy: 0.001)
+    }
+
+    private func makePipeline(
+        speechService: RawTranscriptionServicing,
+        dataManager: MockDataManager
+    ) throws -> TranscriptionPipeline {
+        TranscriptionPipeline(
+            speechService: speechService,
+            settingsStore: FakeTranscriptionSettingsStore(
+                provider: .openAIRealtime,
+                semanticCorrectionMode: .off,
+                historyEnabled: true,
+                openAIModel: "gpt-4o-mini-transcribe"
+            ),
+            dataManager: dataManager,
+            usageMetricsStore: UsageMetricsStore(defaults: try XCTUnwrap(UserDefaults(suiteName: usageDefaultsSuite))),
+            sourceUsageStore: SourceUsageStore(defaults: try XCTUnwrap(UserDefaults(suiteName: sourceDefaultsSuite))),
+            clipboard: FakeClipboard()
+        )
+    }
+
+    private func makeRequest(provider: TranscriptionProvider, modelOverride: String?) -> TranscriptionPipelineRequest {
+        TranscriptionPipelineRequest(
+            audioURL: audioURL,
+            provider: provider,
+            whisperModel: nil,
+            openAIModelOverride: modelOverride,
+            duration: 4,
+            estimatedDuration: nil,
+            sourceAppInfo: .unknown,
+            modelReadyTime: nil,
+            processStart: Date()
+        )
+    }
+}
+
+private final class FakeClipboard: ClipboardWriting {
+    private(set) var contents: String?
+
+    func replaceContents(with string: String) {
+        contents = string
+    }
+}
+
+private final class ScriptedRawTranscriptionService: RawTranscriptionServicing {
+    enum Behavior {
+        case text(String)
+        case delayedText(String, Duration)
+        case failure
+        /// Never returns and ignores cancellation, like a stalled upload.
+        case hang
+    }
+
+    private let behavior: Behavior
+    private var stalledRequests: [CheckedContinuation<String, Never>] = []
+    private(set) var requestedModelOverrides: [String?] = []
+
+    init(behavior: Behavior) {
+        self.behavior = behavior
+    }
+
+    func transcribeRaw(
+        audioURL: URL,
+        provider: TranscriptionProvider,
+        model: WhisperModel?,
+        openAIModelOverride: String?
+    ) async throws -> String {
+        requestedModelOverrides.append(openAIModelOverride)
+        switch behavior {
+        case .text(let text):
+            return text
+        case .delayedText(let text, let delay):
+            try await Task.sleep(for: delay)
+            return text
+        case .failure:
+            throw SpeechToTextError.transcriptionFailed("injected")
+        case .hang:
+            return await withCheckedContinuation { stalledRequests.append($0) }
+        }
     }
 }
 

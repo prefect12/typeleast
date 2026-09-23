@@ -1,6 +1,9 @@
 import SwiftUI
 import AppKit
 
+/// The realtime model finished and heard nothing; ends processing quietly instead of pasting.
+private struct NoSpeechDetected: Error {}
+
 internal extension ContentView {
     func startRecording() {
         if !audioRecorder.hasPermission {
@@ -21,6 +24,9 @@ internal extension ContentView {
             : ""
 
         let targetApp = findValidTargetApp()
+        if transcriptionProvider == .openAIRealtime || transcriptionProvider == .openai {
+            SpeechToTextService.prewarmOpenAIConnection()
+        }
         if transcriptionProvider == .openAIRealtime {
             LiveDictationCoordinator.shared.beginIfNeeded(
                 targetApp: targetApp,
@@ -80,9 +86,32 @@ internal extension ContentView {
                 lastAudioURL = audioURL
                 try Task.checkCancellation()
 
+                // If English was already heard, start the high-accuracy pass now so it overlaps
+                // realtime finalization instead of running after it. The contextual session
+                // already covers accuracy, so it is only needed when that session isn't running.
+                var pendingRefinement: PendingRawTranscription?
+                if transcriptionProvider == .openAIRealtime,
+                   !LiveDictationCoordinator.shared.isContextualTranscriptionActive,
+                   LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
+                       transcript: LiveDictationCoordinator.shared.currentTranscript,
+                       language: TranscriptionSettingsStore.shared.transcriptionLanguage
+                   ) {
+                    pendingRefinement = transcriptionPipeline.startRawTranscription(
+                        audioURL: audioURL,
+                        provider: .openai,
+                        openAIModelOverride: AppDefaults.highAccuracyEnglishTranscriptionModel
+                    )
+                }
+                defer { pendingRefinement?.cancel() }
+
                 let streamingFinishStart = Date()
                 let streamedText = await LiveDictationCoordinator.shared.finishRecognition(finalizeLiveText: false)
                 let didInsertLiveText = LiveDictationCoordinator.shared.hasInsertedLiveText
+                let usedContextualTranscript = LiveDictationCoordinator.shared.lastRecognitionSource == .contextual
+                if streamedText?.isEmpty == true {
+                    Task { await RealtimeDiagnostics.shared.record("no_speech") }
+                    throw NoSpeechDetected()
+                }
                 let streamingFinalizeTime = streamedText == nil
                     ? nil
                     : Date().timeIntervalSince(streamingFinishStart)
@@ -94,6 +123,7 @@ internal extension ContentView {
                         language: TranscriptionSettingsStore.shared.transcriptionLanguage
                     )
                 let shouldUseHighAccuracyEnglishFinalization = transcriptionProvider == .openAIRealtime
+                    && !usedContextualTranscript
                     && LiveDictationCoordinator.shouldUseHighAccuracyEnglishFinalization(
                         transcript: streamedText,
                         language: TranscriptionSettingsStore.shared.transcriptionLanguage
@@ -115,13 +145,19 @@ internal extension ContentView {
                     modelReadyTime = Date().timeIntervalSince(modelReadyStart)
                 }
 
+                if shouldUseStreamedFinalText {
+                    pendingRefinement?.cancel()
+                    pendingRefinement = nil
+                }
+
                 let request = TranscriptionPipelineRequest(
                     audioURL: audioURL,
                     provider: effectiveProvider,
                     whisperModel: effectiveProvider == .local ? selectedWhisperModel : nil,
-                    openAIModelOverride: shouldUseHighAccuracyEnglishFinalization
-                        ? AppDefaults.highAccuracyEnglishTranscriptionModel
-                        : nil,
+                    openAIModelOverride: pendingRefinement?.openAIModelOverride
+                        ?? (shouldUseHighAccuracyEnglishFinalization
+                            ? AppDefaults.highAccuracyEnglishTranscriptionModel
+                            : nil),
                     duration: sessionDuration,
                     estimatedDuration: nil,
                     sourceAppInfo: currentSourceAppInfo(),
@@ -133,7 +169,12 @@ internal extension ContentView {
                 if shouldUseStreamedFinalText, let streamedText {
                     progressMessage = L10n.Recording.finalizingStreaming
                     result = try await transcriptionPipeline.runPretranscribed(
-                        request,
+                        request.with(
+                            provider: request.provider,
+                            openAIModelOverride: usedContextualTranscript
+                                ? AppDefaults.contextualTranscriptionModel
+                                : nil
+                        ),
                         rawText: streamedText,
                         asrTime: streamingFinalizeTime ?? 0,
                         progressHandler: { progressMessage = $0 }
@@ -173,35 +214,44 @@ internal extension ContentView {
                             await RealtimeDiagnostics.shared.record(
                                 "result",
                                 fields: [
-                                    "model": TranscriptionSettingsStore.shared.openAITranscriptionModel,
+                                    "model": request.openAIModelOverride
+                                        ?? TranscriptionSettingsStore.shared.openAITranscriptionModel,
                                     "fallback": "true"
                                 ]
                             )
                         }
                     }
-                    do {
-                        result = try await transcriptionPipeline.run(
+                    if shouldVerifyRealtimeWithBatch, let streamedText {
+                        // Bounded: the streamed text is already good enough to paste, so a slow
+                        // or failed batch pass falls back to it instead of stalling.
+                        let refinement = pendingRefinement ?? transcriptionPipeline.startRawTranscription(
+                            audioURL: audioURL,
+                            provider: request.provider,
+                            openAIModelOverride: request.openAIModelOverride
+                        )
+                        result = try await transcriptionPipeline.runRefining(
                             request,
+                            refinement: refinement,
+                            fallbackRequest: request.with(provider: .openAIRealtime),
+                            fallbackText: streamedText,
+                            fallbackASRTime: streamingFinalizeTime ?? 0,
+                            timeout: TranscriptionPipeline.refinementTimeout(forAudioDuration: sessionDuration),
+                            // Language verification guards against a wrong-language transcript, so it
+                            // keeps the full budget; the English pass only polishes usable text.
+                            maximumExtraWait: shouldVerifyRealtimeLanguage
+                                ? nil
+                                : TranscriptionPipeline.englishRefinementGrace,
                             progressHandler: { progressMessage = $0 }
                         )
-                    } catch is CancellationError {
-                        throw CancellationError()
-                    } catch {
-                        guard shouldVerifyRealtimeWithBatch, let streamedText else { throw error }
-                        let realtimeRequest = TranscriptionPipelineRequest(
-                            audioURL: audioURL,
-                            provider: .openAIRealtime,
-                            whisperModel: nil,
-                            duration: sessionDuration,
-                            estimatedDuration: nil,
-                            sourceAppInfo: request.sourceAppInfo,
-                            modelReadyTime: nil,
-                            processStart: processStart
+                    } else if let pendingRefinement, effectiveProvider == .openai {
+                        result = try await transcriptionPipeline.run(
+                            request,
+                            prestarted: pendingRefinement,
+                            progressHandler: { progressMessage = $0 }
                         )
-                        result = try await transcriptionPipeline.runPretranscribed(
-                            realtimeRequest,
-                            rawText: streamedText,
-                            asrTime: streamingFinalizeTime ?? 0,
+                    } else {
+                        result = try await transcriptionPipeline.run(
+                            request,
                             progressHandler: { progressMessage = $0 }
                         )
                     }
@@ -224,7 +274,7 @@ internal extension ContentView {
                     )
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
-            } catch is CancellationError {
+            } catch is CancellationError, is NoSpeechDetected {
                 await MainActor.run {
                     LiveDictationCoordinator.shared.cancel()
                     streamingDraftText = ""

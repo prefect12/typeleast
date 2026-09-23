@@ -27,11 +27,16 @@ internal extension AppDelegate {
 
         Task {
             await UsageMetricsStore.shared.bootstrapIfNeeded()
+            if let container = DataManager.shared.sharedModelContainer {
+                // Before the full fetch below, so it no longer loads hundreds of MB of old icons.
+                await SourceIconCompactor.compactIfNeeded(container: container)
+            }
             let records = await DataManager.shared.fetchAllRecordsQuietly()
             SourceUsageStore.shared.rebuild(using: records)
         }
 
         AppSetupHelper.setupApp()
+        LiveDictationCoordinator.shared.prewarmRealtimeSessionIfNeeded()
 
         audioRecorder = AudioRecorder()
 

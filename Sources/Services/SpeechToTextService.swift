@@ -138,6 +138,10 @@ internal class SpeechToTextService {
     /// If the custom URL contains "audio/transcriptions", it's treated as a full endpoint.
     /// Otherwise, "/audio/transcriptions" is appended to the base URL.
     private var openAITranscriptionEndpoint: String {
+        Self.openAITranscriptionEndpoint(userDefaults: userDefaults)
+    }
+
+    private static func openAITranscriptionEndpoint(userDefaults: UserDefaults) -> String {
         let custom = userDefaults.string(forKey: "openAIBaseURL") ?? ""
         if custom.isEmpty {
             return "https://api.openai.com/v1/audio/transcriptions"
@@ -150,6 +154,16 @@ internal class SpeechToTextService {
         // Otherwise treat as base URL and append the path
         let base = custom.hasSuffix("/") ? String(custom.dropLast()) : custom
         return "\(base)/audio/transcriptions"
+    }
+
+    /// Opens the HTTPS connection used for batch transcription while the user is still speaking,
+    /// so a fallback or refinement upload after release skips the TCP/TLS setup. The request
+    /// carries no credentials; any HTTP response leaves a reusable connection in Alamofire's pool.
+    static func prewarmOpenAIConnection(userDefaults: UserDefaults = .standard) {
+        guard !AppEnvironment.isRunningTests else { return }
+        let endpoint = openAITranscriptionEndpoint(userDefaults: userDefaults)
+        AF.request(endpoint, method: .head, requestModifier: { $0.timeoutInterval = 10 })
+            .response { _ in }
     }
 
     /// Returns the MiMo chat-completions endpoint used by the V2.5 ASR OpenAI-compatible API.
@@ -208,30 +222,38 @@ internal class SpeechToTextService {
             throw SpeechToTextError.transcriptionFailed("Failed to encode OpenAI transcription request")
         }
 
-        return try await withCheckedThrowingContinuation { continuation in
-            AF.upload(
-                multipartFormData: { multipartFormData in
-                    multipartFormData.append(audioURL, withName: "file")
-                    // Azure deployments already specify the model, but OpenAI-compatible APIs still expect the field.
-                    multipartFormData.append(modelData, withName: "model")
-                    multipartFormData.append(promptData, withName: "prompt")
-                    if let languageCode = language.openAITranscriptionLanguageCode,
-                       let languageData = languageCode.data(using: .utf8) {
-                        multipartFormData.append(languageData, withName: "language")
+        let compressedURL = AudioUploadEncoder.compressedCopy(of: audioURL)
+        defer { compressedURL.map { try? FileManager.default.removeItem(at: $0) } }
+        let uploadURL = compressedURL ?? audioURL
+
+        let request = AF.upload(
+            multipartFormData: { multipartFormData in
+                multipartFormData.append(uploadURL, withName: "file")
+                // Azure deployments already specify the model, but OpenAI-compatible APIs still expect the field.
+                multipartFormData.append(modelData, withName: "model")
+                multipartFormData.append(promptData, withName: "prompt")
+                if let languageCode = language.openAITranscriptionLanguageCode,
+                   let languageData = languageCode.data(using: .utf8) {
+                    multipartFormData.append(languageData, withName: "language")
+                }
+            },
+            to: transcriptionURL,
+            headers: headers
+        )
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                request.responseDecodable(of: WhisperResponse.self) { response in
+                    switch response.result {
+                    case .success(let whisperResponse):
+                        let cleanedText = Self.cleanTranscriptionText(whisperResponse.text)
+                        continuation.resume(returning: cleanedText)
+                    case .failure(let error):
+                        continuation.resume(throwing: SpeechToTextError.transcriptionFailed(error.localizedDescription))
                     }
-                },
-                to: transcriptionURL,
-                headers: headers
-            )
-            .responseDecodable(of: WhisperResponse.self) { response in
-                switch response.result {
-                case .success(let whisperResponse):
-                    let cleanedText = Self.cleanTranscriptionText(whisperResponse.text)
-                    continuation.resume(returning: cleanedText)
-                case .failure(let error):
-                    continuation.resume(throwing: SpeechToTextError.transcriptionFailed(error.localizedDescription))
                 }
             }
+        } onCancel: {
+            request.cancel()
         }
     }
 
