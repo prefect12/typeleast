@@ -15,6 +15,7 @@ internal enum AppDefaults {
         static let selectedWhisperModel = "selectedWhisperModel"
         static let selectedParakeetModel = "selectedParakeetModel"
         static let openAITranscriptionModel = "openAITranscriptionModel"
+        static let contextualTranscriptionEnabled = "contextualTranscriptionEnabled"
         static let miMoASRModel = "miMoASRModel"
         static let transcriptionLanguage = "transcriptionLanguage"
 
@@ -55,6 +56,8 @@ internal enum AppDefaults {
     internal static let defaultOpenAITranscriptionModel = "gpt-4o-mini-transcribe"
     internal static let highAccuracyEnglishTranscriptionModel = "gpt-4o-transcribe"
     internal static let defaultOpenAIRealtimeTranscriptionModel = "gpt-realtime-whisper"
+    /// Runs alongside the realtime model with the user's own vocabulary as context.
+    internal static let contextualTranscriptionModel = "gpt-4o-mini-transcribe"
     internal static let defaultMiMoASRModel = "mimo-v2.5-asr"
     internal static let defaultTranscriptionLanguage: TranscriptionLanguage = .auto
     internal static let defaultRecordingHUDStyle: RecordingHUDStyle = .appleGlass

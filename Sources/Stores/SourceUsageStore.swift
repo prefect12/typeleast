@@ -31,11 +31,37 @@ internal struct SourceAppInfo: Equatable {
         )
     }
     
-    private static func pngData(from image: NSImage?) -> Data? {
-        guard let tiffData = image?.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiffData) else {
+    /// Icons are shown at 26pt or smaller, so 64px covers Retina. Encoding the full 1024px app
+    /// icon took ~250ms on the main thread at every recording start and ~600KB per history record.
+    static let iconPixelSize = 64
+
+    static func pngData(from image: NSImage?, pixelSize: Int = iconPixelSize) -> Data? {
+        guard let image,
+              let bitmap = NSBitmapImageRep(
+                bitmapDataPlanes: nil,
+                pixelsWide: pixelSize,
+                pixelsHigh: pixelSize,
+                bitsPerSample: 8,
+                samplesPerPixel: 4,
+                hasAlpha: true,
+                isPlanar: false,
+                colorSpaceName: .deviceRGB,
+                bytesPerRow: 0,
+                bitsPerPixel: 0
+              ),
+              let context = NSGraphicsContext(bitmapImageRep: bitmap) else {
             return nil
         }
+        bitmap.size = NSSize(width: pixelSize, height: pixelSize)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(
+            in: NSRect(x: 0, y: 0, width: pixelSize, height: pixelSize),
+            from: .zero,
+            operation: .copy,
+            fraction: 1
+        )
+        NSGraphicsContext.restoreGraphicsState()
         return bitmap.representation(using: .png, properties: [:])
     }
 }

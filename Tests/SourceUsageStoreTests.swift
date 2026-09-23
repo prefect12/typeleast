@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import Typeleast
 
@@ -50,6 +51,22 @@ final class SourceUsageStoreTests: XCTestCase {
         XCTAssertEqual(updatedStat.sessionCount, 2)
         XCTAssertEqual(updatedStat.iconData, Data([0x01]), "Icon should not be replaced when nil provided")
         XCTAssertEqual(updatedStat.fallbackSymbolName, "doc")
+    }
+
+    func testSourceIconIsStoredAsSmallPNG() throws {
+        let icon = NSImage(size: NSSize(width: 1_024, height: 1_024), flipped: false) { rect in
+            NSColor.systemBlue.setFill()
+            rect.fill()
+            return true
+        }
+
+        let data = try XCTUnwrap(SourceAppInfo.pngData(from: icon))
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: data))
+
+        XCTAssertEqual(bitmap.pixelsWide, SourceAppInfo.iconPixelSize)
+        XCTAssertEqual(bitmap.pixelsHigh, SourceAppInfo.iconPixelSize)
+        XCTAssertLessThan(data.count, 20_000)
+        XCTAssertNil(SourceAppInfo.pngData(from: nil))
     }
 
     func testRecordUsageIgnoresZeroWords() {
