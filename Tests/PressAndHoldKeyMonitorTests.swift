@@ -22,6 +22,7 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
         keyUpHandler: (() -> Void)? = nil,
         holdStartHandler: (() -> Void)? = nil,
         holdEndHandler: (() -> Void)? = nil,
+        holdCancelHandler: (() -> Void)? = nil,
         now: @escaping () -> Date = Date.init,
         doubleTapInterval: TimeInterval = 0.35,
         scheduleAfter: PressAndHoldKeyMonitor.DelayedWorkScheduler? = nil
@@ -46,6 +47,7 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
             keyUpHandler: keyUpHandler,
             holdStartHandler: holdStartHandler,
             holdEndHandler: holdEndHandler,
+            holdCancelHandler: holdCancelHandler,
             addGlobalMonitor: addGlobalMonitor,
             addLocalMonitor: addLocalMonitor,
             removeMonitor: removeMonitor,
@@ -265,6 +267,77 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
         pendingWork.forEach { $0() }
 
         wait(for: [holdStarted], timeout: 0.1)
+    }
+
+    func testDoubleTapModeShortcutRightAfterHoldStartCancelsHold() {
+        var currentTime = Date(timeIntervalSinceReferenceDate: 100)
+        var pendingWork: [() -> Void] = []
+        let holdStarted = expectation(description: "holdStart")
+        let holdCancelled = expectation(description: "holdCancel")
+        let holdEnded = expectation(description: "holdEnd")
+        holdEnded.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            holdStartHandler: { holdStarted.fulfill() },
+            holdEndHandler: { holdEnded.fulfill() },
+            holdCancelHandler: { holdCancelled.fulfill() },
+            now: { currentTime },
+            scheduleAfter: { _, work in pendingWork.append(work) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        pendingWork.forEach { $0() }
+        wait(for: [holdStarted], timeout: 1.0)
+
+        currentTime = currentTime.addingTimeInterval(0.3)
+        monitor.processInterruption() // a slow ⌘C
+        wait(for: [holdCancelled], timeout: 1.0)
+
+        monitor.processTransition(isKeyDownEvent: false)
+        wait(for: [holdEnded], timeout: 0.1)
+    }
+
+    func testDoubleTapModeShortcutLongAfterHoldStartKeepsRecording() {
+        var currentTime = Date(timeIntervalSinceReferenceDate: 100)
+        var pendingWork: [() -> Void] = []
+        let holdStarted = expectation(description: "holdStart")
+        let holdCancelled = expectation(description: "holdCancel")
+        holdCancelled.isInverted = true
+        let holdEnded = expectation(description: "holdEnd")
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            holdStartHandler: { holdStarted.fulfill() },
+            holdEndHandler: { holdEnded.fulfill() },
+            holdCancelHandler: { holdCancelled.fulfill() },
+            now: { currentTime },
+            scheduleAfter: { _, work in pendingWork.append(work) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        pendingWork.forEach { $0() }
+        wait(for: [holdStarted], timeout: 1.0)
+
+        currentTime = currentTime.addingTimeInterval(1.5)
+        monitor.processInterruption()
+        monitor.processTransition(isKeyDownEvent: false)
+
+        wait(for: [holdEnded], timeout: 1.0)
+        wait(for: [holdCancelled], timeout: 0.1)
+    }
+
+    func testDoubleTapModeHoldStartsAfterTwoHundredMilliseconds() {
+        var scheduledDelays: [TimeInterval] = []
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            holdStartHandler: {},
+            scheduleAfter: { delay, _ in scheduledDelays.append(delay) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+
+        XCTAssertEqual(scheduledDelays, [0.2])
     }
 
     func testDoubleTapModeShortcutPressDoesNotCountAsFirstTap() {

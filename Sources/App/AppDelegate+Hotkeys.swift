@@ -25,7 +25,8 @@ internal extension AppDelegate {
             },
             keyUpHandler: keyUpHandler,
             holdStartHandler: supportsHold ? { [weak self] in self?.handleContinuousModeHoldStart() } : nil,
-            holdEndHandler: supportsHold ? { [weak self] in self?.stopRecordingFromPressAndHold() } : nil
+            holdEndHandler: supportsHold ? { [weak self] in self?.stopRecordingFromPressAndHold() } : nil,
+            holdCancelHandler: supportsHold ? { [weak self] in self?.cancelHoldRecording() } : nil
         )
 
         pressAndHoldMonitor = monitor
@@ -45,6 +46,16 @@ internal extension AppDelegate {
     private func handleContinuousModeHoldStart() {
         guard audioRecorder?.isRecording != true else { return }
         startRecordingFromPressAndHold()
+    }
+
+    /// The hold turned out to be a shortcut like ⌘C; discards the take instead of transcribing it.
+    private func cancelHoldRecording() {
+        guard isHoldRecordingActive else { return }
+        isHoldRecordingActive = false
+        updateMenuBarIcon(isRecording: false)
+        // The recording view cancels the take and its live session on escape.
+        NotificationCenter.default.post(name: .escapeKeyPressed, object: nil)
+        if recordingWindow?.isVisible == true { toggleRecordWindow() }
     }
 
     private func handlePressAndHoldKeyUp() {

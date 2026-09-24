@@ -178,12 +178,14 @@ internal final class PressAndHoldKeyMonitor {
     private let keyUpHandler: (() -> Void)?
     private let holdStartHandler: (() -> Void)?
     private let holdEndHandler: (() -> Void)?
+    private let holdCancelHandler: (() -> Void)?
     private let addGlobalMonitor: EventMonitorFactory
     private let addLocalMonitor: LocalEventMonitorFactory
     private let removeMonitor: EventMonitorRemoval
     private let now: () -> Date
     private let doubleTapInterval: TimeInterval
     private let holdDelay: TimeInterval
+    private let shortcutCancelWindow: TimeInterval
     private let scheduleAfter: DelayedWorkScheduler?
 
     private var flagsMonitors: [Any] = []
@@ -196,6 +198,7 @@ internal final class PressAndHoldKeyMonitor {
     private var lastTapTime: Date?
     private var pressGeneration = 0
     private var isHolding = false
+    private var holdStartedAt: Date?
 
     init(
         configuration: PressAndHoldConfiguration,
@@ -203,12 +206,14 @@ internal final class PressAndHoldKeyMonitor {
         keyUpHandler: (() -> Void)? = nil,
         holdStartHandler: (() -> Void)? = nil,
         holdEndHandler: (() -> Void)? = nil,
+        holdCancelHandler: (() -> Void)? = nil,
         addGlobalMonitor: @escaping EventMonitorFactory = NSEvent.addGlobalMonitorForEvents(matching:handler:),
         addLocalMonitor: @escaping LocalEventMonitorFactory = NSEvent.addLocalMonitorForEvents(matching:handler:),
         removeMonitor: @escaping EventMonitorRemoval = NSEvent.removeMonitor(_:),
         now: @escaping () -> Date = Date.init,
         doubleTapInterval: TimeInterval = 0.35,
-        holdDelay: TimeInterval = 0.3,
+        holdDelay: TimeInterval = 0.2,
+        shortcutCancelWindow: TimeInterval = 1.0,
         scheduleAfter: DelayedWorkScheduler? = nil
     ) {
         self.configuration = configuration
@@ -216,12 +221,14 @@ internal final class PressAndHoldKeyMonitor {
         self.keyUpHandler = keyUpHandler
         self.holdStartHandler = holdStartHandler
         self.holdEndHandler = holdEndHandler
+        self.holdCancelHandler = holdCancelHandler
         self.addGlobalMonitor = addGlobalMonitor
         self.addLocalMonitor = addLocalMonitor
         self.removeMonitor = removeMonitor
         self.now = now
         self.doubleTapInterval = doubleTapInterval
         self.holdDelay = holdDelay
+        self.shortcutCancelWindow = shortcutCancelWindow
         self.scheduleAfter = scheduleAfter
     }
 
@@ -273,6 +280,7 @@ internal final class PressAndHoldKeyMonitor {
         isPressed = false
         lastTapTime = nil
         isHolding = false
+        holdStartedAt = nil
         pressGeneration += 1
     }
 
@@ -359,8 +367,18 @@ internal final class PressAndHoldKeyMonitor {
     }
 
     /// Cancels a pending hold and forgets the tap once the modifier is used as part of a shortcut.
+    /// A hold that started just before the shortcut key (e.g. a slow ⌘C) is cancelled too.
     func processInterruption() {
-        guard isPressed, !isHolding else { return }
+        guard isPressed else { return }
+        if isHolding {
+            guard let holdCancelHandler,
+                  let holdStartedAt,
+                  now().timeIntervalSince(holdStartedAt) <= shortcutCancelWindow else { return }
+            isHolding = false
+            self.holdStartedAt = nil
+            Task { @MainActor in holdCancelHandler() }
+            return
+        }
         pressGeneration += 1
         lastTapTime = nil
     }
@@ -370,6 +388,7 @@ internal final class PressAndHoldKeyMonitor {
         let work: () -> Void = { [weak self] in
             guard let self, self.isPressed, self.pressGeneration == generation else { return }
             self.isHolding = true
+            self.holdStartedAt = self.now()
             self.lastTapTime = nil
             Task { @MainActor in holdStartHandler() }
         }
