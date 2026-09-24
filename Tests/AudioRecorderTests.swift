@@ -163,3 +163,20 @@ private final class StubDateProvider {
         return dates.removeFirst()
     }
 }
+
+@MainActor
+final class AudioRecorderSilenceTests: XCTestCase {
+    func testQuietPeakIsTreatedAsSilence() {
+        XCTAssertTrue(AudioRecorder.isLikelySilent(peakLevel: 0))
+        XCTAssertTrue(AudioRecorder.isLikelySilent(peakLevel: 0.2))
+    }
+
+    func testSpeechLevelPeakIsNotSilence() {
+        XCTAssertFalse(AudioRecorder.isLikelySilent(peakLevel: AudioRecorder.silencePeakThreshold))
+        XCTAssertFalse(AudioRecorder.isLikelySilent(peakLevel: 0.6))
+    }
+
+    func testUnknownPeakIsNotSilence() {
+        XCTAssertFalse(AudioRecorder.isLikelySilent(peakLevel: nil))
+    }
+}

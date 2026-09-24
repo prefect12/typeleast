@@ -78,6 +78,21 @@ internal extension ContentView {
                     throw NSError(domain: "AudioRecorder", code: 1, userInfo: [NSLocalizedDescriptionKey: LocalizedStrings.Errors.failedToGetRecordingURL])
                 }
                 let sessionDuration = audioRecorder.lastRecordingDuration
+                let peakLevel = audioRecorder.lastRecordingPeakLevel
+                if transcriptionProvider == .openAIRealtime {
+                    Task {
+                        await RealtimeDiagnostics.shared.record(
+                            "recording_peak_level",
+                            fields: ["peak": peakLevel.map { String(format: "%.2f", $0) } ?? "unknown"]
+                        )
+                    }
+                    // Silent takes would otherwise wait out the realtime final timeout and then
+                    // re-upload the audio for batch transcription just to learn nothing was said.
+                    if AudioRecorder.isLikelySilent(peakLevel: peakLevel) {
+                        Task { await RealtimeDiagnostics.shared.record("no_speech", fields: ["reason": "silent_audio"]) }
+                        throw NoSpeechDetected()
+                    }
+                }
                 
                 guard !audioURL.path.isEmpty else {
                     throw NSError(domain: "AudioRecorder", code: 2, userInfo: [NSLocalizedDescriptionKey: LocalizedStrings.Errors.recordingURLEmpty])

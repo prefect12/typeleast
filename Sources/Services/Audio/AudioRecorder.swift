@@ -21,6 +21,18 @@ internal class AudioRecorder: NSObject, ObservableObject {
     private let dateProvider: () -> Date
     private(set) var currentSessionStart: Date?
     private(set) var lastRecordingDuration: TimeInterval?
+    /// Loudest normalized level (0...1) heard during the last finished recording.
+    private(set) var lastRecordingPeakLevel: Float?
+    private var currentPeakLevel: Float = 0
+
+    /// Below roughly -42 dB for the whole take: room tone and keyboard noise, not speech.
+    static let silencePeakThreshold: Float = 0.3
+
+    static func isLikelySilent(peakLevel: Float?) -> Bool {
+        guard let peakLevel else { return false }
+        return peakLevel < silencePeakThreshold
+    }
+
     
     override init() {
         self.volumeManager = MicrophoneVolumeManager.shared
@@ -138,6 +150,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
             audioRecorder?.record()
             currentSessionStart = dateProvider()
             lastRecordingDuration = nil
+            resetPeakLevel()
             
             self.isRecording = true
             self.startLevelMonitoring()
@@ -180,7 +193,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
                 pcm16AudioDataHandler(pcmData)
 
                 let level = Self.normalizedLevel(from: buffer)
-                Task { @MainActor [weak self] in self?.audioLevel = level }
+                Task { @MainActor [weak self] in self?.updateLevel(level) }
             }
 
             engine.prepare()
@@ -188,6 +201,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
             audioEngine = engine
             currentSessionStart = dateProvider()
             lastRecordingDuration = nil
+            resetPeakLevel()
             isRecording = true
             return true
         } catch {
@@ -213,6 +227,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
         let now = dateProvider()
         let sessionDuration = currentSessionStart.map { now.timeIntervalSince($0) }
         lastRecordingDuration = sessionDuration
+        lastRecordingPeakLevel = currentPeakLevel
         currentSessionStart = nil
 
         if let audioEngine {
@@ -304,13 +319,21 @@ internal class AudioRecorder: NSObject, ObservableObject {
                 guard let self = self, let recorder = self.audioRecorder else { return }
 
                 recorder.updateMeters()
-                let normalizedLevel = self.normalizeLevel(recorder.averagePower(forChannel: 0))
-
-                self.audioLevel = normalizedLevel
+                self.updateLevel(self.normalizeLevel(recorder.averagePower(forChannel: 0)))
             }
         }
     }
     
+    private func updateLevel(_ level: Float) {
+        audioLevel = level
+        if isRecording { currentPeakLevel = max(currentPeakLevel, level) }
+    }
+
+    private func resetPeakLevel() {
+        currentPeakLevel = 0
+        lastRecordingPeakLevel = nil
+    }
+
     private func stopLevelMonitoring() {
         levelUpdateTimer?.invalidate()
         levelUpdateTimer = nil
