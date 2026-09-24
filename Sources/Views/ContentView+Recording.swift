@@ -60,6 +60,7 @@ internal extension ContentView {
     func stopAndProcess() {
         processingTask?.cancel()
         NotificationCenter.default.post(name: .recordingStopped, object: nil)
+        let dictationSession = LiveDictationCoordinator.shared.sessionID
         
         let shouldHintThisRun = !hasShownFirstModelUseHint && isLocalModelInvocationPlanned()
         if shouldHintThisRun { showFirstModelUseHint = true }
@@ -276,7 +277,7 @@ internal extension ContentView {
                     await LiveDictationCoordinator.shared.finishLiveText(with: result.text)
                 }
 
-                LiveDictationCoordinator.shared.cancel()
+                LiveDictationCoordinator.shared.cancel(session: dictationSession)
 
                 await MainActor.run {
                     transcriptionStartTime = nil
@@ -291,14 +292,14 @@ internal extension ContentView {
                 }
             } catch is CancellationError, is NoSpeechDetected {
                 await MainActor.run {
-                    LiveDictationCoordinator.shared.cancel()
+                    LiveDictationCoordinator.shared.cancel(session: dictationSession)
                     streamingDraftText = ""
                     isProcessing = false
                     transcriptionStartTime = nil
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch {
-                LiveDictationCoordinator.shared.cancel()
+                LiveDictationCoordinator.shared.cancel(session: dictationSession)
                 streamingDraftText = ""
                 if case let SpeechToTextError.localTranscriptionFailed(inner) = error,
                    let lwError = inner as? LocalWhisperError,

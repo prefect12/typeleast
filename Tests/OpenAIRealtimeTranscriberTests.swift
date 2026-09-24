@@ -318,6 +318,21 @@ final class OpenAIRealtimeTranscriberTests: XCTestCase {
         XCTAssertLessThan(elapsed, .seconds(2))
     }
 
+    func testFinishGivesUpOnPendingHandshakeAfterStartupWait() async throws {
+        let transport = CancellationIgnoringSocketTransport()
+        let transcriber = try makeTranscriber(transport: transport, handshakeTimeout: .seconds(5))
+
+        let startedAt = ContinuousClock().now
+        transcriber.start(language: .chineseEnglish)
+        transcriber.appendPCM16AudioData(Data(repeating: 1, count: 1_600))
+        let text = await transcriber.finish(startupWait: .milliseconds(100))
+        let elapsed = startedAt.duration(to: ContinuousClock().now)
+
+        XCTAssertNil(text)
+        XCTAssertEqual(transcriber.state, .failed(.handshakeTimeout))
+        XCTAssertLessThan(elapsed, .seconds(1))
+    }
+
     func testFinishKeepsWaitingWhileServerIsStillStreamingDeltas() async throws {
         let transport = MockRealtimeSocketTransport(messages: [Self.sessionCreated, Self.sessionUpdated])
         let transcriber = try makeTranscriber(transport: transport)
