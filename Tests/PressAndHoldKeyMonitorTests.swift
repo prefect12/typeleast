@@ -249,6 +249,57 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
         wait(for: [toggled], timeout: 0.1)
     }
 
+    func testDoubleTapModeShortcutKeyCancelsPendingHold() {
+        var pendingWork: [() -> Void] = []
+        let holdStarted = expectation(description: "holdStart")
+        holdStarted.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            holdStartHandler: { holdStarted.fulfill() },
+            scheduleAfter: { _, work in pendingWork.append(work) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processInterruption() // e.g. ⌘C
+        pendingWork.forEach { $0() }
+
+        wait(for: [holdStarted], timeout: 0.1)
+    }
+
+    func testDoubleTapModeShortcutPressDoesNotCountAsFirstTap() {
+        var currentTime = Date(timeIntervalSinceReferenceDate: 100)
+        let toggled = expectation(description: "toggle")
+        toggled.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: { toggled.fulfill() },
+            now: { currentTime },
+            scheduleAfter: { _, _ in }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processInterruption()
+        monitor.processTransition(isKeyDownEvent: false)
+        currentTime = currentTime.addingTimeInterval(0.1)
+        monitor.processTransition(isKeyDownEvent: true)
+
+        wait(for: [toggled], timeout: 0.1)
+    }
+
+    func testDoubleTapModeRegistersShortcutInterruptionMonitor() {
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle)
+        )
+
+        monitor.start()
+
+        XCTAssertEqual(addedGlobalEvents.map(\.0), [.flagsChanged, .keyDown])
+        monitor.stop()
+        XCTAssertEqual(removedEvents.count, 4)
+    }
+
     // MARK: - stop()
 
     func testStopRemovesRegisteredMonitors() {

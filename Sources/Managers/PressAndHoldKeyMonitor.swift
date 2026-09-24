@@ -189,6 +189,7 @@ internal final class PressAndHoldKeyMonitor {
     private var flagsMonitors: [Any] = []
     private var keyDownMonitors: [Any] = []
     private var keyUpMonitors: [Any] = []
+    private var interruptionMonitors: [Any] = []
     private let monitorQueue = DispatchQueue(label: "com.typeleast.pressAndHoldMonitor")
 
     private var isPressed = false
@@ -232,6 +233,12 @@ internal final class PressAndHoldKeyMonitor {
             flagsMonitors = addEventMonitors(matching: .flagsChanged) { [weak self] event in
                 self?.handleModifierEvent(event)
             }
+            if configuration.mode == .doubleTapToggle {
+                // Any other key pressed with the modifier means a shortcut like ⌘C, not dictation.
+                interruptionMonitors = addEventMonitors(matching: .keyDown) { [weak self] _ in
+                    self?.scheduleInterruption()
+                }
+            }
         } else {
             keyDownMonitors = addEventMonitors(matching: .keyDown) { [weak self] event in
                 self?.handleKeyEvent(event, isKeyDown: true)
@@ -258,6 +265,11 @@ internal final class PressAndHoldKeyMonitor {
         }
         keyUpMonitors.removeAll()
 
+        for monitor in interruptionMonitors {
+            removeMonitor(monitor)
+        }
+        interruptionMonitors.removeAll()
+
         isPressed = false
         lastTapTime = nil
         isHolding = false
@@ -269,7 +281,11 @@ internal final class PressAndHoldKeyMonitor {
     }
 
     private func handleModifierEvent(_ event: NSEvent) {
-        guard event.type == .flagsChanged, event.keyCode == configuration.key.keyCode else { return }
+        guard event.type == .flagsChanged else { return }
+        guard event.keyCode == configuration.key.keyCode else {
+            if configuration.mode == .doubleTapToggle { scheduleInterruption() }
+            return
+        }
 
         let isKeyDownEvent = (event.modifierFlags.rawValue & configuration.key.deviceModifierMask) != 0
         monitorQueue.async { [weak self] in
@@ -334,6 +350,19 @@ internal final class PressAndHoldKeyMonitor {
         Task { @MainActor [keyDownHandler] in
             keyDownHandler()
         }
+    }
+
+    private func scheduleInterruption() {
+        monitorQueue.async { [weak self] in
+            self?.processInterruption()
+        }
+    }
+
+    /// Cancels a pending hold and forgets the tap once the modifier is used as part of a shortcut.
+    func processInterruption() {
+        guard isPressed, !isHolding else { return }
+        pressGeneration += 1
+        lastTapTime = nil
     }
 
     private func scheduleHoldStart(for generation: Int) {
