@@ -106,7 +106,14 @@ internal final class URLSessionRealtimeSocketTransport: RealtimeSocketTransport,
 
     func sendPing() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            // URLSession can invoke the pong handler again (e.g. on cancellation); resume only once.
+            let resumed = OSAllocatedUnfairLock(initialState: false)
             task.sendPing { error in
+                let isFirstCall = resumed.withLock { alreadyResumed -> Bool in
+                    defer { alreadyResumed = true }
+                    return !alreadyResumed
+                }
+                guard isFirstCall else { return }
                 if let error {
                     continuation.resume(throwing: error)
                 } else {
