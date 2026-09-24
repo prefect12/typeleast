@@ -235,6 +235,49 @@ final class TranscriptionPipelineTests: XCTestCase {
         XCTAssertEqual(records.first?.asrTime ?? 0, 0.42, accuracy: 0.001)
         XCTAssertGreaterThanOrEqual(records.first?.transcriptionTime ?? 0, 0.42)
     }
+
+    func testRunPretranscribedRemovesSentencePeriodsForChatApps() async throws {
+        let dataManager = MockDataManager()
+        let usageDefaults = try XCTUnwrap(UserDefaults(suiteName: usageDefaultsSuite))
+        let sourceDefaults = try XCTUnwrap(UserDefaults(suiteName: sourceDefaultsSuite))
+        let pipeline = TranscriptionPipeline(
+            speechService: FakeRawTranscriptionService(text: "unused"),
+            settingsStore: FakeTranscriptionSettingsStore(
+                provider: .openAIRealtime,
+                semanticCorrectionMode: .off,
+                historyEnabled: true,
+                openAIModel: "gpt-4o-transcribe"
+            ),
+            dataManager: dataManager,
+            usageMetricsStore: UsageMetricsStore(defaults: usageDefaults),
+            sourceUsageStore: SourceUsageStore(defaults: sourceDefaults),
+            clipboard: clipboard,
+            categoryIdForBundle: { $0 == "com.tencent.xinWeChat" ? "chat" : "general" }
+        )
+
+        let result = try await pipeline.runPretranscribed(
+            TranscriptionPipelineRequest(
+                audioURL: audioURL,
+                provider: .openAIRealtime,
+                whisperModel: nil,
+                duration: 1.0,
+                estimatedDuration: nil,
+                sourceAppInfo: SourceAppInfo(
+                    bundleIdentifier: "com.tencent.xinWeChat",
+                    displayName: "WeChat",
+                    iconData: nil,
+                    fallbackSymbolName: nil
+                ),
+                modelReadyTime: nil,
+                processStart: Date()
+            ),
+            rawText: "好的。明天见吗？",
+            asrTime: 0.1
+        )
+
+        XCTAssertEqual(result.text, "好的 明天见吗？")
+        XCTAssertEqual(clipboard.contents, "好的 明天见吗？")
+    }
 }
 
 /// Refinement tests share the pipeline fakes above but need no clipboard assertions, so they

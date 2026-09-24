@@ -68,6 +68,7 @@ internal final class TranscriptionPipeline {
     private let usageMetricsStore: UsageMetricsStore
     private let sourceUsageStore: SourceUsageStore
     private let clipboard: ClipboardWriting
+    private let categoryIdForBundle: (String) -> String
 
     init(
         speechService: RawTranscriptionServicing = SpeechToTextService(),
@@ -76,7 +77,8 @@ internal final class TranscriptionPipeline {
         dataManager: DataManagerProtocol = DataManager.shared,
         usageMetricsStore: UsageMetricsStore? = nil,
         sourceUsageStore: SourceUsageStore? = nil,
-        clipboard: ClipboardWriting = NSPasteboard.general
+        clipboard: ClipboardWriting = NSPasteboard.general,
+        categoryIdForBundle: @escaping (String) -> String = { AppCategoryManager.shared.categoryId(for: $0) }
     ) {
         self.speechService = speechService
         self.semanticCorrectionService = semanticCorrectionService
@@ -85,6 +87,7 @@ internal final class TranscriptionPipeline {
         self.usageMetricsStore = usageMetricsStore ?? .shared
         self.sourceUsageStore = sourceUsageStore ?? .shared
         self.clipboard = clipboard
+        self.categoryIdForBundle = categoryIdForBundle
     }
 
     func run(
@@ -286,6 +289,10 @@ internal final class TranscriptionPipeline {
             if !trimmed.isEmpty {
                 finalText = outcome.text
             }
+        }
+
+        if categoryIdForBundle(request.sourceAppInfo.bundleIdentifier) == ChatPunctuationFormatter.chatCategoryId {
+            finalText = ChatPunctuationFormatter.removingSentencePeriods(from: finalText)
         }
 
         let measuredTranscriptionElapsed = Date().timeIntervalSince(transcriptionStart)
