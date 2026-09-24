@@ -355,7 +355,7 @@ internal final class TranscriptionPipeline {
         case .mimo:
             return settingsStore.miMoASRModel
         case .gemini:
-            return nil
+            return SpeechToTextService.geminiTranscriptionModel
         }
     }
 }

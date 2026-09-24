@@ -10,6 +10,7 @@ internal enum L10n {
     // MARK: - Dashboard Nav
     enum Nav {
         static var overview: String { isCN ? "总览" : "Overview" }
+        static var usage: String { isCN ? "用量" : "Usage" }
         static var timingAnalysis: String { isCN ? "耗时分析" : "Timing Analysis" }
         static var transcripts: String { isCN ? "转录记录" : "Transcripts" }
         static var categories: String { isCN ? "分类" : "Categories" }

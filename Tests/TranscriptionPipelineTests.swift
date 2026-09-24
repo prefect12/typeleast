@@ -144,6 +144,43 @@ final class TranscriptionPipelineTests: XCTestCase {
         XCTAssertEqual(sourceStore.allSources().first?.bundleIdentifier, SourceAppInfo.unknown.bundleIdentifier)
     }
 
+    func testRunRecordsGeminiModelNameWhenHistoryEnabled() async throws {
+        let speechService = FakeRawTranscriptionService(text: "Gemini transcript")
+        let dataManager = MockDataManager()
+        let usageDefaults = try XCTUnwrap(UserDefaults(suiteName: usageDefaultsSuite))
+        let sourceDefaults = try XCTUnwrap(UserDefaults(suiteName: sourceDefaultsSuite))
+        let usageStore = UsageMetricsStore(defaults: usageDefaults)
+        let sourceStore = SourceUsageStore(defaults: sourceDefaults)
+        let settingsStore = FakeTranscriptionSettingsStore(
+            provider: .gemini,
+            semanticCorrectionMode: .off,
+            historyEnabled: true
+        )
+        let pipeline = TranscriptionPipeline(
+            speechService: speechService,
+            settingsStore: settingsStore,
+            dataManager: dataManager,
+            usageMetricsStore: usageStore,
+            sourceUsageStore: sourceStore
+        )
+
+        _ = try await pipeline.run(
+            TranscriptionPipelineRequest(
+                audioURL: audioURL,
+                provider: .gemini,
+                whisperModel: nil,
+                duration: 3,
+                estimatedDuration: nil,
+                sourceAppInfo: .unknown,
+                modelReadyTime: nil,
+                processStart: Date()
+            )
+        )
+
+        let records = try await dataManager.fetchAllRecords()
+        XCTAssertEqual(records.first?.modelUsed, SpeechToTextService.geminiTranscriptionModel)
+    }
+
     func testRunPretranscribedSkipsSpeechServiceButKeepsSideEffects() async throws {
         let speechService = FakeRawTranscriptionService(text: "Should not run")
         let dataManager = MockDataManager()

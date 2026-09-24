@@ -99,6 +99,7 @@ internal enum DashboardTheme {
 // MARK: - Navigation Item
 internal enum DashboardNavItem: String, CaseIterable, Identifiable, Hashable {
     case dashboard
+    case usage
     case timingAnalysis
     case transcripts
     case categories
@@ -112,6 +113,7 @@ internal enum DashboardNavItem: String, CaseIterable, Identifiable, Hashable {
     var displayName: String {
         switch self {
         case .dashboard: return L10n.Nav.overview
+        case .usage: return L10n.Nav.usage
         case .timingAnalysis: return L10n.Nav.timingAnalysis
         case .transcripts: return L10n.Nav.transcripts
         case .categories: return L10n.Nav.categories
@@ -125,6 +127,7 @@ internal enum DashboardNavItem: String, CaseIterable, Identifiable, Hashable {
     var icon: String {
         switch self {
         case .dashboard: return "square.text.square"
+        case .usage: return "chart.pie"
         case .timingAnalysis: return "chart.bar.xaxis"
         case .transcripts: return "doc.text"
         case .categories: return "folder"
@@ -188,6 +191,8 @@ internal struct DashboardView: View {
         switch item {
         case .dashboard:
             DashboardHomeView(selectedNav: Binding(get: { selectionModel.selectedNav ?? .dashboard }, set: { selectionModel.selectedNav = $0 }))
+        case .usage:
+            UsageDashboardView()
         case .timingAnalysis:
             DashboardTimingAnalysisView()
         case .transcripts:
@@ -214,6 +219,7 @@ private struct DashboardSidebar: View {
 
     private let primaryItems: [DashboardNavItem] = [
         .dashboard,
+        .usage,
         .timingAnalysis,
         .transcripts,
         .categories

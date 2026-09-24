@@ -75,6 +75,7 @@ class LanguageManagerTests: XCTestCase {
         LanguageManager.shared.current = .english
 
         XCTAssertEqual(L10n.Nav.overview, "Overview")
+        XCTAssertEqual(L10n.Nav.usage, "Usage")
         XCTAssertEqual(L10n.Nav.transcripts, "Transcripts")
         XCTAssertEqual(L10n.Home.thisMonth, "This Month")
         XCTAssertEqual(L10n.Home.words, "Words")
@@ -115,6 +116,7 @@ class LanguageManagerTests: XCTestCase {
         LanguageManager.shared.current = .chinese
 
         XCTAssertEqual(L10n.Nav.overview, "总览")
+        XCTAssertEqual(L10n.Nav.usage, "用量")
         XCTAssertEqual(L10n.Nav.transcripts, "转录记录")
         XCTAssertEqual(L10n.Home.thisMonth, "本月统计")
         XCTAssertEqual(L10n.Home.words, "字数")

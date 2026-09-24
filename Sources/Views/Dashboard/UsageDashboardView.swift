@@ -2,6 +2,7 @@ import SwiftUI
 
 internal struct UsageDashboardView: View {
     @State private var metricsStore = UsageMetricsStore.shared
+    @State private var modelStats: [ModelUsageStats] = []
     @State private var isRebuilding = false
     @State private var rebuildError: String?
     @State private var showResetConfirmation = false
@@ -54,7 +55,17 @@ internal struct UsageDashboardView: View {
                         iconName: "keyboard.fill",
                         accentColor: .green
                     )
+
+                    UsageMetricCard(
+                        title: "Estimated API Cost",
+                        value: formatCurrency(totalKnownCostUSD),
+                        subtitle: unknownCostCount > 0 ? "\(unknownCostCount) model groups unknown" : "Known model rates",
+                        iconName: "creditcard.fill",
+                        accentColor: .teal
+                    )
                 }
+
+                modelUsageSection
             }
 
             if let error = rebuildError {
@@ -104,10 +115,22 @@ internal struct UsageDashboardView: View {
             Button("Reset", role: .destructive) {
                 metricsStore.reset()
                 SourceUsageStore.shared.reset()
+                modelStats = []
             }
         } message: {
             Text("This clears the aggregated usage counters and source stats. Your transcription history remains untouched.")
         }
+        .task {
+            await loadModelStats()
+        }
+    }
+
+    private var totalKnownCostUSD: Double {
+        modelStats.compactMap(\.estimatedCostUSD).reduce(0, +)
+    }
+
+    private var unknownCostCount: Int {
+        modelStats.filter { $0.estimatedCostUSD == nil }.count
     }
 
     private func heroCard(snapshot: UsageSnapshot) -> some View {
@@ -167,6 +190,13 @@ internal struct UsageDashboardView: View {
             return
         }
         metricsStore.rebuild(using: records)
+        modelStats = UsageMetricsStore.modelUsageBreakdown(from: records)
+    }
+
+    private func loadModelStats() async {
+        guard DataManager.shared.isHistoryEnabled else { return }
+        let records = await DataManager.shared.fetchAllRecordsQuietly()
+        modelStats = UsageMetricsStore.modelUsageBreakdown(from: records)
     }
 
     private func formatNumber(_ value: Int) -> String {
@@ -204,6 +234,66 @@ internal struct UsageDashboardView: View {
         }
     }
 
+    private func formatDurationShort(_ interval: TimeInterval) -> String {
+        guard interval > 0 else { return "0s" }
+        if interval < 60 {
+            return String(format: "%.0fs", interval)
+        }
+        if interval < 3600 {
+            let minutes = Int(interval / 60)
+            let seconds = Int(interval.truncatingRemainder(dividingBy: 60))
+            return "\(minutes)m \(seconds)s"
+        }
+        let hours = Int(interval / 3600)
+        let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
+        return "\(hours)h \(minutes)m"
+    }
+
+    private func formatCurrency(_ value: Double?) -> String {
+        guard let value else { return "Unknown" }
+        if value > 0, value < 0.01 {
+            return "<$0.01"
+        }
+        return Self.currencyFormatter.string(from: NSNumber(value: value)) ?? "$0.00"
+    }
+
+    private var modelUsageSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Model Usage")
+                    .font(.headline)
+                Spacer()
+                Text("Estimated from saved history")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if modelStats.isEmpty {
+                Text("No model-level history yet.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(modelStats.prefix(8)) { stats in
+                        ModelUsageRow(
+                            stats: stats,
+                            duration: formatDurationShort(stats.recordingDuration),
+                            averageProcessing: formatDurationShort(stats.averageProcessingTime),
+                            cost: formatCurrency(stats.estimatedCostUSD)
+                        )
+                    }
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+        )
+    }
+
     private static let numberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
@@ -218,6 +308,61 @@ internal struct UsageDashboardView: View {
         formatter.maximumFractionDigits = 1
         return formatter
     }()
+
+    private static let currencyFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        return formatter
+    }()
+}
+
+private struct ModelUsageRow: View {
+    let stats: ModelUsageStats
+    let duration: String
+    let averageProcessing: String
+    let cost: String
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(stats.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                Text(stats.provider.displayName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(minWidth: 140, maxWidth: .infinity, alignment: .leading)
+
+            usageColumn(title: "Runs", value: "\(stats.sessions)")
+            usageColumn(title: "Audio", value: duration)
+            usageColumn(title: "Avg", value: averageProcessing)
+            usageColumn(title: "Cost", value: cost)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func usageColumn(title: String, value: String) -> some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(width: 72, alignment: .trailing)
+    }
 }
 
 private struct UsageMetricCard: View {

@@ -31,6 +31,8 @@ internal enum SpeechToTextError: Error, LocalizedError {
 
 @Observable
 internal class SpeechToTextService {
+    static let geminiTranscriptionModel = "gemini-2.5-flash-lite"
+
     private let localWhisperService: LocalWhisperService
     private let parakeetService: ParakeetService
     private let keychainService: KeychainServiceProtocol
@@ -356,7 +358,7 @@ internal class SpeechToTextService {
         }
         
         // Now use the uploaded file for transcription
-        let transcriptionURL = "\(geminiBaseURL)/v1beta/models/gemini-2.5-flash-lite:generateContent"
+        let transcriptionURL = "\(geminiBaseURL)/v1beta/models/\(Self.geminiTranscriptionModel):generateContent"
         
         let headers: HTTPHeaders = [
             "X-Goog-Api-Key": apiKey,
@@ -412,7 +414,7 @@ internal class SpeechToTextService {
             return audioData.base64EncodedString()
         }
         
-        let url = "\(geminiBaseURL)/v1beta/models/gemini-2.5-flash-lite:generateContent"
+        let url = "\(geminiBaseURL)/v1beta/models/\(Self.geminiTranscriptionModel):generateContent"
         
         let headers: HTTPHeaders = [
             "X-Goog-Api-Key": apiKey,

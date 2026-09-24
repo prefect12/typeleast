@@ -103,6 +103,64 @@ final class UsageMetricsStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshot.totalCharacters, 50)
     }
 
+    func testModelUsageBreakdownGroupsDurationAndCostByModel() {
+        let openAIRecord = TranscriptionRecord(
+            text: "hello world",
+            provider: .openai,
+            duration: 60,
+            modelUsed: "gpt-4o-transcribe",
+            wordCount: 2,
+            characterCount: 11,
+            transcriptionTime: 4
+        )
+        let miMoRecord = TranscriptionRecord(
+            text: "voice note",
+            provider: .mimo,
+            duration: 3600,
+            modelUsed: "mimo-v2.5-asr",
+            wordCount: 2,
+            characterCount: 10,
+            transcriptionTime: 12
+        )
+        let localRecord = TranscriptionRecord(
+            text: "offline",
+            provider: .local,
+            duration: 30,
+            modelUsed: "base",
+            wordCount: 1,
+            characterCount: 7,
+            transcriptionTime: 1
+        )
+
+        let stats = UsageMetricsStore.modelUsageBreakdown(from: [openAIRecord, miMoRecord, localRecord])
+
+        let openAIStats = stats.first { $0.modelName == "gpt-4o-transcribe" }
+        XCTAssertEqual(openAIStats?.sessions, 1)
+        XCTAssertEqual(openAIStats?.recordingDuration ?? -1, 60, accuracy: 0.01)
+        XCTAssertEqual(openAIStats?.estimatedCostUSD ?? -1, 0.006, accuracy: 0.000001)
+
+        let miMoStats = stats.first { $0.modelName == "mimo-v2.5-asr" }
+        XCTAssertEqual(miMoStats?.estimatedCostUSD ?? -1, 0.074, accuracy: 0.000001)
+
+        let localStats = stats.first { $0.modelName == "base" }
+        XCTAssertEqual(localStats?.estimatedCostUSD ?? -1, 0, accuracy: 0.000001)
+    }
+
+    func testGeminiCostEstimateUsesAudioAndOutputTokenApproximation() {
+        let record = TranscriptionRecord(
+            text: String(repeating: "a", count: 200),
+            provider: .gemini,
+            duration: 60,
+            modelUsed: SpeechToTextService.geminiTranscriptionModel,
+            wordCount: 1,
+            characterCount: 200
+        )
+
+        let cost = UsageCostEstimator.estimatedCostUSD(for: record)
+
+        XCTAssertEqual(cost ?? -1, 0.000596, accuracy: 0.000001)
+    }
+
 }
 
 @MainActor

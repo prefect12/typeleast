@@ -11,6 +11,7 @@ private struct BreakdownRow: Identifiable, Equatable {
     let recordingDuration: TimeInterval
     let processingDuration: TimeInterval
     let processingSamples: Int
+    let estimatedCostUSD: Double?
 
     var id: String { label }
 
@@ -243,12 +244,7 @@ internal struct DashboardHomeView: View {
     }
 
     private var allModelRows: [BreakdownRow] {
-        makeBreakdown(records: recentRecords) { record in
-            if let model = record.modelUsed, !model.isEmpty {
-                return model
-            }
-            return providerLabel(for: record)
-        }
+        makeBreakdown(records: recentRecords, label: modelLabel(for:))
     }
 
     private var trendPoints: [ActivityDataPoint] {
@@ -548,7 +544,9 @@ internal struct DashboardHomeView: View {
             rows: allModelRows,
             totalWords: max(aggregate.words, 1),
             color: modelColor(for:),
-            valueFormatter: { row in "\(formatCompactNumber(row.words)) · \(formatDurationPrecise(row.averageProcessingTime))" }
+            valueFormatter: { row in
+                "\(row.sessions)x · \(formatDurationShort(row.recordingDuration)) · \(formatCurrency(row.estimatedCostUSD))"
+            }
         )
     }
 
@@ -1508,9 +1506,11 @@ private extension DashboardHomeView {
                 sessions: 0,
                 recordingDuration: 0,
                 processingDuration: 0,
-                processingSamples: 0
+                processingSamples: 0,
+                estimatedCostUSD: 0
             )
             let processing = record.transcriptionTime ?? 0
+            let cost = UsageCostEstimator.estimatedCostUSD(for: record)
             buckets[key] = BreakdownRow(
                 label: key,
                 words: existing.words + wordCount(for: record),
@@ -1518,7 +1518,8 @@ private extension DashboardHomeView {
                 sessions: existing.sessions + 1,
                 recordingDuration: existing.recordingDuration + (record.duration ?? 0),
                 processingDuration: existing.processingDuration + max(0, processing),
-                processingSamples: existing.processingSamples + (processing > 0 ? 1 : 0)
+                processingSamples: existing.processingSamples + (processing > 0 ? 1 : 0),
+                estimatedCostUSD: combineCost(existing.estimatedCostUSD, cost)
             )
         }
 
@@ -1539,9 +1540,15 @@ private extension DashboardHomeView {
                 sessions: source.sessionCount,
                 recordingDuration: 0,
                 processingDuration: 0,
-                processingSamples: 0
+                processingSamples: 0,
+                estimatedCostUSD: nil
             )
         }
+    }
+
+    func combineCost(_ lhs: Double?, _ rhs: Double?) -> Double? {
+        guard let lhs, let rhs else { return nil }
+        return lhs + rhs
     }
 
     func generateActivityWeeks() -> [[Date]] {
@@ -1571,10 +1578,7 @@ private extension DashboardHomeView {
     }
 
     func modelLabel(for record: TranscriptionRecord) -> String {
-        if let model = record.modelUsed, !model.isEmpty {
-            return model
-        }
-        return providerLabel(for: record)
+        UsageCostEstimator.normalizedModelName(for: record)
     }
 
     func providerColor(for label: String) -> Color {
@@ -1678,10 +1682,27 @@ private extension DashboardHomeView {
         return "\(hours)h \(minutes % 60)m"
     }
 
+    func formatCurrency(_ value: Double?) -> String {
+        guard let value else { return L10n.isChinese ? "未知" : "Unknown" }
+        if value > 0, value < 0.01 {
+            return "<$0.01"
+        }
+        return Self.currencyFormatter.string(from: NSNumber(value: value)) ?? "$0.00"
+    }
+
     private static let integerFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.maximumFractionDigits = 0
+        return formatter
+    }()
+
+    private static let currencyFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
         return formatter
     }()
 

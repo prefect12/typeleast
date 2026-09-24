@@ -62,6 +62,104 @@ internal struct UsageSnapshot: Equatable {
     }
 }
 
+internal struct ModelUsageStats: Identifiable, Equatable {
+    let provider: TranscriptionProvider
+    let modelName: String
+    let sessions: Int
+    let recordingDuration: TimeInterval
+    let processingDuration: TimeInterval
+    let processingSamples: Int
+    let words: Int
+    let characters: Int
+    let estimatedCostUSD: Double?
+
+    var id: String {
+        "\(provider.rawValue)|\(modelName)"
+    }
+
+    var displayName: String {
+        modelName.isEmpty ? provider.displayName : modelName
+    }
+
+    var averageProcessingTime: TimeInterval {
+        guard processingSamples > 0 else { return 0 }
+        return processingDuration / Double(processingSamples)
+    }
+}
+
+internal enum UsageCostEstimator {
+    private static let secondsPerMinute: Double = 60
+    private static let secondsPerHour: Double = 3600
+    private static let geminiAudioTokensPerSecond: Double = 32
+    private static let estimatedOutputCharactersPerToken: Double = 4
+
+    // Public provider prices verified on 2026-07-08. Keep these estimates scoped to recorded ASR usage.
+    private static let openAIPerMinuteUSD: [String: Double] = [
+        "gpt-4o-transcribe": 0.006,
+        "gpt-4o-mini-transcribe": 0.003,
+        "whisper-1": 0.006
+    ]
+
+    private static let miMoASRPerHourUSD: [String: Double] = [
+        "mimo-v2.5-asr": 0.074
+    ]
+
+    private struct GeminiTokenPrice {
+        let audioInputPerMillionUSD: Double
+        let textOutputPerMillionUSD: Double
+    }
+
+    private static let geminiTokenPrices: [String: GeminiTokenPrice] = [
+        "gemini-2.5-flash-lite": GeminiTokenPrice(
+            audioInputPerMillionUSD: 0.30,
+            textOutputPerMillionUSD: 0.40
+        )
+    ]
+
+    static func normalizedModelName(for record: TranscriptionRecord) -> String {
+        if let model = record.modelUsed?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !model.isEmpty {
+            return model
+        }
+
+        switch record.transcriptionProvider {
+        case .openai:
+            return AppDefaults.defaultOpenAITranscriptionModel
+        case .openAIRealtime:
+            return AppDefaults.defaultOpenAIRealtimeTranscriptionModel
+        case .mimo:
+            return AppDefaults.defaultMiMoASRModel
+        case .gemini:
+            return SpeechToTextService.geminiTranscriptionModel
+        case .local, .parakeet, .none:
+            return record.provider
+        }
+    }
+
+    static func estimatedCostUSD(for record: TranscriptionRecord) -> Double? {
+        guard let provider = record.transcriptionProvider else { return nil }
+        let model = normalizedModelName(for: record).lowercased()
+        let duration = max(0, record.duration ?? 0)
+
+        switch provider {
+        case .openai, .openAIRealtime:
+            guard let rate = openAIPerMinuteUSD[model], duration > 0 else { return nil }
+            return duration / secondsPerMinute * rate
+        case .mimo:
+            guard let rate = miMoASRPerHourUSD[model], duration > 0 else { return nil }
+            return duration / secondsPerHour * rate
+        case .gemini:
+            guard let price = geminiTokenPrices[model], duration > 0 else { return nil }
+            let inputTokens = duration * geminiAudioTokensPerSecond
+            let outputTokens = Double(max(record.characterCount, record.text.count)) / estimatedOutputCharactersPerToken
+            return (inputTokens / 1_000_000 * price.audioInputPerMillionUSD) +
+                (outputTokens / 1_000_000 * price.textOutputPerMillionUSD)
+        case .local, .parakeet:
+            return 0
+        }
+    }
+}
+
 @Observable
 @MainActor
 internal final class UsageMetricsStore {
@@ -192,6 +290,69 @@ internal final class UsageMetricsStore {
         rebuilt.lastUpdated = Date()
         rebuilt.dailyActivity = cleanupOldDailyActivity(rebuilt.dailyActivity)
         persist(rebuilt)
+    }
+
+    static func modelUsageBreakdown(from records: [TranscriptionRecord]) -> [ModelUsageStats] {
+        struct MutableStats {
+            var provider: TranscriptionProvider
+            var modelName: String
+            var sessions: Int = 0
+            var recordingDuration: TimeInterval = 0
+            var processingDuration: TimeInterval = 0
+            var processingSamples: Int = 0
+            var words: Int = 0
+            var characters: Int = 0
+            var knownCostUSD: Double = 0
+            var hasUnknownCost = false
+        }
+
+        var buckets: [String: MutableStats] = [:]
+
+        for record in records {
+            guard let provider = record.transcriptionProvider else { continue }
+            let modelName = UsageCostEstimator.normalizedModelName(for: record)
+            let key = "\(provider.rawValue)|\(modelName)"
+            var existing = buckets[key] ?? MutableStats(provider: provider, modelName: modelName)
+
+            let processing = max(0, record.transcriptionTime ?? 0)
+            existing.sessions += 1
+            existing.recordingDuration += max(0, record.duration ?? 0)
+            existing.processingDuration += processing
+            existing.processingSamples += processing > 0 ? 1 : 0
+            existing.words += record.wordCount > 0 ? record.wordCount : estimatedWordCount(for: record.text)
+            existing.characters += record.characterCount > 0 ? record.characterCount : record.text.count
+
+            if let cost = UsageCostEstimator.estimatedCostUSD(for: record) {
+                existing.knownCostUSD += cost
+            } else {
+                existing.hasUnknownCost = true
+            }
+
+            buckets[key] = existing
+        }
+
+        return buckets.values.map { stats in
+            ModelUsageStats(
+                provider: stats.provider,
+                modelName: stats.modelName,
+                sessions: stats.sessions,
+                recordingDuration: stats.recordingDuration,
+                processingDuration: stats.processingDuration,
+                processingSamples: stats.processingSamples,
+                words: stats.words,
+                characters: stats.characters,
+                estimatedCostUSD: stats.hasUnknownCost ? nil : stats.knownCostUSD
+            )
+        }
+        .sorted {
+            if $0.estimatedCostUSD != $1.estimatedCostUSD {
+                return ($0.estimatedCostUSD ?? -1) > ($1.estimatedCostUSD ?? -1)
+            }
+            if $0.recordingDuration == $1.recordingDuration {
+                return $0.sessions > $1.sessions
+            }
+            return $0.recordingDuration > $1.recordingDuration
+        }
     }
 
     func reset() {
