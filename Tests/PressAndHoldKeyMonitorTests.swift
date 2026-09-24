@@ -20,8 +20,11 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
         configuration: PressAndHoldConfiguration,
         keyDownHandler: @escaping () -> Void = {},
         keyUpHandler: (() -> Void)? = nil,
+        holdStartHandler: (() -> Void)? = nil,
+        holdEndHandler: (() -> Void)? = nil,
         now: @escaping () -> Date = Date.init,
-        doubleTapInterval: TimeInterval = 0.35
+        doubleTapInterval: TimeInterval = 0.35,
+        scheduleAfter: PressAndHoldKeyMonitor.DelayedWorkScheduler? = nil
     ) -> PressAndHoldKeyMonitor {
         let addGlobalMonitor: PressAndHoldKeyMonitor.EventMonitorFactory = { [weak self] mask, handler in
             self?.addedGlobalEvents.append((mask, handler))
@@ -41,11 +44,14 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
             configuration: configuration,
             keyDownHandler: keyDownHandler,
             keyUpHandler: keyUpHandler,
+            holdStartHandler: holdStartHandler,
+            holdEndHandler: holdEndHandler,
             addGlobalMonitor: addGlobalMonitor,
             addLocalMonitor: addLocalMonitor,
             removeMonitor: removeMonitor,
             now: now,
-            doubleTapInterval: doubleTapInterval
+            doubleTapInterval: doubleTapInterval,
+            scheduleAfter: scheduleAfter
         )
     }
 
@@ -172,6 +178,75 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
         monitor.processTransition(isKeyDownEvent: true)
 
         wait(for: [expectationDown], timeout: 0.1)
+    }
+
+    func testDoubleTapModeHoldStartsAndReleaseStops() {
+        var pendingWork: [() -> Void] = []
+        let holdStarted = expectation(description: "holdStart")
+        let holdEnded = expectation(description: "holdEnd")
+        let toggled = expectation(description: "toggle")
+        toggled.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: { toggled.fulfill() },
+            holdStartHandler: { holdStarted.fulfill() },
+            holdEndHandler: { holdEnded.fulfill() },
+            scheduleAfter: { _, work in pendingWork.append(work) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        pendingWork.forEach { $0() }
+        wait(for: [holdStarted], timeout: 1.0)
+
+        monitor.processTransition(isKeyDownEvent: false)
+        wait(for: [holdEnded], timeout: 1.0)
+        wait(for: [toggled], timeout: 0.1)
+    }
+
+    func testDoubleTapModeQuickTapDoesNotStartHold() {
+        var pendingWork: [() -> Void] = []
+        let holdStarted = expectation(description: "holdStart")
+        holdStarted.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            holdStartHandler: { holdStarted.fulfill() },
+            scheduleAfter: { _, work in pendingWork.append(work) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processTransition(isKeyDownEvent: false)
+        pendingWork.forEach { $0() }
+
+        wait(for: [holdStarted], timeout: 0.1)
+    }
+
+    func testDoubleTapModeReleasedHoldDoesNotCountAsFirstTap() {
+        var currentTime = Date(timeIntervalSinceReferenceDate: 100)
+        var pendingWork: [() -> Void] = []
+        let holdStarted = expectation(description: "holdStart")
+        let toggled = expectation(description: "toggle")
+        toggled.isInverted = true
+
+        let monitor = makeMonitor(
+            configuration: PressAndHoldConfiguration(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: { toggled.fulfill() },
+            holdStartHandler: { holdStarted.fulfill() },
+            holdEndHandler: {},
+            now: { currentTime },
+            scheduleAfter: { _, work in pendingWork.append(work) }
+        )
+
+        monitor.processTransition(isKeyDownEvent: true)
+        pendingWork.removeFirst()()
+        wait(for: [holdStarted], timeout: 1.0)
+        monitor.processTransition(isKeyDownEvent: false)
+
+        currentTime = currentTime.addingTimeInterval(0.1)
+        monitor.processTransition(isKeyDownEvent: true)
+
+        wait(for: [toggled], timeout: 0.1)
     }
 
     // MARK: - stop()

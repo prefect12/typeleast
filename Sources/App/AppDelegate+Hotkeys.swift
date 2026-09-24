@@ -17,12 +17,15 @@ internal extension AppDelegate {
             self?.handlePressAndHoldKeyUp()
         } : nil
 
+        let supportsHold = newConfiguration.mode == .doubleTapToggle
         let monitor = PressAndHoldKeyMonitor(
             configuration: newConfiguration,
             keyDownHandler: { [weak self] in
                 self?.handlePressAndHoldKeyDown()
             },
-            keyUpHandler: keyUpHandler
+            keyUpHandler: keyUpHandler,
+            holdStartHandler: supportsHold ? { [weak self] in self?.handleContinuousModeHoldStart() } : nil,
+            holdEndHandler: supportsHold ? { [weak self] in self?.stopRecordingFromPressAndHold() } : nil
         )
 
         pressAndHoldMonitor = monitor
@@ -36,6 +39,12 @@ internal extension AppDelegate {
         case .toggle, .doubleTapToggle:
             handleHotkey(source: .pressAndHold)
         }
+    }
+
+    /// Holding the key in continuous mode is push-to-talk, unless a toggled recording is already running.
+    private func handleContinuousModeHoldStart() {
+        guard audioRecorder?.isRecording != true else { return }
+        startRecordingFromPressAndHold()
     }
 
     private func handlePressAndHoldKeyUp() {

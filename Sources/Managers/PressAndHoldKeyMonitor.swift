@@ -171,15 +171,20 @@ internal final class PressAndHoldKeyMonitor {
     typealias EventMonitorFactory = (NSEvent.EventTypeMask, @escaping (NSEvent) -> Void) -> Any?
     typealias LocalEventMonitorFactory = (NSEvent.EventTypeMask, @escaping (NSEvent) -> NSEvent?) -> Any?
     typealias EventMonitorRemoval = (Any) -> Void
+    typealias DelayedWorkScheduler = (TimeInterval, @escaping () -> Void) -> Void
 
     private let configuration: PressAndHoldConfiguration
     private let keyDownHandler: () -> Void
     private let keyUpHandler: (() -> Void)?
+    private let holdStartHandler: (() -> Void)?
+    private let holdEndHandler: (() -> Void)?
     private let addGlobalMonitor: EventMonitorFactory
     private let addLocalMonitor: LocalEventMonitorFactory
     private let removeMonitor: EventMonitorRemoval
     private let now: () -> Date
     private let doubleTapInterval: TimeInterval
+    private let holdDelay: TimeInterval
+    private let scheduleAfter: DelayedWorkScheduler?
 
     private var flagsMonitors: [Any] = []
     private var keyDownMonitors: [Any] = []
@@ -188,25 +193,35 @@ internal final class PressAndHoldKeyMonitor {
 
     private var isPressed = false
     private var lastTapTime: Date?
+    private var pressGeneration = 0
+    private var isHolding = false
 
     init(
         configuration: PressAndHoldConfiguration,
         keyDownHandler: @escaping () -> Void,
         keyUpHandler: (() -> Void)? = nil,
+        holdStartHandler: (() -> Void)? = nil,
+        holdEndHandler: (() -> Void)? = nil,
         addGlobalMonitor: @escaping EventMonitorFactory = NSEvent.addGlobalMonitorForEvents(matching:handler:),
         addLocalMonitor: @escaping LocalEventMonitorFactory = NSEvent.addLocalMonitorForEvents(matching:handler:),
         removeMonitor: @escaping EventMonitorRemoval = NSEvent.removeMonitor(_:),
         now: @escaping () -> Date = Date.init,
-        doubleTapInterval: TimeInterval = 0.35
+        doubleTapInterval: TimeInterval = 0.35,
+        holdDelay: TimeInterval = 0.3,
+        scheduleAfter: DelayedWorkScheduler? = nil
     ) {
         self.configuration = configuration
         self.keyDownHandler = keyDownHandler
         self.keyUpHandler = keyUpHandler
+        self.holdStartHandler = holdStartHandler
+        self.holdEndHandler = holdEndHandler
         self.addGlobalMonitor = addGlobalMonitor
         self.addLocalMonitor = addLocalMonitor
         self.removeMonitor = removeMonitor
         self.now = now
         self.doubleTapInterval = doubleTapInterval
+        self.holdDelay = holdDelay
+        self.scheduleAfter = scheduleAfter
     }
 
     func start() {
@@ -245,6 +260,8 @@ internal final class PressAndHoldKeyMonitor {
 
         isPressed = false
         lastTapTime = nil
+        isHolding = false
+        pressGeneration += 1
     }
 
     deinit {
@@ -286,6 +303,13 @@ internal final class PressAndHoldKeyMonitor {
         } else {
             guard isPressed else { return }
             isPressed = false
+            if isHolding {
+                isHolding = false
+                if let holdEndHandler {
+                    Task { @MainActor in holdEndHandler() }
+                }
+                return
+            }
             guard let keyUpHandler else { return }
             Task { @MainActor in
                 keyUpHandler()
@@ -293,18 +317,37 @@ internal final class PressAndHoldKeyMonitor {
         }
     }
 
+    /// A quick second tap toggles recording; holding the first press past `holdDelay`
+    /// records push-to-talk style until release.
     private func handleDoubleTapKeyDown() {
         let currentTime = now()
+        pressGeneration += 1
 
         guard let previousTapTime = lastTapTime,
               currentTime.timeIntervalSince(previousTapTime) <= doubleTapInterval else {
             lastTapTime = currentTime
+            scheduleHoldStart(for: pressGeneration)
             return
         }
 
         lastTapTime = nil
         Task { @MainActor [keyDownHandler] in
             keyDownHandler()
+        }
+    }
+
+    private func scheduleHoldStart(for generation: Int) {
+        guard let holdStartHandler else { return }
+        let work: () -> Void = { [weak self] in
+            guard let self, self.isPressed, self.pressGeneration == generation else { return }
+            self.isHolding = true
+            self.lastTapTime = nil
+            Task { @MainActor in holdStartHandler() }
+        }
+        if let scheduleAfter {
+            scheduleAfter(holdDelay, work)
+        } else {
+            monitorQueue.asyncAfter(deadline: .now() + holdDelay, execute: work)
         }
     }
 
