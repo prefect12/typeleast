@@ -12,7 +12,7 @@ internal final class LiveDictationCoordinator {
     static let shared = LiveDictationCoordinator()
 
     /// How long a finished realtime transcript waits for the contextual one before being used.
-    static let contextualGrace: Duration = .seconds(1)
+    static let contextualGrace: Duration = .milliseconds(500)
 
     private let streamingTranscriber = StreamingSpeechTranscriber()
     private let openAIRealtimeTranscriber = OpenAIRealtimeTranscriber()
@@ -25,6 +25,9 @@ internal final class LiveDictationCoordinator {
     private var isContextualActive = false
     private var sessionAudioBytes = 0
     private(set) var lastRecognitionSource: RecognitionSource?
+    /// Identifies the dictation that `beginIfNeeded` last started. A recording can start while the
+    /// previous one is still processing, so late cleanup must not tear down the newer session.
+    private(set) var sessionID = 0
     private var appleStreamingText = ""
     private var keepWarmUntil: Date?
     private var consecutivePrewarmFailures = 0
@@ -123,6 +126,7 @@ internal final class LiveDictationCoordinator {
         targetApp: NSRunningApplication?,
         updateHandler: StreamingSpeechTranscriber.UpdateHandler? = nil
     ) -> Bool {
+        sessionID += 1
         let settings = TranscriptionSettingsStore.shared
         guard settings.isStreamingTranscriptionEnabled else {
             cancel()
@@ -251,6 +255,7 @@ internal final class LiveDictationCoordinator {
 
     func finishRecognition(finalizeLiveText: Bool) async -> String? {
         let text: String?
+        let session = sessionID
         let wasOpenAIRealtimeActive = isOpenAIRealtimeActive
         lastRecognitionSource = nil
         if isOpenAIRealtimeActive {
@@ -281,6 +286,8 @@ internal final class LiveDictationCoordinator {
         } else {
             text = await streamingTranscriber.finish()
         }
+        // A newer recording started while this one was finishing; its state is not ours to reset.
+        guard sessionID == session else { return text }
         isOpenAIRealtimeActive = false
         isContextualActive = false
         appleStreamingText = ""
@@ -358,6 +365,13 @@ internal final class LiveDictationCoordinator {
 
         await liveTextInsertionManager.finish(finalText: finalText, targetApp: activeTargetApp)
         activeTargetApp = nil
+    }
+
+    /// Cancels only if `session` is still the active dictation, so a stale processing task cannot
+    /// cancel a recording that started after it.
+    func cancel(session: Int) {
+        guard session == sessionID else { return }
+        cancel()
     }
 
     func cancel() {

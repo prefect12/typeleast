@@ -337,9 +337,21 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
     func finish(
         timeout: Duration = .milliseconds(2_500),
         maximumTimeout: Duration = .seconds(5),
-        progressWindow: Duration = .seconds(1)
+        progressWindow: Duration = .seconds(1),
+        startupWait: Duration = .milliseconds(1_500)
     ) async -> String? {
         let generation = sessionGeneration
+        // A handshake still pending at release can take the full handshake timeout (twice when it
+        // follows a stalled prewarm); give up sooner so the batch fallback starts right away.
+        let startupDeadline = ContinuousClock().now.advanced(by: startupWait)
+        while state == .connecting {
+            guard sessionGeneration == generation else { return nil }
+            if ContinuousClock().now >= startupDeadline {
+                fail(.handshakeTimeout)
+                return nil
+            }
+            try? await Task.sleep(for: .milliseconds(40))
+        }
         await startTask?.value
         guard sessionGeneration == generation else { return nil }
         startTask = nil
@@ -411,7 +423,8 @@ internal final class OpenAIRealtimeTranscriber: ObservableObject {
                 if let pendingPrewarm {
                     // A prewarm is already mid-handshake; finishing it beats starting over.
                     await pendingPrewarm.value
-                    guard self.sessionGeneration == generation else { return }
+                    // finish() may have given up on the handshake while the prewarm was pending.
+                    guard self.sessionGeneration == generation, self.state == .connecting else { return }
                     if let configuration, let warm = self.takeWarmSession(configuration: configuration) {
                         self.adopt(warm)
                         return

@@ -64,7 +64,10 @@ cp Info.plist "$APP_BUNDLE/Contents/Info.plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName '$APP_NAME'" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP_BUNDLE/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_BUNDLE/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :NSSpeechRecognitionUsageDescription 'This isolated test build uses OpenAI Realtime transcription and does not use Apple Speech Recognition.'" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
+# Realtime dictation also runs Apple Speech as a fallback; without this key TCC kills the app.
+SPEECH_USAGE="Typeleast uses speech recognition to prepare streaming transcripts while you record."
+/usr/libexec/PlistBuddy -c "Add :NSSpeechRecognitionUsageDescription string '$SPEECH_USAGE'" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || \
+  /usr/libexec/PlistBuddy -c "Set :NSSpeechRecognitionUsageDescription '$SPEECH_USAGE'" "$APP_BUNDLE/Contents/Info.plist"
 
 if [[ -f TypeleastIcon.png ]]; then
   "$SCRIPT_DIR/generate-icons.sh" >/dev/null

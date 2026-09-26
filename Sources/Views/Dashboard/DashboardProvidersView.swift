@@ -466,6 +466,7 @@ internal struct DashboardProvidersView: View {
                         }
                         .textFieldStyle(.roundedBorder)
                         .font(DashboardTheme.Fonts.mono(13, weight: .regular))
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         
                         Button {
                             isShowing.wrappedValue.toggle()
