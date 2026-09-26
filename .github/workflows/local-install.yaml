@@ -1,0 +1,25 @@
+name: Typeleast 2.1.3 Local Install
+on:
+  push:
+    branches: [codex/typeleast-local-install-20260927]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        run: |
+          make build > build.log 2>&1 || { tail -150 build.log; exit 1; }
+          find .build -type d -name '*.bundle' -prune -exec cp -R {} Typeleast.app/Contents/Resources/ \;
+          /usr/libexec/PlistBuddy -c 'Add :KadeForkSourceCommit string 9b17647153ffb82422736efff67181a559493441' Typeleast.app/Contents/Info.plist
+          codesign --force --deep --sign - --preserve-metadata=entitlements Typeleast.app
+          codesign --verify --deep --strict Typeleast.app
+          ditto -c -k --keepParent Typeleast.app Typeleast-2.1.3.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Typeleast-2.1.3
+          path: Typeleast-2.1.3.zip
+          retention-days: 7
