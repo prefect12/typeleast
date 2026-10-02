@@ -136,7 +136,9 @@ internal enum PressAndHoldSettings {
         let modeIdentifier = defaults.string(forKey: modeKey) ?? PressAndHoldConfiguration.defaults.mode.rawValue
 
         let key = PressAndHoldKey(rawValue: keyIdentifier) ?? migratedKey(from: keyIdentifier) ?? PressAndHoldConfiguration.defaults.key
-        let mode = PressAndHoldMode(rawValue: modeIdentifier) ?? PressAndHoldConfiguration.defaults.mode
+        let mode = modeIdentifier == "holdAndDoubleTapToggle"
+            ? PressAndHoldMode.doubleTapToggle
+            : (PressAndHoldMode(rawValue: modeIdentifier) ?? PressAndHoldConfiguration.defaults.mode)
 
         return PressAndHoldConfiguration(enabled: enabled, key: key, mode: mode)
     }
@@ -315,7 +317,18 @@ internal final class PressAndHoldKeyMonitor {
 
     func processTransition(isKeyDownEvent: Bool) {
         if isKeyDownEvent {
-            guard !isPressed else { return }
+            if isPressed {
+                isPressed = false
+                lastTapTime = nil
+                pressGeneration += 1
+                if isHolding || configuration.mode == .hold {
+                    isHolding = false
+                    holdStartedAt = nil
+                    let end = holdEndHandler ?? keyUpHandler
+                    if let end { Task { @MainActor in end() } }
+                    return
+                }
+            }
             isPressed = true
             if configuration.mode == .doubleTapToggle {
                 handleDoubleTapKeyDown()

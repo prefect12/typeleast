@@ -6,6 +6,8 @@ private struct NoSpeechDetected: Error {}
 
 internal extension ContentView {
     func startRecording() {
+        guard audioRecorder.sessionState.phase == .idle else { return }
+        showSuccess = false
         if !audioRecorder.hasPermission {
             permissionManager.requestPermissionWithEducation()
             return
@@ -58,6 +60,8 @@ internal extension ContentView {
     }
     
     func stopAndProcess() {
+        guard audioRecorder.isRecording,
+              let session = audioRecorder.sessionState.beginProcessing() else { return }
         processingTask?.cancel()
         NotificationCenter.default.post(name: .recordingStopped, object: nil)
         let dictationSession = LiveDictationCoordinator.shared.sessionID
@@ -193,7 +197,7 @@ internal extension ContentView {
                         ),
                         rawText: streamedText,
                         asrTime: streamingFinalizeTime ?? 0,
-                        progressHandler: { progressMessage = $0 }
+                        progressHandler: { if audioRecorder.sessionState.isCurrent(session) { progressMessage = $0 } }
                     )
                 } else {
                     if shouldUseHighAccuracyEnglishFinalization {
@@ -257,29 +261,35 @@ internal extension ContentView {
                             maximumExtraWait: shouldVerifyRealtimeLanguage
                                 ? nil
                                 : TranscriptionPipeline.englishRefinementGrace,
-                            progressHandler: { progressMessage = $0 }
+                            progressHandler: { if audioRecorder.sessionState.isCurrent(session) { progressMessage = $0 } }
                         )
                     } else if let pendingRefinement, effectiveProvider == .openai {
                         result = try await transcriptionPipeline.run(
                             request,
                             prestarted: pendingRefinement,
-                            progressHandler: { progressMessage = $0 }
+                            progressHandler: { if audioRecorder.sessionState.isCurrent(session) { progressMessage = $0 } }
                         )
                     } else {
                         result = try await transcriptionPipeline.run(
                             request,
-                            progressHandler: { progressMessage = $0 }
+                            progressHandler: { if audioRecorder.sessionState.isCurrent(session) { progressMessage = $0 } }
                         )
                     }
                 }
 
+                try Task.checkCancellation()
+                guard audioRecorder.sessionState.isCurrent(session) else { return }
                 if didInsertLiveText {
                     await LiveDictationCoordinator.shared.finishLiveText(with: result.text)
                 }
 
+                guard audioRecorder.sessionState.isCurrent(session) else { return }
                 LiveDictationCoordinator.shared.cancel(session: dictationSession)
 
                 await MainActor.run {
+                    guard audioRecorder.sessionState.id == session else { return }
+                    guard audioRecorder.sessionState.isCurrent(session) else { return }
+                    audioRecorder.sessionState.finish(session)
                     transcriptionStartTime = nil
                     streamingDraftText = ""
                     showConfirmationAndPaste(
@@ -292,19 +302,32 @@ internal extension ContentView {
                 }
             } catch is CancellationError, is NoSpeechDetected {
                 await MainActor.run {
+                    guard audioRecorder.sessionState.id == session else { return }
+                    guard audioRecorder.sessionState.isCurrent(session) else { return }
+                    audioRecorder.sessionState.finish(session)
                     LiveDictationCoordinator.shared.cancel(session: dictationSession)
                     streamingDraftText = ""
                     isProcessing = false
                     transcriptionStartTime = nil
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
+                    // A cancelled or silent take has no confirmation/paste step to dismiss
+                    // the HUD. Finish its window lifecycle here instead of leaving it idle.
+                    showSuccess = false
+                    NSApp.windows.first {
+                        $0.title == AppIdentity.recordingWindowTitle
+                    }?.orderOut(nil)
+                    NotificationCenter.default.post(name: .restoreFocusToPreviousApp, object: nil)
                 }
             } catch {
+                guard audioRecorder.sessionState.isCurrent(session) else { return }
+                audioRecorder.sessionState.finish(session)
                 LiveDictationCoordinator.shared.cancel(session: dictationSession)
                 streamingDraftText = ""
                 if case let SpeechToTextError.localTranscriptionFailed(inner) = error,
                    let lwError = inner as? LocalWhisperError,
                    lwError == .modelNotDownloaded {
                     await MainActor.run {
+                        guard audioRecorder.sessionState.id == session else { return }
                         errorMessage = "Local Whisper model not downloaded. Opening Settings…"
                         showError = true
                         isProcessing = false
@@ -314,6 +337,7 @@ internal extension ContentView {
                     }
                 } else if let pe = error as? ParakeetError, pe == .modelNotReady {
                     await MainActor.run {
+                        guard audioRecorder.sessionState.id == session else { return }
                         errorMessage = "Parakeet model not downloaded. Opening Settings…"
                         showError = true
                         isProcessing = false
@@ -323,6 +347,7 @@ internal extension ContentView {
                     }
                 } else {
                     await MainActor.run {
+                        guard audioRecorder.sessionState.id == session else { return }
                         errorMessage = error.localizedDescription
                         showError = true
                         isProcessing = false
@@ -335,6 +360,8 @@ internal extension ContentView {
     }
 
     func transcribeExternalAudioFile(_ audioURL: URL) {
+        guard audioRecorder.sessionState.phase == .idle,
+              let session = audioRecorder.sessionState.beginProcessing() else { return }
         processingTask?.cancel()
 
         let shouldHintThisRun = !hasShownFirstModelUseHint && isLocalModelInvocationPlanned()
@@ -376,10 +403,14 @@ internal extension ContentView {
                         modelReadyTime: modelReadyTime,
                         processStart: processStart
                     ),
-                    progressHandler: { progressMessage = $0 }
+                    progressHandler: { if audioRecorder.sessionState.isCurrent(session) { progressMessage = $0 } }
                 )
 
+                try Task.checkCancellation()
                 await MainActor.run {
+                    guard audioRecorder.sessionState.id == session else { return }
+                    guard audioRecorder.sessionState.isCurrent(session) else { return }
+                    audioRecorder.sessionState.finish(session)
                     transcriptionStartTime = nil
                     showConfirmationAndPaste(
                         text: result.text,
@@ -390,15 +421,21 @@ internal extension ContentView {
                 }
             } catch is CancellationError {
                 await MainActor.run {
+                    guard audioRecorder.sessionState.id == session else { return }
+                    guard audioRecorder.sessionState.isCurrent(session) else { return }
+                    audioRecorder.sessionState.finish(session)
                     isProcessing = false
                     transcriptionStartTime = nil
                     if shouldHintThisRun { hasShownFirstModelUseHint = true; showFirstModelUseHint = false }
                 }
             } catch {
+                guard audioRecorder.sessionState.isCurrent(session) else { return }
+                audioRecorder.sessionState.finish(session)
                 if case let SpeechToTextError.localTranscriptionFailed(inner) = error,
                    let lwError = inner as? LocalWhisperError,
                    lwError == .modelNotDownloaded {
                     await MainActor.run {
+                        guard audioRecorder.sessionState.id == session else { return }
                         errorMessage = "Local Whisper model not downloaded. Opening Settings…"
                         showError = true
                         isProcessing = false
@@ -408,6 +445,7 @@ internal extension ContentView {
                     }
                 } else if let pe = error as? ParakeetError, pe == .modelNotReady {
                     await MainActor.run {
+                        guard audioRecorder.sessionState.id == session else { return }
                         errorMessage = "Parakeet model not downloaded. Opening Settings…"
                         showError = true
                         isProcessing = false
@@ -417,6 +455,7 @@ internal extension ContentView {
                     }
                 } else {
                     await MainActor.run {
+                        guard audioRecorder.sessionState.id == session else { return }
                         errorMessage = error.localizedDescription
                         showError = true
                         isProcessing = false
@@ -434,6 +473,7 @@ internal extension ContentView {
         processStart: Date? = nil,
         shouldPasteAutomatically: Bool = true
     ) {
+        let completedSession = audioRecorder.sessionState.id
         showSuccess = true
         isProcessing = false
         soundManager.playCompletionSound()
@@ -441,6 +481,7 @@ internal extension ContentView {
         if TranscriptionSettingsStore.shared.isSmartPasteEnabled, shouldPasteAutomatically {
             if !awaitingSemanticPaste {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    guard audioRecorder.sessionState.id == completedSession else { return }
                     performUserTriggeredPaste(recordID: recordID, processStart: processStart, pasteStart: Date())
                 }
             }
@@ -449,6 +490,7 @@ internal extension ContentView {
             NotificationCenter.default.post(name: .restoreFocusToPreviousApp, object: nil)
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                guard audioRecorder.sessionState.id == completedSession else { return }
                 let recordWindow = NSApp.windows.first { window in
                     window.title == AppIdentity.recordingWindowTitle
                 }
@@ -466,7 +508,7 @@ internal extension ContentView {
     }
     
     func retryLastTranscription() {
-        guard !isProcessing else { return }
+        guard audioRecorder.sessionState.phase == .idle else { return }
         
         guard let audioURL = lastAudioURL else {
             errorMessage = "No audio file available to retry. Please record again."
@@ -481,6 +523,7 @@ internal extension ContentView {
             return
         }
         
+        guard let session = audioRecorder.sessionState.beginProcessing() else { return }
         processingTask?.cancel()
         
         processingTask = Task { @MainActor in
@@ -507,9 +550,12 @@ internal extension ContentView {
                         modelReadyTime: nil,
                         processStart: processStart
                     ),
-                    progressHandler: { progressMessage = $0 }
+                    progressHandler: { if audioRecorder.sessionState.isCurrent(session) { progressMessage = $0 } }
                 )
 
+                try Task.checkCancellation()
+                guard audioRecorder.sessionState.isCurrent(session) else { return }
+                audioRecorder.sessionState.finish(session)
                 transcriptionStartTime = nil
                 showConfirmationAndPaste(
                     text: result.text,
@@ -518,11 +564,17 @@ internal extension ContentView {
                 )
             } catch is CancellationError {
                 await MainActor.run {
+                    guard audioRecorder.sessionState.id == session else { return }
+                    guard audioRecorder.sessionState.isCurrent(session) else { return }
+                    audioRecorder.sessionState.finish(session)
                     isProcessing = false
                     transcriptionStartTime = nil
                 }
             } catch {
                 await MainActor.run {
+                    guard audioRecorder.sessionState.id == session else { return }
+                    guard audioRecorder.sessionState.isCurrent(session) else { return }
+                    audioRecorder.sessionState.finish(session)
                     errorMessage = error.localizedDescription
                     showError = true
                     isProcessing = false

@@ -2,6 +2,21 @@ import SwiftUI
 import AppKit
 
 internal extension ContentView {
+    func cancelCurrentSession() {
+        processingTask?.cancel()
+        processingTask = nil
+        audioRecorder.cancelRecording()
+        LiveDictationCoordinator.shared.cancel()
+        streamingDraftText = ""
+        isProcessing = false
+        transcriptionStartTime = nil
+        showSuccess = false
+        showFirstModelUseHint = false
+        hideRecordingWindow()
+        NotificationCenter.default.post(name: .recordingStopped, object: nil)
+        NotificationCenter.default.post(name: .restoreFocusToPreviousApp, object: nil)
+    }
+
     func handleOnAppear() {
         audioRecorder.checkMicrophonePermission()
         setupNotificationObservers()
@@ -15,11 +30,7 @@ internal extension ContentView {
     
     func handleOnDisappear() {
         removeNotificationObservers()
-        processingTask?.cancel()
-        processingTask = nil
-        LiveDictationCoordinator.shared.cancel()
-        streamingDraftText = ""
-        lastAudioURL = nil
+        if audioRecorder.sessionState.phase != .idle { cancelCurrentSession() }
     }
     
     private func setupNotificationObservers() {
@@ -39,21 +50,20 @@ internal extension ContentView {
             forName: .spaceKeyPressed,
             object: nil,
             queue: .main
-        ) { _ in
+        ) { notification in
+            let stopOnly = (notification.object as? String) == "stop"
             Task { @MainActor in
-                guard !isHandlingSpaceKey else { return }
-                isHandlingSpaceKey = true
-                
-                if audioRecorder.isRecording {
+                if stopOnly {
+                    if audioRecorder.isRecording { stopAndProcess() }
+                } else if audioRecorder.sessionState.phase == .processing {
+                    cancelCurrentSession()
+                } else if audioRecorder.isRecording {
                     stopAndProcess()
-                } else if !isProcessing && audioRecorder.hasPermission && !showSuccess {
+                } else if audioRecorder.hasPermission && !showSuccess {
                     startRecording()
                 } else if !audioRecorder.hasPermission {
                     permissionManager.requestPermissionWithEducation()
                 }
-                
-                try? await Task.sleep(for: .seconds(1))
-                isHandlingSpaceKey = false
             }
         }
         
@@ -63,31 +73,7 @@ internal extension ContentView {
             queue: .main
         ) { _ in
             Task { @MainActor in
-                if audioRecorder.isRecording {
-                    audioRecorder.cancelRecording()
-                    LiveDictationCoordinator.shared.cancel()
-                    streamingDraftText = ""
-                    isProcessing = false
-                } else if isProcessing {
-                    processingTask?.cancel()
-                    LiveDictationCoordinator.shared.cancel()
-                    streamingDraftText = ""
-                    isProcessing = false
-                } else {
-                    let recordWindow = NSApp.windows.first { window in
-                        window.title == AppIdentity.recordingWindowTitle
-                    }
-                    
-                    if let window = recordWindow {
-                        window.orderOut(nil)
-                    } else {
-                        NSApplication.shared.keyWindow?.orderOut(nil)
-                    }
-                    
-                    NotificationCenter.default.post(name: .restoreFocusToPreviousApp, object: nil)
-                    
-                    showSuccess = false
-                }
+                cancelCurrentSession()
             }
         }
         

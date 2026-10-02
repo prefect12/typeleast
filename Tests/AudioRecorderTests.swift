@@ -4,6 +4,29 @@ import AVFoundation
 
 @MainActor
 final class AudioRecorderTests: XCTestCase {
+    func testRecordReturningFalseDoesNotStartSession() {
+        let mock = MockAVAudioRecorder()
+        mock.setShouldFailToRecord(true)
+        let recorder = AudioRecorder(recorderFactory: { _, _ in mock })
+        recorder.hasPermission = true
+        XCTAssertFalse(recorder.startRecording())
+        XCTAssertFalse(recorder.isRecording)
+        XCTAssertEqual(recorder.sessionState.phase, .idle)
+        mock.setShouldFailToRecord(false)
+        XCTAssertTrue(recorder.startRecording())
+        recorder.cancelRecording()
+    }
+
+    func testRepeatedStopDoesNotReturnConsumedAudio() {
+        let recorder = AudioRecorder(recorderFactory: { _, _ in MockAVAudioRecorder() })
+        recorder.hasPermission = true
+        XCTAssertTrue(recorder.startRecording())
+        let url = recorder.stopRecording()
+        XCTAssertNotNil(url)
+        XCTAssertNil(recorder.stopRecording())
+        if let url { try? FileManager.default.removeItem(at: url) }
+    }
+
     override func tearDown() {
         UserDefaults.standard.removeObject(forKey: "autoBoostMicrophoneVolume")
         super.tearDown()

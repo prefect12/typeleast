@@ -21,6 +21,7 @@ private final class ObserverBox: @unchecked Sendable {
 
 internal extension ContentView {
     func performUserTriggeredPaste(recordID: UUID? = nil, processStart: Date? = nil, pasteStart: Date? = nil) {
+        let session = audioRecorder.sessionState.id
         guard let targetApp = findValidTargetApp() else {
             updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: pasteStart)
             showSuccess = false
@@ -29,6 +30,7 @@ internal extension ContentView {
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            guard audioRecorder.sessionState.id == session else { return }
             self.hideRecordingWindow()
             self.activateTargetAppAndPaste(
                 targetApp,
@@ -86,13 +88,18 @@ internal extension ContentView {
         processStart: Date? = nil,
         pasteStart: Date? = nil
     ) {
+        let session = audioRecorder.sessionState.id
         Task { @MainActor in
             do {
+                guard audioRecorder.sessionState.id == session else { return }
                 try await activateApplication(target)
+                guard audioRecorder.sessionState.id == session else { return }
                 await pasteManager.pasteWithCompletionHandler()
+                guard audioRecorder.sessionState.id == session else { return }
                 updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: pasteStart)
                 self.showSuccess = false
             } catch {
+                guard audioRecorder.sessionState.id == session else { return }
                 updateTimingAfterPaste(recordID: recordID, processStart: processStart, pasteStart: pasteStart)
                 self.showSuccess = false
             }

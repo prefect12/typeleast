@@ -291,6 +291,9 @@ internal final class TranscriptionPipeline {
             }
         }
 
+        // Correction providers can return after cancellation; stop before clipboard/history writes.
+        try Task.checkCancellation()
+
         if categoryIdForBundle(request.sourceAppInfo.bundleIdentifier) == ChatPunctuationFormatter.chatCategoryId {
             finalText = ChatPunctuationFormatter.removingSentencePeriods(from: finalText)
         }

@@ -57,6 +57,36 @@ final class PressAndHoldKeyMonitorTests: XCTestCase {
         )
     }
 
+    func testLostReleaseDuringHoldCanStopOnNextPhysicalDown() {
+        var work: [() -> Void] = []
+        let started = expectation(description: "started")
+        let ended = expectation(description: "recovered stop")
+        let monitor = makeMonitor(
+            configuration: .init(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            holdStartHandler: { started.fulfill() },
+            holdEndHandler: { ended.fulfill() },
+            scheduleAfter: { _, action in work.append(action) }
+        )
+        monitor.processTransition(isKeyDownEvent: true)
+        work.removeFirst()()
+        wait(for: [started], timeout: 1)
+        monitor.processTransition(isKeyDownEvent: true)
+        wait(for: [ended], timeout: 1)
+    }
+
+    func testLostReleaseDoesNotPermanentlyDisableDoubleTap() {
+        let toggled = expectation(description: "recovered double tap")
+        let monitor = makeMonitor(
+            configuration: .init(enabled: true, key: .rightCommand, mode: .doubleTapToggle),
+            keyDownHandler: { toggled.fulfill() }
+        )
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processTransition(isKeyDownEvent: true)
+        monitor.processTransition(isKeyDownEvent: false)
+        monitor.processTransition(isKeyDownEvent: true)
+        wait(for: [toggled], timeout: 1)
+    }
+
     // MARK: - start()
 
     func testStartRegistersFlagMonitorForModifierKey() {

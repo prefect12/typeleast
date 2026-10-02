@@ -8,6 +8,15 @@ final class ErrorPresenterTests: XCTestCase {
         ErrorPresenter.shared.isTestEnvironment = true
     }
 
+    func testTranscriptionErrorWithAPIKeyHintStillOffersRetryAndDismisses() {
+        let retry = expectation(forNotification: .retryTranscriptionRequested, object: nil)
+        let dismissed = expectation(description: "dismissed")
+        ErrorPresenter.shared.showError("Transcription failed: Audio file contains no audio data. Check your API key.") {
+            dismissed.fulfill()
+        }
+        wait(for: [retry, dismissed], timeout: 1)
+    }
+
     // MARK: - Retry Notifications
 
     @MainActor func testConnectionErrorPostsRetryRequested() {

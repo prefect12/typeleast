@@ -7,6 +7,7 @@ import os.log
 internal class AudioRecorder: NSObject, ObservableObject {
     typealias PCM16AudioDataHandler = @Sendable (Data) -> Void
 
+    @Published var sessionState = RecordingSessionState()
     @Published var isRecording = false
     @Published var audioLevel: Float = 0.0
     @Published var hasPermission = false
@@ -99,7 +100,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
     
     func startRecording(pcm16AudioDataHandler: PCM16AudioDataHandler? = nil) -> Bool {
         // Check permission first
-        guard hasPermission else {
+        guard hasPermission, sessionState.phase == .idle else {
             return false
         }
         
@@ -147,15 +148,22 @@ internal class AudioRecorder: NSObject, ObservableObject {
             audioRecorder = try recorderFactory(audioFilename, settings)
             audioRecorder?.delegate = self
             audioRecorder?.isMeteringEnabled = true
-            audioRecorder?.record()
+            guard audioRecorder?.record() == true else {
+                audioRecorder = nil
+                cleanupRecording()
+                return false
+            }
             currentSessionStart = dateProvider()
             lastRecordingDuration = nil
             resetPeakLevel()
             
+            _ = sessionState.beginRecording()
             self.isRecording = true
             self.startLevelMonitoring()
             return true
         } catch {
+            audioRecorder = nil
+            cleanupRecording()
             Logger.audioRecorder.error("Failed to start recording: \(error.localizedDescription)")
             // Restore volume if recording failed and we boosted it
             if UserDefaults.standard.autoBoostMicrophoneVolume {
@@ -202,6 +210,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
             currentSessionStart = dateProvider()
             lastRecordingDuration = nil
             resetPeakLevel()
+            _ = sessionState.beginRecording()
             isRecording = true
             return true
         } catch {
@@ -224,6 +233,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
     }
     
     func stopRecording() -> URL? {
+        guard isRecording else { return nil }
         let now = dateProvider()
         let sessionDuration = currentSessionStart.map { now.timeIntervalSince($0) }
         lastRecordingDuration = sessionDuration
@@ -256,7 +266,10 @@ internal class AudioRecorder: NSObject, ObservableObject {
         self.isRecording = false
         self.stopLevelMonitoring()
         
-        return recordingURL
+        if sessionState.phase == .recording { sessionState.finish(sessionState.id) }
+        let url = recordingURL
+        recordingURL = nil
+        return url
     }
     
     func cleanupRecording() {
@@ -282,6 +295,7 @@ internal class AudioRecorder: NSObject, ObservableObject {
     }
     
     func cancelRecording() {
+        sessionState.cancel()
         // Stop recording and cleanup without returning URL
         if let audioEngine {
             audioEngine.inputNode.removeTap(onBus: 0)
@@ -289,7 +303,6 @@ internal class AudioRecorder: NSObject, ObservableObject {
             self.audioEngine = nil
             wavWriter?.cancel()
             wavWriter = nil
-            recordingURL = nil
         } else {
             audioRecorder?.stop()
             audioRecorder = nil

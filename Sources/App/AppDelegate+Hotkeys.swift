@@ -66,6 +66,11 @@ internal extension AppDelegate {
     private func startRecordingFromPressAndHold() {
         guard let recorder = audioRecorder else { return }
 
+        if recorder.sessionState.phase == .processing {
+            NotificationCenter.default.post(name: .escapeKeyPressed, object: nil)
+            return
+        }
+
         if recorder.isRecording {
             isHoldRecordingActive = true
             return
@@ -106,9 +111,11 @@ internal extension AppDelegate {
         isHoldRecordingActive = false
         updateMenuBarIcon(isRecording: false)
 
+        let stoppingSession = recorder.sessionState.id
         showRecordingWindowForProcessing {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
+                guard recorder.sessionState.id == stoppingSession, recorder.isRecording else { return }
+                NotificationCenter.default.post(name: .spaceKeyPressed, object: "stop")
             }
         }
     }
@@ -137,14 +144,21 @@ internal extension AppDelegate {
             return
         }
 
+        if recorder.sessionState.phase == .processing {
+            NotificationCenter.default.post(name: .escapeKeyPressed, object: nil)
+            return
+        }
+
         if recorder.isRecording {
             updateMenuBarIcon(isRecording: false)
             if recordingWindow == nil || recordingWindow?.isVisible == false {
                 toggleRecordWindow()
             }
 
+            let stoppingSession = recorder.sessionState.id
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                NotificationCenter.default.post(name: .spaceKeyPressed, object: nil)
+                guard recorder.sessionState.id == stoppingSession, recorder.isRecording else { return }
+                NotificationCenter.default.post(name: .spaceKeyPressed, object: "stop")
             }
         } else {
             if !recorder.hasPermission {
