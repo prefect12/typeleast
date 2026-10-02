@@ -21,7 +21,6 @@ internal struct ContentView: View {
     @State var errorMessage = ""
     @State var showSuccess = false
     @State var isHovered = false
-    @State var isHandlingSpaceKey = false
     @State var processingTask: Task<Void, Never>?
     @State var transcriptionProgressObserver: NSObjectProtocol?
     @State var spaceKeyObserver: NSObjectProtocol?
@@ -49,7 +48,13 @@ internal struct ContentView: View {
     }
     
     private func showErrorAlert() {
-        ErrorPresenter.shared.showError(errorMessage)
+        let session = audioRecorder.sessionState.id
+        ErrorPresenter.shared.showError(errorMessage) {
+            guard audioRecorder.sessionState.id == session,
+                  !audioRecorder.isRecording, audioRecorder.sessionState.phase == .idle else { return }
+            hideRecordingWindow()
+            NotificationCenter.default.post(name: .restoreFocusToPreviousApp, object: nil)
+        }
         showError = false
     }
     
@@ -59,7 +64,9 @@ internal struct ContentView: View {
             audioLevel: audioRecorder.audioLevel,
             streamingDraftText: streamingDraftText,
             onTap: {
-                if audioRecorder.isRecording {
+                if audioRecorder.sessionState.phase == .processing {
+                    cancelCurrentSession()
+                } else if audioRecorder.isRecording {
                     stopAndProcess()
                 } else if showSuccess {
                     if TranscriptionSettingsStore.shared.isSmartPasteEnabled {
@@ -99,7 +106,8 @@ internal struct ContentView: View {
         .focusable(false)
         .onAppear { handleOnAppear() }
         .onDisappear { handleOnDisappear() }
-        .onChange(of: audioRecorder.isRecording) { _, _ in
+        .onChange(of: audioRecorder.isRecording) { _, recording in
+            if recording { showSuccess = false; streamingDraftText = "" }
             updateStatus()
         }
         .onChange(of: isProcessing) { _, _ in

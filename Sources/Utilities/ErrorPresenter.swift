@@ -34,7 +34,7 @@ internal class ErrorPresenter {
         queue.sync { _isTestEnvironment = AppEnvironment.isRunningTests }
     }
     
-    func showError(_ message: String) {
+    func showError(_ message: String, onDismiss: (() -> Void)? = nil) {
         // Sanitize input to prevent sensitive data leakage
         let sanitizedMessage = sanitizeErrorMessage(message)
         
@@ -44,6 +44,7 @@ internal class ErrorPresenter {
         // Ensure we're on the main thread for UI operations
         Task { @MainActor in
             await showAlertOnMainThread(sanitizedMessage)
+            onDismiss?()
         }
     }
     
@@ -94,7 +95,8 @@ internal class ErrorPresenter {
     private func getErrorType(from message: String) -> String? {
         let lowercasedMessage = message.lowercased()
         
-        for (errorType, patterns) in errorPatterns {
+        for errorType in ["transcription", "api_key", "microphone", "connection"] {
+            let patterns = errorPatterns[errorType] ?? []
             if patterns.contains(where: { lowercasedMessage.contains($0) }) {
                 return errorType
             }
